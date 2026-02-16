@@ -1,0 +1,34 @@
+# Garmin Connect Sync - Cron Schedule Examples
+# Add to your crontab with: crontab -e
+
+# Daily sync at 2:00 AM
+0 2 * * * /path/to/garmin-connect-sync/cron/sync-cron.sh
+
+# Daily sync at 6:00 AM
+0 6 * * * /path/to/garmin-connect-sync/cron/sync-cron.sh
+
+# Twice daily: 6 AM and 6 PM
+0 6,18 * * * /path/to/garmin-connect-sync/cron/sync-cron.sh
+
+# Every 6 hours
+0 */6 * * * /path/to/garmin-connect-sync/cron/sync-cron.sh
+
+# Notes:
+# - Replace /path/to/garmin-connect-sync with your actual project path
+# - Ensure sync-cron.sh is executable: chmod +x cron/sync-cron.sh
+# - Logs are written to logs/cron-sync.log
+# - Sync runs incrementally by default (only new data)
+
+# To install:
+# 1. Make the script executable:
+#    chmod +x /path/to/garmin-connect-sync/cron/sync-cron.sh
+#
+# 2. Edit your crontab:
+#    crontab -e
+#
+# 3. Add one of the schedule lines above (adjust path)
+#
+# 4. Save and exit
+#
+# 5. Verify cron is running:
+#    crontab -l

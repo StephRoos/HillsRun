@@ -1,0 +1,59 @@
+# Garmin Connect to PostgreSQL - Configuration File
+# Copy this file to config.yaml and adjust values
+
+# Database Configuration
+database:
+  host: postgres  # Use 'localhost' for local development, 'postgres' for Docker
+  port: 5432
+  database: garmin_connect
+  user: garmin
+  password: ${POSTGRES_PASSWORD}  # Will be read from environment variable
+  pool_min_size: 1
+  pool_max_size: 10
+
+# Garmin Connect Configuration
+garmin:
+  # Path to Garmin tokens directory (where OAuth tokens are stored)
+  # Default: ~/.garminconnect
+  tokens_dir: ~/.garminconnect
+
+  # Optional: Email and password (not needed if tokens exist)
+  # email: your.email@example.com
+  # password: your_password
+
+# Synchronization Configuration
+sync:
+  # Categories to synchronize
+  # Available: daily_health, activities, body_composition, advanced_metrics, wellness
+  categories:
+    - daily_health
+    - activities
+    - body_composition
+    - advanced_metrics
+    - wellness
+
+  # Sync mode: 'incremental' or 'full'
+  # - incremental: Only sync new data since last sync
+  # - full: Sync all data within days_back window
+  mode: incremental
+
+  # Number of days to go back for full sync
+  days_back: 90
+
+  # Rate limiting: delay between API calls (seconds)
+  # Recommended: 0.5-1.0 to avoid rate limits
+  rate_limit_delay: 0.5
+
+# Logging Configuration
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: INFO
+
+  # Log directory (relative to project root)
+  log_dir: logs
+
+  # Enable console logging
+  log_to_console: true
+
+  # Enable file logging
+  log_to_file: true

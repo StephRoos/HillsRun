@@ -1,0 +1,11 @@
+# Core dependencies
+garminconnect>=0.2.19
+asyncpg>=0.29.0
+pyyaml>=6.0.1
+tenacity>=8.2.3
+python-dateutil>=2.8.2
+pytz>=2024.1
+
+# Additional dependencies from garminconnect
+garth>=0.4.46
+requests>=2.31.0
