@@ -308,6 +308,16 @@ Contributions are welcome! Please:
 
 [Your chosen license]
 
+## Current Deployment
+
+Successfully deployed on **Ugreen NAS** (ARM64) with automated daily sync:
+
+- **Host**: `192.168.129.21`, PostgreSQL on port `15432`
+- **Sync schedule**: Daily at 06:00 (Europe/Paris) via Docker scheduler
+- **Data**: 90 days of historical data across all 5 categories (387 records, 63k+ heart rate samples)
+
+See [docs/SETUP.md](docs/SETUP.md#ugreen-nas-tested--deployed) for full NAS deployment guide.
+
 ## Acknowledgments
 
 - Built with [python-garminconnect](https://github.com/cyberjunky/python-garminconnect)

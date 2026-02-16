@@ -483,6 +483,94 @@ Common issues and solutions for the Garmin Connect sync application.
 
 ---
 
+## NAS Deployment Issues
+
+### Error: `'NoneType' object has no attribute 'get'` on profile
+
+**Symptom**: SyncManager crashes trying to read user profile at startup.
+
+**Cause**: `garth.Client().load()` approach requires setting `display_name` manually on the Garmin client. The profile is fetched via `garth_client.profile`, not via the garminconnect `get_user_profile()` method.
+
+**Solution**: The `garmin_client.py` `connect()` method now uses:
+```python
+garth_client = garth.Client()
+garth_client.load(tokens_dir)
+self.client = Garmin()
+self.client.garth = garth_client
+prof = garth_client.profile
+self.client.display_name = prof.get("displayName")
+```
+
+### Error: `'list' object has no attribute 'get'`
+
+**Symptom**: Fetchers crash when processing API responses.
+
+**Cause**: Some Garmin API endpoints return a JSON list `[{...}]` instead of a dict `{...}`. This varies by account and endpoint.
+
+**Solution**: All fetchers use `_ensure_dict()` to handle both formats:
+```python
+@staticmethod
+def _ensure_dict(data):
+    if isinstance(data, dict):
+        return data
+    if isinstance(data, list) and data and isinstance(data[0], dict):
+        return data[0]
+    return None
+```
+
+### Error: `numeric field overflow` in body_composition
+
+**Symptom**: Database insert fails with numeric overflow for weight, bone_mass, or muscle_mass columns.
+
+**Cause**: Garmin API returns weight and mass values in **grams** (e.g., `82345` for 82.345 kg), which overflows `NUMERIC(5,2)` columns.
+
+**Solution**:
+1. Widened schema columns to `NUMERIC(10,2)`
+2. Added grams-to-kg conversion in `body_comp.py` with per-field thresholds:
+   - Weight: threshold 500 (values > 500 are treated as grams)
+   - Bone mass: threshold 100
+   - Muscle mass: threshold 200
+
+### Error: `startdate must be a string`
+
+**Symptom**: `get_weigh_ins()` or `get_body_composition()` fails with type error.
+
+**Cause**: These methods expect ISO date strings, not `date` objects.
+
+**Solution**: Pass `.isoformat()` when calling these Garmin API methods.
+
+### Error: `unsupported operand type(s) for /: 'str' and 'float'`
+
+**Symptom**: Timestamp parsing fails in body battery or sleep data.
+
+**Cause**: Some timestamps are ISO strings (e.g., `"2025-01-15T..."`) while others are millisecond integers. The parser only handled one format.
+
+**Solution**: `_parse_timestamp()` now handles both:
+```python
+if isinstance(value, (int, float)):
+    return datetime.fromtimestamp(value / 1000.0)
+if isinstance(value, str):
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+```
+
+### NAS crontab permission denied
+
+**Symptom**: `crontab -e` fails with permission denied on Ugreen NAS.
+
+**Solution**: Use a Docker-based scheduler container instead. See [SETUP.md](SETUP.md#7-automated-daily-sync-docker-scheduler) for the `garmin-scheduler` service configuration.
+
+### SSH key authentication fails on NAS
+
+**Symptom**: `ssh-copy-id` doesn't work, or pasted keys get line-wrapped.
+
+**Solution**: Use pipe-based key transfer:
+```bash
+cat ~/.ssh/id_rsa.pub | ssh Steph@192.168.129.21 \
+  "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+```
+
+---
+
 ## Getting Help
 
 If issues persist:

@@ -378,11 +378,161 @@ systemctl --user list-timers
 
 Similar to Synology, using Container Station for Docker management.
 
-### Ugreen NAS
+### Ugreen NAS (Tested & Deployed)
 
-1. Install Docker via app store
-2. Use SSH or terminal for setup
-3. Follow standard Docker deployment steps
+Successfully deployed on Ugreen NAS (ARM64) at `192.168.129.21`.
+
+#### 1. SSH Access Setup
+
+```bash
+# Copy SSH key for passwordless access
+cat ~/.ssh/id_rsa.pub | ssh Steph@192.168.129.21 \
+  "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+```
+
+> **Note**: `ssh-copy-id` may not work on Ugreen NAS. Use the `cat` pipe method above.
+
+#### 2. Docker Group Permissions
+
+```bash
+# Add user to docker group to avoid sudo
+ssh Steph@192.168.129.21 "sudo usermod -aG docker Steph"
+# Log out and back in for group change to take effect
+```
+
+#### 3. Deploy Files
+
+```bash
+# From development machine, transfer project files
+cd /home/steph/Projects/HillsRun
+tar czf - --exclude='.venv' --exclude='__pycache__' --exclude='.git' \
+  src/ config/ sql/ scripts/ main.py pyproject.toml requirements.txt Dockerfile docker-compose.yml .env | \
+  ssh Steph@192.168.129.21 "mkdir -p /volume1/docker/garmin-sync && cd /volume1/docker/garmin-sync && tar xzf -"
+```
+
+#### 4. Configure Environment
+
+On the NAS, create/edit `/volume1/docker/garmin-sync/.env`:
+
+```bash
+POSTGRES_DB=garmin_connect
+POSTGRES_USER=garmin
+POSTGRES_PASSWORD=your_secure_password
+POSTGRES_PORT=15432
+GARMIN_TOKENS_DIR=/home/Steph/.garminconnect
+LOG_LEVEL=INFO
+TZ=Europe/Paris
+```
+
+> **Important**: `GARMIN_TOKENS_DIR` must point to the NAS user's Garmin tokens directory (`/home/Steph/.garminconnect`), not the dev machine's.
+
+#### 5. Garmin Authentication on NAS
+
+```bash
+ssh Steph@192.168.129.21
+pip install garth
+python3 -c "
+import garth
+garth.login('your.email@example.com', 'your_password')
+garth.save('/home/Steph/.garminconnect')
+"
+```
+
+#### 6. Build and Start
+
+```bash
+ssh Steph@192.168.129.21
+cd /volume1/docker/garmin-sync
+
+# Start PostgreSQL
+docker compose up -d postgres
+sleep 10
+
+# Initialize schema
+docker compose exec postgres psql -U garmin -d garmin_connect -f /docker-entrypoint-initdb.d/01_schema.sql
+
+# Build and run first sync
+docker compose build garmin-sync
+docker compose --profile sync run --rm garmin-sync --full
+```
+
+#### 7. Automated Daily Sync (Docker Scheduler)
+
+Since NAS crontab may be locked, use a Docker-based scheduler:
+
+Create `cron-entrypoint.sh`:
+```bash
+#!/bin/bash
+echo "Garmin sync scheduler started (TZ=${TZ:-UTC})"
+while true; do
+  CURRENT_HOUR=$(date +%H)
+  CURRENT_MIN=$(date +%M)
+  if [ "$CURRENT_HOUR" = "06" ] && [ "$CURRENT_MIN" = "00" ]; then
+    echo "[$(date)] Running daily Garmin sync..."
+    cd /app && python main.py 2>&1
+    echo "[$(date)] Sync complete"
+    sleep 120
+  fi
+  sleep 30
+done
+```
+
+Add to `docker-compose.yml`:
+```yaml
+  garmin-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: garmin-scheduler
+    entrypoint: ["/bin/bash", "/app/cron-entrypoint.sh"]
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-garmin_connect}
+      POSTGRES_USER: ${POSTGRES_USER:-garmin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      GARMIN_TOKENS_DIR: /tokens
+      CONFIG_PATH: /app/config/config.yaml
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      TZ: ${TZ:-Europe/Paris}
+    volumes:
+      - ${GARMIN_TOKENS_DIR:-~/.garminconnect}:/tokens:ro
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+      - ./cron-entrypoint.sh:/app/cron-entrypoint.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - garmin-network
+```
+
+Start the scheduler:
+```bash
+docker compose up -d garmin-scheduler
+```
+
+#### 8. Access Database from VS Code
+
+Install the **Database Client** extension in VS Code and connect:
+
+- **Server Type**: PostgreSQL
+- **Host**: 192.168.129.21
+- **Port**: 15432
+- **User**: garmin
+- **Password**: (from .env)
+- **Database**: garmin_connect
+
+#### Deployment Results
+
+First full sync (90 days) successfully stored:
+- **387 total records** across all 5 categories
+- **91 daily health** summaries + **63,472 heart rate** samples
+- **60 activities**
+- **54 body composition** records
+- **91 advanced metrics** days (HRV, SpO2, VO2 Max, respiration)
+- **91 wellness/hydration** records
 
 ## Verification Checklist
 
