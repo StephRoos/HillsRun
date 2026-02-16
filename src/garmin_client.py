@@ -33,16 +33,22 @@ class GarminClient:
     def connect(self) -> None:
         """Connect to Garmin Connect using stored tokens."""
         try:
-            # Configure garth to use custom tokens directory
-            garth.resume(self.config.tokens_dir)
-            logger.info(f"Loaded Garmin tokens from {self.config.tokens_dir}")
+            tokens_dir = str(self.config.tokens_dir)
 
-            # Initialize Garmin client without credentials (using tokens)
+            # Create a garth client and load tokens into it
+            garth_client = garth.Client()
+            garth_client.load(tokens_dir)
+            logger.info(f"Loaded Garmin tokens from {tokens_dir}")
+
+            # Initialize Garmin client and inject our configured garth client
             self.client = Garmin()
+            self.client.garth = garth_client
 
-            # Test connection
-            self.client.get_user_profile()
-            logger.info("Successfully connected to Garmin Connect")
+            # Fetch profile to set display_name (required for API URL paths)
+            prof = garth_client.profile
+            self.client.display_name = prof.get("displayName")
+            self.client.full_name = prof.get("fullName")
+            logger.info(f"Successfully connected to Garmin Connect as {self.client.display_name}")
 
         except FileNotFoundError:
             logger.error(
@@ -168,7 +174,7 @@ class GarminClient:
             List of weigh-in records
         """
         self._rate_limit()
-        return self.client.get_weigh_ins(start_date, end_date)
+        return self.client.get_weigh_ins(start_date.isoformat(), end_date.isoformat())
 
     @safe_api_call
     @retry_api_call
@@ -183,7 +189,7 @@ class GarminClient:
             Body composition data
         """
         self._rate_limit()
-        return self.client.get_body_composition(start_date, end_date)
+        return self.client.get_body_composition(start_date.isoformat(), end_date.isoformat())
 
     # ============================================
     # Advanced Metrics
@@ -342,4 +348,4 @@ class GarminClient:
             List of blood pressure readings
         """
         self._rate_limit()
-        return self.client.get_blood_pressure(start_date, end_date)
+        return self.client.get_blood_pressure(start_date.isoformat(), end_date.isoformat())

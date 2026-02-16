@@ -50,9 +50,13 @@ class SyncManager:
         if not success:
             raise Exception(f"Failed to get user profile: {error}")
 
-        # Extract user info (format varies, use safe defaults)
-        garmin_user_id = str(profile.get("userId") or profile.get("displayName") or "unknown")
-        display_name = profile.get("displayName")
+        # Extract user info - get_full_name() returns a string or dict
+        if isinstance(profile, dict):
+            garmin_user_id = str(profile.get("userId") or profile.get("displayName") or "unknown")
+            display_name = profile.get("displayName")
+        else:
+            garmin_user_id = str(profile) if profile else "unknown"
+            display_name = str(profile) if profile else None
 
         self.user_id = await self.db.get_or_create_user(
             garmin_user_id=garmin_user_id,

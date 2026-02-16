@@ -18,6 +18,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # Copy application code
 COPY src/ ./src/
+COPY main.py ./
 COPY config/ ./config/
 
 # Create directories for logs and tokens
@@ -28,4 +29,4 @@ ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
 # Default command
-CMD ["python", "-m", "src.main"]
+CMD ["python", "main.py"]

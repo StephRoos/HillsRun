@@ -49,23 +49,20 @@ class DailyHealthFetcher(BaseFetcher):
                 # Fetch daily summary
                 await self._fetch_daily_summary(current_date, date_str)
                 records_count += 1
-
-                # Fetch heart rate data
-                await self._fetch_heart_rate(current_date, date_str)
-
-                # Fetch sleep data
-                await self._fetch_sleep(current_date, date_str)
-
-                # Fetch stress data
-                await self._fetch_stress(current_date, date_str)
-
-                # Fetch body battery
-                await self._fetch_body_battery(current_date, date_str)
-
             except Exception as e:
-                error_msg = f"Error fetching daily health for {date_str}: {e}"
-                logger.error(error_msg)
-                errors.append(error_msg)
+                logger.error(f"Error fetching daily summary for {date_str}: {e}")
+                errors.append(str(e))
+
+            for name, method in [
+                ("heart_rate", self._fetch_heart_rate),
+                ("sleep", self._fetch_sleep),
+                ("stress", self._fetch_stress),
+                ("body_battery", self._fetch_body_battery),
+            ]:
+                try:
+                    await method(current_date, date_str)
+                except Exception as e:
+                    logger.warning(f"Error fetching {name} for {date_str}: {e}")
 
             current_date += timedelta(days=1)
 
@@ -75,6 +72,15 @@ class DailyHealthFetcher(BaseFetcher):
 
         return records_count, error_message
 
+    @staticmethod
+    def _ensure_dict(data) -> Optional[Dict[str, Any]]:
+        """Ensure data is a dict. If it's a list, take first element."""
+        if isinstance(data, dict):
+            return data
+        if isinstance(data, list) and data and isinstance(data[0], dict):
+            return data[0]
+        return None
+
     async def _fetch_daily_summary(self, current_date: date, date_str: str) -> None:
         """Fetch and store daily summary."""
         success, data, error = self.garmin_client.get_user_summary(date_str)
@@ -83,6 +89,7 @@ class DailyHealthFetcher(BaseFetcher):
             logger.warning(f"Failed to get daily summary for {date_str}: {error}")
             return
 
+        data = self._ensure_dict(data)
         if not data:
             logger.debug(f"No daily summary data for {date_str}")
             return
@@ -129,6 +136,7 @@ class DailyHealthFetcher(BaseFetcher):
             logger.warning(f"Failed to get heart rates for {date_str}: {error}")
             return
 
+        data = self._ensure_dict(data)
         if not data:
             logger.debug(f"No heart rate data for {date_str}")
             return
@@ -148,17 +156,25 @@ class DailyHealthFetcher(BaseFetcher):
         if not hr_values:
             return samples
 
-        # Try to parse the values
         for entry in hr_values:
-            timestamp_ms = entry.get("timestamp")
-            hr_value = entry.get("heartRate")
+            try:
+                if isinstance(entry, dict):
+                    timestamp_ms = entry.get("timestamp")
+                    hr_value = entry.get("heartRate")
+                elif isinstance(entry, (list, tuple)) and len(entry) >= 2:
+                    timestamp_ms = entry[0]
+                    hr_value = entry[1]
+                else:
+                    continue
 
-            if timestamp_ms and hr_value:
-                timestamp = datetime.fromtimestamp(timestamp_ms / 1000.0)
-                samples.append({
-                    "timestamp": timestamp,
-                    "heart_rate": hr_value,
-                })
+                if timestamp_ms and hr_value and hr_value > 0:
+                    timestamp = datetime.fromtimestamp(timestamp_ms / 1000.0)
+                    samples.append({
+                        "timestamp": timestamp,
+                        "heart_rate": hr_value,
+                    })
+            except (TypeError, ValueError, IndexError):
+                continue
 
         return samples
 
@@ -170,6 +186,7 @@ class DailyHealthFetcher(BaseFetcher):
             logger.warning(f"Failed to get sleep data for {date_str}: {error}")
             return
 
+        data = self._ensure_dict(data)
         if not data:
             logger.debug(f"No sleep data for {date_str}")
             return
@@ -184,13 +201,8 @@ class DailyHealthFetcher(BaseFetcher):
         daily_sleep_dto = data.get("dailySleepDTO", {})
         sleep_movement = data.get("sleepMovement", [])
 
-        # Parse timestamps
-        sleep_start = None
-        sleep_end = None
-        if daily_sleep_dto.get("sleepStartTimestampGMT"):
-            sleep_start = datetime.fromtimestamp(daily_sleep_dto["sleepStartTimestampGMT"] / 1000.0)
-        if daily_sleep_dto.get("sleepEndTimestampGMT"):
-            sleep_end = datetime.fromtimestamp(daily_sleep_dto["sleepEndTimestampGMT"] / 1000.0)
+        sleep_start = self._parse_timestamp(daily_sleep_dto.get("sleepStartTimestampGMT"))
+        sleep_end = self._parse_timestamp(daily_sleep_dto.get("sleepEndTimestampGMT"))
 
         return {
             "calendar_date": calendar_date,
@@ -214,6 +226,7 @@ class DailyHealthFetcher(BaseFetcher):
             logger.warning(f"Failed to get stress data for {date_str}: {error}")
             return
 
+        data = self._ensure_dict(data)
         if not data:
             logger.debug(f"No stress data for {date_str}")
             return
@@ -246,6 +259,7 @@ class DailyHealthFetcher(BaseFetcher):
             logger.warning(f"Failed to get body battery for {date_str}: {error}")
             return
 
+        data = self._ensure_dict(data)
         if not data:
             logger.debug(f"No body battery data for {date_str}")
             return
@@ -255,15 +269,25 @@ class DailyHealthFetcher(BaseFetcher):
         await self.db.upsert_body_battery(self.user_id, bb_data)
         logger.debug(f"Stored body battery data for {date_str}")
 
+    @staticmethod
+    def _parse_timestamp(value) -> Optional[datetime]:
+        """Parse a timestamp that may be int (ms) or ISO string."""
+        if not value:
+            return None
+        try:
+            if isinstance(value, (int, float)):
+                return datetime.fromtimestamp(value / 1000.0)
+            if isinstance(value, str):
+                # Try ISO format
+                return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except (ValueError, OSError):
+            pass
+        return None
+
     def _transform_body_battery_data(self, calendar_date: date, data: Dict[str, Any]) -> Dict[str, Any]:
         """Transform body battery data for database."""
-        # Parse timestamps
-        start_ts = None
-        end_ts = None
-        if data.get("startTimestampGMT"):
-            start_ts = datetime.fromtimestamp(data["startTimestampGMT"] / 1000.0)
-        if data.get("endTimestampGMT"):
-            end_ts = datetime.fromtimestamp(data["endTimestampGMT"] / 1000.0)
+        start_ts = self._parse_timestamp(data.get("startTimestampGMT"))
+        end_ts = self._parse_timestamp(data.get("endTimestampGMT"))
 
         return {
             "calendar_date": calendar_date,

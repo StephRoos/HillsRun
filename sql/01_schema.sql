@@ -146,16 +146,16 @@ CREATE TABLE IF NOT EXISTS body_composition (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT REFERENCES garmin_user(user_id) ON DELETE CASCADE,
     timestamp TIMESTAMPTZ NOT NULL,
-    weight_kg NUMERIC(6, 2),
-    bmi NUMERIC(5, 2),
-    body_fat_percentage NUMERIC(5, 2),
-    body_water_percentage NUMERIC(5, 2),
-    bone_mass_kg NUMERIC(5, 2),
-    muscle_mass_kg NUMERIC(6, 2),
+    weight_kg NUMERIC(10, 2),
+    bmi NUMERIC(10, 2),
+    body_fat_percentage NUMERIC(10, 2),
+    body_water_percentage NUMERIC(10, 2),
+    bone_mass_kg NUMERIC(10, 2),
+    muscle_mass_kg NUMERIC(10, 2),
     metabolic_age INTEGER,
     visceral_fat_rating INTEGER,
-    basal_met NUMERIC(7, 2), -- Basal metabolic rate
-    active_met NUMERIC(7, 2), -- Active metabolic rate
+    basal_met NUMERIC(10, 2), -- Basal metabolic rate
+    active_met NUMERIC(10, 2), -- Active metabolic rate
     physique_rating INTEGER,
     source_type VARCHAR(50), -- manual, scale, estimate
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,

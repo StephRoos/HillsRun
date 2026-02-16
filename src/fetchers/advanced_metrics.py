@@ -3,7 +3,7 @@
 import logging
 import json
 from datetime import date, timedelta, datetime
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional, Tuple, Dict, Any, List
 
 from .base import BaseFetcher
 
@@ -73,6 +73,15 @@ class AdvancedMetricsFetcher(BaseFetcher):
 
         return records_count, error_message
 
+    @staticmethod
+    def _ensure_dict(data) -> Optional[Dict[str, Any]]:
+        """Ensure data is a dict. If it's a list, take first element."""
+        if isinstance(data, dict):
+            return data
+        if isinstance(data, list) and data and isinstance(data[0], dict):
+            return data[0]
+        return None
+
     async def _fetch_hrv(self, current_date: date, date_str: str) -> None:
         """Fetch and store HRV data."""
         success, data, error = self.garmin_client.get_hrv_data(date_str)
@@ -81,6 +90,7 @@ class AdvancedMetricsFetcher(BaseFetcher):
             logger.debug(f"No HRV data for {date_str}: {error}")
             return
 
+        data = self._ensure_dict(data)
         if not data:
             return
 
@@ -108,6 +118,7 @@ class AdvancedMetricsFetcher(BaseFetcher):
             logger.debug(f"No SpO2 data for {date_str}: {error}")
             return
 
+        data = self._ensure_dict(data)
         if not data:
             return
 
@@ -140,6 +151,7 @@ class AdvancedMetricsFetcher(BaseFetcher):
             logger.debug(f"No fitness metrics for {date_str}: {error}")
             return
 
+        data = self._ensure_dict(data)
         if not data:
             return
 
@@ -168,6 +180,7 @@ class AdvancedMetricsFetcher(BaseFetcher):
             logger.debug(f"No respiration data for {date_str}: {error}")
             return
 
+        data = self._ensure_dict(data)
         if not data:
             return
 

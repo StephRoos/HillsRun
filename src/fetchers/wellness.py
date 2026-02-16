@@ -71,7 +71,9 @@ class WellnessFetcher(BaseFetcher):
             logger.debug(f"No hydration data for {date_str}: {error}")
             return
 
-        if not data:
+        if isinstance(data, list):
+            data = data[0] if data and isinstance(data[0], dict) else None
+        if not data or not isinstance(data, dict):
             return
 
         # Transform and store
