@@ -32,8 +32,8 @@ class DailySummary(BaseModel):
     active_calories: Optional[int] = None
     bmr_calories: Optional[int] = None
     total_calories: Optional[int] = None
-    floors_ascended: Optional[int] = None
-    floors_descended: Optional[int] = None
+    floors_ascended: Optional[float] = None
+    floors_descended: Optional[float] = None
     moderate_intensity_minutes: Optional[int] = None
     vigorous_intensity_minutes: Optional[int] = None
     highly_active_seconds: Optional[int] = None
@@ -152,6 +152,19 @@ class RespirationData(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class TrainingReadiness(BaseModel):
+    calendar_date: date
+    score: Optional[int] = None
+    score_feedback: Optional[str] = None
+    hrv_status: Optional[str] = None
+    sleep_score: Optional[int] = None
+    recent_training_load: Optional[int] = None
+    acute_load: Optional[float] = None
+    chronic_load: Optional[float] = None
+
+    model_config = {"from_attributes": True}
+
+
 class Activity(BaseModel):
     activity_id: int
     activity_name: Optional[str] = None
@@ -171,6 +184,8 @@ class Activity(BaseModel):
     vo2_max_value: Optional[float] = None
     device_name: Optional[str] = None
     num_laps: Optional[int] = None
+    aerobic_training_effect: Optional[float] = None
+    anaerobic_training_effect: Optional[float] = None
 
     model_config = {"from_attributes": True}
 

@@ -9,10 +9,16 @@ def get_db(request: Request):
     return request.app.state.db
 
 
-def get_user_id(request: Request) -> int:
+async def get_user_id(request: Request) -> int:
     user_id = request.app.state.user_id
     if user_id is None:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="No user found in database")
+        # User may have been created by a sync after API startup — retry once
+        db = request.app.state.db
+        user_id = await db.query_first_user()
+        if user_id is not None:
+            request.app.state.user_id = user_id
+        else:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="No user found in database")
     return user_id
 
 

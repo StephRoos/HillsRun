@@ -11,6 +11,8 @@ dependencies = [
     "tenacity>=8.2.3",
     "python-dateutil>=2.8.2",
     "pytz>=2024.1",
+    "streamlit>=1.54.0",
+    "plotly>=6.5.2",
 ]
 
 [project.optional-dependencies]

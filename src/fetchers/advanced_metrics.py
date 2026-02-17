@@ -58,6 +58,9 @@ class AdvancedMetricsFetcher(BaseFetcher):
                 # Fetch respiration data
                 await self._fetch_respiration(current_date, date_str)
 
+                # Fetch training readiness
+                await self._fetch_training_readiness(current_date, date_str)
+
                 records_count += 1
 
             except Exception as e:
@@ -94,8 +97,14 @@ class AdvancedMetricsFetcher(BaseFetcher):
         if not data:
             return
 
+        # HRV response wraps summary under "hrvSummary"
+        summary = data.get("hrvSummary")
+        if not summary:
+            logger.debug(f"No hrvSummary in HRV data for {date_str}")
+            return
+
         # Transform and store
-        hrv_data = self._transform_hrv_data(current_date, data)
+        hrv_data = self._transform_hrv_data(current_date, summary)
         await self.db.upsert_hrv_data(self.user_id, hrv_data)
         logger.debug(f"Stored HRV data for {date_str}")
 
@@ -198,3 +207,28 @@ class AdvancedMetricsFetcher(BaseFetcher):
             "min_waking_respiration_rate": data.get("minWakingRespirationRate"),
             "avg_sleep_respiration_rate": data.get("avgSleepRespirationRate"),
         }
+
+    async def _fetch_training_readiness(self, current_date: date, date_str: str) -> None:
+        """Fetch and store training readiness data."""
+        success, data, error = self.garmin_client.get_training_readiness(date_str)
+
+        if not success:
+            logger.debug(f"No training readiness for {date_str}: {error}")
+            return
+
+        data = self._ensure_dict(data)
+        if not data:
+            return
+
+        tr_data = {
+            "calendar_date": current_date,
+            "score": data.get("score") or data.get("readinessScore"),
+            "score_feedback": data.get("scoreFeedback") or data.get("readinessFeedback"),
+            "hrv_status": data.get("hrvStatus"),
+            "sleep_score": data.get("sleepScore") or data.get("sleepScoreValue"),
+            "recent_training_load": data.get("recentTrainingLoad") or data.get("acuteTrainingLoad"),
+            "acute_load": data.get("acuteLoad") or data.get("acuteTrainingLoadScore"),
+            "chronic_load": data.get("chronicLoad") or data.get("chronicTrainingLoad"),
+        }
+        await self.db.upsert_training_readiness(self.user_id, tr_data)
+        logger.debug(f"Stored training readiness for {date_str}")

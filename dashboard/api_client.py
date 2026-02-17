@@ -65,6 +65,137 @@ def list_jobs(limit: int = 10) -> List[Dict]:
     return _get("/api/v1/sync/jobs", params={"limit": limit})
 
 
+# --- Data endpoints ---
+
+
+def _date_params(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 50,
+    **extra: Any,
+) -> Dict[str, Any]:
+    """Build common query params for data endpoints."""
+    params: Dict[str, Any] = {"limit": limit}
+    if start_date:
+        params["start_date"] = start_date
+    if end_date:
+        params["end_date"] = end_date
+    params.update({k: v for k, v in extra.items() if v is not None})
+    return params
+
+
+# Daily health
+
+def get_daily_summary(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 50,
+) -> List[Dict]:
+    """Get daily summary data."""
+    params = _date_params(start_date, end_date, limit)
+    return _get("/api/v1/daily/summary", params=params)["data"]
+
+
+def get_sleep_data(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 50,
+) -> List[Dict]:
+    """Get sleep data."""
+    params = _date_params(start_date, end_date, limit)
+    return _get("/api/v1/daily/sleep", params=params)["data"]
+
+
+def get_stress_data(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 50,
+) -> List[Dict]:
+    """Get stress data."""
+    params = _date_params(start_date, end_date, limit)
+    return _get("/api/v1/daily/stress", params=params)["data"]
+
+
+def get_body_battery(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 50,
+) -> List[Dict]:
+    """Get body battery data."""
+    params = _date_params(start_date, end_date, limit)
+    return _get("/api/v1/daily/body-battery", params=params)["data"]
+
+
+def get_heart_rate(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 200,
+) -> List[Dict]:
+    """Get heart rate samples."""
+    params = _date_params(start_date, end_date, limit)
+    return _get("/api/v1/daily/heart-rate", params=params)["data"]
+
+
+# Body & metrics
+
+def get_body_composition(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 50,
+) -> List[Dict]:
+    """Get body composition data."""
+    params = _date_params(start_date, end_date, limit)
+    return _get("/api/v1/body/composition", params=params)["data"]
+
+
+def get_hrv_data(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 50,
+) -> List[Dict]:
+    """Get HRV data."""
+    params = _date_params(start_date, end_date, limit)
+    return _get("/api/v1/metrics/hrv", params=params)["data"]
+
+
+def get_training_readiness(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 50,
+) -> List[Dict]:
+    """Get training readiness data."""
+    params = _date_params(start_date, end_date, limit)
+    return _get("/api/v1/metrics/training-readiness", params=params)["data"]
+
+
+def get_fitness_metrics(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 50,
+) -> List[Dict]:
+    """Get fitness metrics (VO2max, lactate threshold, etc.)."""
+    params = _date_params(start_date, end_date, limit)
+    return _get("/api/v1/metrics/fitness", params=params)["data"]
+
+
+# Activities
+
+def get_activities(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 50,
+    sport_type: Optional[str] = None,
+) -> List[Dict]:
+    """Get activities list."""
+    params = _date_params(start_date, end_date, limit, sport_type=sport_type)
+    return _get("/api/v1/activities", params=params)["data"]
+
+
+def get_activity(activity_id: int) -> Dict:
+    """Get a single activity detail."""
+    return _get(f"/api/v1/activities/{activity_id}")["data"]
+
+
 # --- Health ---
 
 def health_check() -> Dict:

@@ -531,6 +531,37 @@ class Database:
             data.get("avg_sleep_respiration_rate"),
         )
 
+    async def upsert_training_readiness(self, user_id: int, data: Dict[str, Any]) -> None:
+        """Upsert training readiness data."""
+        query = """
+            INSERT INTO training_readiness (
+                user_id, calendar_date, score, score_feedback, hrv_status,
+                sleep_score, recent_training_load, acute_load, chronic_load
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            ON CONFLICT (user_id, calendar_date) DO UPDATE SET
+                score = EXCLUDED.score,
+                score_feedback = EXCLUDED.score_feedback,
+                hrv_status = EXCLUDED.hrv_status,
+                sleep_score = EXCLUDED.sleep_score,
+                recent_training_load = EXCLUDED.recent_training_load,
+                acute_load = EXCLUDED.acute_load,
+                chronic_load = EXCLUDED.chronic_load,
+                updated_at = CURRENT_TIMESTAMP
+        """
+        await self.pool.execute(
+            query,
+            user_id,
+            data.get("calendar_date"),
+            data.get("score"),
+            data.get("score_feedback"),
+            data.get("hrv_status"),
+            data.get("sleep_score"),
+            data.get("recent_training_load"),
+            data.get("acute_load"),
+            data.get("chronic_load"),
+        )
+
     # ============================================
     # Activity Operations
     # ============================================
@@ -781,6 +812,20 @@ class Database:
         )
         rows = await self.pool.fetch(
             "SELECT * FROM respiration_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3"
+            " ORDER BY calendar_date DESC LIMIT $4 OFFSET $5",
+            user_id, start_date, end_date, limit, offset,
+        )
+        return rows, total
+
+    async def query_training_readiness(
+        self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
+    ):
+        total = await self.pool.fetchval(
+            "SELECT COUNT(*) FROM training_readiness WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
+            user_id, start_date, end_date,
+        )
+        rows = await self.pool.fetch(
+            "SELECT * FROM training_readiness WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3"
             " ORDER BY calendar_date DESC LIMIT $4 OFFSET $5",
             user_id, start_date, end_date, limit, offset,
         )

@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends
 from ..auth import get_api_key
 from ..dependencies import get_db, get_user_id, date_range, pagination
-from ..schemas import HrvData, Spo2Data, FitnessMetrics, RespirationData, make_page
+from ..schemas import HrvData, Spo2Data, FitnessMetrics, RespirationData, TrainingReadiness, make_page
 
 router = APIRouter(prefix="/api/v1/metrics", tags=["metrics"], dependencies=[Depends(get_api_key)])
 
@@ -50,3 +50,14 @@ async def respiration(
 ):
     rows, total = await db.query_respiration_data(user_id, dates[0], dates[1], pages[0], pages[1])
     return make_page(rows, total, pages[0], pages[1], RespirationData)
+
+
+@router.get("/training-readiness")
+async def training_readiness(
+    db=Depends(get_db),
+    user_id: int = Depends(get_user_id),
+    dates=Depends(date_range),
+    pages=Depends(pagination),
+):
+    rows, total = await db.query_training_readiness(user_id, dates[0], dates[1], pages[0], pages[1])
+    return make_page(rows, total, pages[0], pages[1], TrainingReadiness)
