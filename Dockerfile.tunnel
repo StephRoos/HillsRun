@@ -1,0 +1,4 @@
+FROM cloudflare/cloudflared:latest
+# Token is passed via TUNNEL_TOKEN env var at runtime
+# Build for NAS: docker buildx build --platform linux/arm64 -t cloudflared-tunnel:latest -f Dockerfile.tunnel --output type=docker,dest=cloudflared-tunnel-arm64.tar .
+ENTRYPOINT ["sh", "-c", "cloudflared tunnel --no-autoupdate run --token $TUNNEL_TOKEN"]
