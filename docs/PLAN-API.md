@@ -4,9 +4,9 @@
 
 Le projet HillsRun (sync Garmin Connect -> PostgreSQL) est déployé sur un NAS Ugreen et fonctionne en CLI. L'objectif est d'exposer les données via une API REST sécurisée accessible depuis l'extérieur, pour consultation directe et futur dashboard web.
 
-**Infra actuelle** : NAS ARM64 (192.168.129.21), PostgreSQL sur port 15432, ports 80/443 occupés par le serveur web du NAS.
+**Infra actuelle** : NAS Ugreen ARM64 (192.168.129.21), PostgreSQL en container Docker, ports 80/443 occupés par UGOS.
 
-**Approche** : FastAPI (async, cohérent avec asyncpg existant) + auth par API key + reverse proxy NAS pour HTTPS.
+**Approche** : FastAPI (async, cohérent avec asyncpg existant) + auth par API key + Cloudflare Tunnel pour HTTPS externe.
 
 ---
 
@@ -121,12 +121,27 @@ Pas de volume tokens/config nécessaire (read-only sur la DB).
 
 La méthode `validate()` dans `src/config.py:176` vérifie que le répertoire Garmin tokens existe. Le container API n'a pas de tokens. Solution : l'API utilise `Config.from_env()` **sans** appeler `validate()` — seul `config.database` est nécessaire.
 
-## Reverse proxy NAS + HTTPS
+## Accès HTTPS externe : Cloudflare Tunnel
 
-Configuration manuelle dans l'interface du NAS :
-- Source : `https://ton-domaine.com` (port 443)
-- Destination : `http://localhost:8100`
-- Le NAS gère le certificat SSL (Let's Encrypt)
+UGOS n'a pas de reverse proxy intégré. Solution : **Cloudflare Tunnel** (gratuit).
+
+**Prérequis** : domaine géré par Cloudflare (nameservers transférés).
+
+**Architecture** :
+```
+Internet → Cloudflare (HTTPS) → Tunnel → NAS (localhost:8000)
+```
+
+**Container `cloudflared-tunnel`** sur le NAS :
+- Image buildée depuis `Dockerfile.tunnel` (ARM64)
+- Network mode : `host`
+- Variable d'env : `TUNNEL_TOKEN` (généré dans Cloudflare Zero Trust)
+- Le token est embarqué dans l'image déployée sur le NAS
+
+**Configuration Cloudflare** :
+- Zero Trust → Networks → Connectors → tunnel `garmin-api`
+- Public hostname : `api.hillsrun.com` → `http://127.0.0.1:8000`
+- DNS : CNAME `api` créé automatiquement par Cloudflare
 
 ## Ordre d'implémentation
 
@@ -135,15 +150,21 @@ Configuration manuelle dans l'interface du NAS :
 3. ✅ **`src/api/`** — auth, dependencies, schemas, routers (health/daily/body/metrics/activities/wellness/sync), main
 4. ✅ **`Dockerfile.api`** — image Docker pour l'API
 5. ✅ **`docker-compose.yml` + `.env.example`** — service garmin-api ajouté
-6. **Test local** — `docker-compose up -d garmin-api` + curl http://localhost:8100/health
-7. **Deploy NAS** — `git pull` sur le NAS, `docker-compose build garmin-api`, `docker-compose up -d garmin-api`
-8. **Configurer reverse proxy NAS** — Source HTTPS → `http://localhost:8100`
-9. **Test externe** — `curl -H "X-API-Key: ..." https://ton-domaine.com/api/v1/sync/status`
+6. ✅ **Test local** — docker compose up + healthcheck OK, auth 401 vérifié, Swagger UI OK
+7. ✅ **Deploy NAS** — image ARM64 buildée via `docker buildx`, importée via UGOS Docker UI (pas de git sur le NAS)
+8. ✅ **Cloudflare Tunnel** — container `cloudflared-tunnel` (ARM64, mode host) connecté, 4 connexions (Bruxelles + Marseille)
+9. ✅ **Test externe** — `https://api.hillsrun.com/health` → `{"status":"ok"}`, auth 401 sans clé, Swagger UI accessible
+
+### Notes de déploiement NAS
+- Pas de git sur le NAS → images Docker buildées localement (ARM64) et importées via UGOS
+- UGOS ne supporte pas le passage d'arguments CMD → token Cloudflare embarqué dans l'image
+- Containers en mode **host** (pas bridge) pour que cloudflared joigne l'API sur localhost
+- `POSTGRES_HOST=127.0.0.1` avec le port exposé du container postgres
 
 ## Vérification
 
-1. `curl http://localhost:8100/health` → `{"status": "ok"}`
-2. `curl -H "X-API-Key: ..." http://localhost:8100/api/v1/daily/summary` → données paginées
-3. `curl http://localhost:8100/api/v1/daily/summary` (sans clé) → 401
-4. `curl https://ton-domaine.com/api/v1/sync/status -H "X-API-Key: ..."` → état sync depuis l'extérieur
-5. Swagger UI accessible à `https://ton-domaine.com/docs`
+1. ✅ `https://api.hillsrun.com/health` → `{"status": "ok"}`
+2. `curl -H "X-API-Key: ..." https://api.hillsrun.com/api/v1/daily/summary` → données paginées
+3. ✅ `https://api.hillsrun.com/api/v1/daily/summary` (sans clé) → 401
+4. `curl -H "X-API-Key: ..." https://api.hillsrun.com/api/v1/sync/status` → état sync depuis l'extérieur
+5. ✅ Swagger UI accessible à `https://api.hillsrun.com/docs`
