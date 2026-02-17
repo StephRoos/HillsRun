@@ -61,8 +61,13 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-garmin_connect}
       POSTGRES_USER: ${POSTGRES_USER:-garmin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      GARMIN_TOKENS_DIR: /tokens
+      CONFIG_PATH: /app/config/config.yaml
       API_KEY: ${API_KEY}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ${GARMIN_TOKENS_DIR:-~/.garminconnect}:/tokens:ro
+      - ./config:/app/config:ro
     ports:
       - "${API_PORT:-8100}:8000"
     depends_on:
@@ -73,6 +78,23 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+    restart: unless-stopped
+    networks:
+      - garmin-network
+
+  garmin-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    container_name: garmin-dashboard
+    environment:
+      API_BASE_URL: http://garmin-api:8000
+      API_KEY: ${API_KEY}
+    ports:
+      - "${DASHBOARD_PORT:-8501}:8501"
+    depends_on:
+      garmin-api:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - garmin-network

@@ -1,8 +1,9 @@
 """Pydantic response schemas."""
 
 from datetime import date, datetime
+from enum import Enum
 from typing import Any, Generic, List, Optional, TypeVar
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 T = TypeVar("T")
 
@@ -235,6 +236,46 @@ class SyncStatus(BaseModel):
     error_message: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+class SyncTriggerRequest(BaseModel):
+    categories: Optional[List[str]] = Field(
+        None,
+        description="Categories to sync. Defaults to all.",
+        json_schema_extra={"examples": [["daily_health", "activities"]]},
+    )
+    mode: str = Field(
+        "incremental",
+        description="Sync mode: 'incremental' or 'full'",
+    )
+    days_back: int = Field(90, description="Days to look back for full sync")
+    start_date: Optional[date] = Field(None, description="Override start date")
+    end_date: Optional[date] = Field(None, description="Override end date")
+    dry_run: bool = Field(False, description="If true, show what would be synced without writing")
+
+
+class SyncJobStatus(str, Enum):
+    pending = "pending"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+
+
+class SyncJobResponse(BaseModel):
+    job_id: str
+    status: SyncJobStatus
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    request: SyncTriggerRequest
+    result: Optional[dict] = None
+    error: Optional[str] = None
+    logs: List[str] = []
+
+
+class SyncTriggerResponse(BaseModel):
+    job_id: str
+    message: str
 
 
 def make_page(rows, total: int, limit: int, offset: int, schema_class) -> dict:
