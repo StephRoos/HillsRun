@@ -28,5 +28,5 @@ RUN mkdir -p /app/logs
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
-# Default command
-CMD ["python", "main.py"]
+# Default command (use SYNC_ARGS env var to override, e.g. "--full --days-back 90")
+CMD ["sh", "-c", "python main.py $SYNC_ARGS"]
