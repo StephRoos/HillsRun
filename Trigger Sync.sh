@@ -1,0 +1,1 @@
+ssh Steph@192.168.129.21 "cd /volume1/docker/garmin-sync && docker compose --profile sync run --rm garmin-sync"
