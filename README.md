@@ -308,6 +308,74 @@ Contributions are welcome! Please:
 
 [Your chosen license]
 
+## REST API
+
+A read-only REST API (FastAPI) exposes all synced data over HTTP, secured by API key.
+
+### Start the API
+
+```bash
+# Add API_KEY to your .env (see .env.example)
+echo "API_KEY=your_secret_key" >> .env
+
+# Build and start
+docker-compose build garmin-api
+docker-compose up -d garmin-api
+```
+
+### Endpoints
+
+All endpoints are `GET`, authenticated via `X-API-Key` header (except `/health`).
+Default date range: last 30 days. Pagination: `?limit=50&offset=0` (max limit 200).
+
+| Route | Description |
+|-------|-------------|
+| `GET /health` | Health check (no auth) |
+| `GET /api/v1/daily/summary` | Daily health summary |
+| `GET /api/v1/daily/heart-rate` | Intraday heart rate samples |
+| `GET /api/v1/daily/sleep` | Sleep data |
+| `GET /api/v1/daily/stress` | Stress levels |
+| `GET /api/v1/daily/body-battery` | Body battery |
+| `GET /api/v1/body/composition` | Weight, BMI, body fat/muscle |
+| `GET /api/v1/metrics/hrv` | Heart rate variability |
+| `GET /api/v1/metrics/spo2` | Blood oxygen |
+| `GET /api/v1/metrics/fitness` | VO2 Max, fitness age |
+| `GET /api/v1/metrics/respiration` | Respiration rate |
+| `GET /api/v1/activities` | Activities list (filter: `sport_type`, `activity_type`) |
+| `GET /api/v1/activities/{id}` | Activity detail |
+| `GET /api/v1/activities/{id}/splits` | Activity laps/splits |
+| `GET /api/v1/wellness/hydration` | Hydration |
+| `GET /api/v1/sync/status` | Sync state per category |
+
+### Example
+
+```bash
+# Health check
+curl http://localhost:8100/health
+
+# Last 7 days of activities
+curl -H "X-API-Key: your_key" \
+  "http://localhost:8100/api/v1/activities?start_date=2026-02-10&end_date=2026-02-17"
+
+# Paginated daily summary
+curl -H "X-API-Key: your_key" \
+  "http://localhost:8100/api/v1/daily/summary?limit=10&offset=0"
+```
+
+Swagger UI available at `http://localhost:8100/docs`.
+
+### HTTPS via NAS reverse proxy
+
+Configure the NAS reverse proxy:
+- Source: `https://your-domain.com` (port 443)
+- Destination: `http://localhost:8100`
+
+The NAS manages the SSL certificate (Let's Encrypt).
+
+See [docs/PLAN-API.md](docs/PLAN-API.md) for the full API implementation plan.
+
+---
+
 ## Current Deployment
 
 Successfully deployed on **Ugreen NAS** (ARM64) with automated daily sync:

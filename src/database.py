@@ -637,3 +637,208 @@ class Database:
             data.get("hydration_goal_ml"),
             data.get("hydration_entries"),
         )
+
+    # ============================================
+    # Read-Only Query Operations (API)
+    # ============================================
+
+    async def query_first_user(self) -> Optional[int]:
+        """Return the user_id of the first user (single-user setup)."""
+        return await self.pool.fetchval("SELECT user_id FROM garmin_user ORDER BY user_id LIMIT 1")
+
+    async def query_daily_summaries(
+        self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
+    ):
+        total = await self.pool.fetchval(
+            "SELECT COUNT(*) FROM daily_summary WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
+            user_id, start_date, end_date,
+        )
+        rows = await self.pool.fetch(
+            "SELECT * FROM daily_summary WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3"
+            " ORDER BY calendar_date DESC LIMIT $4 OFFSET $5",
+            user_id, start_date, end_date, limit, offset,
+        )
+        return rows, total
+
+    async def query_heart_rate_samples(
+        self, user_id: int, start_date: date, end_date: date, limit: int = 1000, offset: int = 0
+    ):
+        total = await self.pool.fetchval(
+            "SELECT COUNT(*) FROM heart_rate_samples WHERE user_id=$1 AND timestamp::date BETWEEN $2 AND $3",
+            user_id, start_date, end_date,
+        )
+        rows = await self.pool.fetch(
+            "SELECT * FROM heart_rate_samples WHERE user_id=$1 AND timestamp::date BETWEEN $2 AND $3"
+            " ORDER BY timestamp DESC LIMIT $4 OFFSET $5",
+            user_id, start_date, end_date, limit, offset,
+        )
+        return rows, total
+
+    async def query_sleep_data(
+        self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
+    ):
+        total = await self.pool.fetchval(
+            "SELECT COUNT(*) FROM sleep_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
+            user_id, start_date, end_date,
+        )
+        rows = await self.pool.fetch(
+            "SELECT * FROM sleep_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3"
+            " ORDER BY calendar_date DESC LIMIT $4 OFFSET $5",
+            user_id, start_date, end_date, limit, offset,
+        )
+        return rows, total
+
+    async def query_stress_data(
+        self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
+    ):
+        total = await self.pool.fetchval(
+            "SELECT COUNT(*) FROM stress_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
+            user_id, start_date, end_date,
+        )
+        rows = await self.pool.fetch(
+            "SELECT * FROM stress_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3"
+            " ORDER BY calendar_date DESC LIMIT $4 OFFSET $5",
+            user_id, start_date, end_date, limit, offset,
+        )
+        return rows, total
+
+    async def query_body_battery(
+        self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
+    ):
+        total = await self.pool.fetchval(
+            "SELECT COUNT(*) FROM body_battery WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
+            user_id, start_date, end_date,
+        )
+        rows = await self.pool.fetch(
+            "SELECT * FROM body_battery WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3"
+            " ORDER BY calendar_date DESC LIMIT $4 OFFSET $5",
+            user_id, start_date, end_date, limit, offset,
+        )
+        return rows, total
+
+    async def query_body_composition(
+        self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
+    ):
+        total = await self.pool.fetchval(
+            "SELECT COUNT(*) FROM body_composition WHERE user_id=$1 AND timestamp::date BETWEEN $2 AND $3",
+            user_id, start_date, end_date,
+        )
+        rows = await self.pool.fetch(
+            "SELECT * FROM body_composition WHERE user_id=$1 AND timestamp::date BETWEEN $2 AND $3"
+            " ORDER BY timestamp DESC LIMIT $4 OFFSET $5",
+            user_id, start_date, end_date, limit, offset,
+        )
+        return rows, total
+
+    async def query_hrv_data(
+        self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
+    ):
+        total = await self.pool.fetchval(
+            "SELECT COUNT(*) FROM hrv_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
+            user_id, start_date, end_date,
+        )
+        rows = await self.pool.fetch(
+            "SELECT * FROM hrv_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3"
+            " ORDER BY calendar_date DESC LIMIT $4 OFFSET $5",
+            user_id, start_date, end_date, limit, offset,
+        )
+        return rows, total
+
+    async def query_spo2_data(
+        self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
+    ):
+        total = await self.pool.fetchval(
+            "SELECT COUNT(*) FROM spo2_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
+            user_id, start_date, end_date,
+        )
+        rows = await self.pool.fetch(
+            "SELECT * FROM spo2_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3"
+            " ORDER BY calendar_date DESC LIMIT $4 OFFSET $5",
+            user_id, start_date, end_date, limit, offset,
+        )
+        return rows, total
+
+    async def query_fitness_metrics(
+        self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
+    ):
+        total = await self.pool.fetchval(
+            "SELECT COUNT(*) FROM fitness_metrics WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
+            user_id, start_date, end_date,
+        )
+        rows = await self.pool.fetch(
+            "SELECT * FROM fitness_metrics WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3"
+            " ORDER BY calendar_date DESC LIMIT $4 OFFSET $5",
+            user_id, start_date, end_date, limit, offset,
+        )
+        return rows, total
+
+    async def query_respiration_data(
+        self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
+    ):
+        total = await self.pool.fetchval(
+            "SELECT COUNT(*) FROM respiration_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
+            user_id, start_date, end_date,
+        )
+        rows = await self.pool.fetch(
+            "SELECT * FROM respiration_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3"
+            " ORDER BY calendar_date DESC LIMIT $4 OFFSET $5",
+            user_id, start_date, end_date, limit, offset,
+        )
+        return rows, total
+
+    async def query_activities(
+        self,
+        user_id: int,
+        start_date: date,
+        end_date: date,
+        limit: int = 50,
+        offset: int = 0,
+        sport_type: Optional[str] = None,
+        activity_type: Optional[str] = None,
+    ):
+        filters = "user_id=$1 AND start_timestamp::date BETWEEN $2 AND $3"
+        params: list = [user_id, start_date, end_date]
+        if sport_type:
+            params.append(sport_type)
+            filters += f" AND sport_type=${len(params)}"
+        if activity_type:
+            params.append(activity_type)
+            filters += f" AND activity_type=${len(params)}"
+        total = await self.pool.fetchval(f"SELECT COUNT(*) FROM activities WHERE {filters}", *params)
+        params += [limit, offset]
+        rows = await self.pool.fetch(
+            f"SELECT * FROM activities WHERE {filters}"
+            f" ORDER BY start_timestamp DESC LIMIT ${len(params)-1} OFFSET ${len(params)}",
+            *params,
+        )
+        return rows, total
+
+    async def query_activity_by_id(self, activity_id: int):
+        return await self.pool.fetchrow(
+            "SELECT * FROM activities WHERE activity_id=$1", activity_id
+        )
+
+    async def query_activity_splits(self, activity_id: int):
+        return await self.pool.fetch(
+            "SELECT * FROM activity_splits WHERE activity_id=$1 ORDER BY split_index",
+            activity_id,
+        )
+
+    async def query_hydration_data(
+        self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
+    ):
+        total = await self.pool.fetchval(
+            "SELECT COUNT(*) FROM hydration_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
+            user_id, start_date, end_date,
+        )
+        rows = await self.pool.fetch(
+            "SELECT * FROM hydration_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3"
+            " ORDER BY calendar_date DESC LIMIT $4 OFFSET $5",
+            user_id, start_date, end_date, limit, offset,
+        )
+        return rows, total
+
+    async def query_sync_status(self):
+        return await self.pool.fetch(
+            "SELECT * FROM sync_state ORDER BY category"
+        )

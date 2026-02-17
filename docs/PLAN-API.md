@@ -130,14 +130,15 @@ Configuration manuelle dans l'interface du NAS :
 
 ## Ordre d'implémentation
 
-1. **`requirements-api.txt`** — dépendances FastAPI/uvicorn
-2. **`src/database.py`** — ajouter les méthodes query
-3. **`src/api/`** — auth, dependencies, schemas, routers, main
-4. **`Dockerfile.api`** — image Docker pour l'API
-5. **`docker-compose.yml` + `.env`** — ajouter le service
-6. **Test local** — `uvicorn src.api.main:app --reload` + curl
-7. **Deploy NAS** — build, start, configurer reverse proxy
-8. **Test externe** — accès via le domaine HTTPS
+1. ✅ **`requirements-api.txt`** — dépendances FastAPI/uvicorn
+2. ✅ **`src/database.py`** — méthodes query ajoutées (query_* read-only + query_first_user)
+3. ✅ **`src/api/`** — auth, dependencies, schemas, routers (health/daily/body/metrics/activities/wellness/sync), main
+4. ✅ **`Dockerfile.api`** — image Docker pour l'API
+5. ✅ **`docker-compose.yml` + `.env.example`** — service garmin-api ajouté
+6. **Test local** — `docker-compose up -d garmin-api` + curl http://localhost:8100/health
+7. **Deploy NAS** — `git pull` sur le NAS, `docker-compose build garmin-api`, `docker-compose up -d garmin-api`
+8. **Configurer reverse proxy NAS** — Source HTTPS → `http://localhost:8100`
+9. **Test externe** — `curl -H "X-API-Key: ..." https://ton-domaine.com/api/v1/sync/status`
 
 ## Vérification
 
