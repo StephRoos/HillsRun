@@ -89,7 +89,7 @@ export function SecondaryMetrics({ activity }: { activity: ActivityDetail }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+        <CardTitle className="text-sm font-medium">
           Detailed metrics
         </CardTitle>
       </CardHeader>

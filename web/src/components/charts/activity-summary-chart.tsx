@@ -26,7 +26,7 @@ export function SplitsElevationChart({ splits }: { splits: ActivitySplit[] }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+        <CardTitle className="text-sm font-medium">
           D+ par split
         </CardTitle>
       </CardHeader>
@@ -37,7 +37,7 @@ export function SplitsElevationChart({ splits }: { splits: ActivitySplit[] }) {
               x: labels,
               y: elevations,
               type: "bar" as const,
-              marker: { color: "#22c55e" },
+              marker: { color: "#FF8C00" },
               hovertemplate: "%{y:.0f} m<extra></extra>",
             },
           ]}
@@ -66,7 +66,7 @@ export function SplitsPaceChart({ splits }: { splits: ActivitySplit[] }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+        <CardTitle className="text-sm font-medium">
           Allure par split
         </CardTitle>
       </CardHeader>
@@ -77,7 +77,7 @@ export function SplitsPaceChart({ splits }: { splits: ActivitySplit[] }) {
               x: labels,
               y: paces,
               type: "bar" as const,
-              marker: { color: "#3b82f6" },
+              marker: { color: "#0891B2" },
               hovertemplate: "%{y:.1f} min/km<extra></extra>",
             },
           ]}
@@ -110,7 +110,7 @@ export function SplitsHrChart({ splits }: { splits: ActivitySplit[] }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+        <CardTitle className="text-sm font-medium">
           FC moy par split
         </CardTitle>
       </CardHeader>

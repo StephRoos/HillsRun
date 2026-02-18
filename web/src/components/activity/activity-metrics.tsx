@@ -15,7 +15,7 @@ function MetricCard({ label, value, icon: Icon }: MetricCardProps) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-xs font-medium text-muted-foreground">
+        <CardTitle className="text-xs font-medium">
           {label}
         </CardTitle>
         <Icon className="h-4 w-4 text-muted-foreground" />

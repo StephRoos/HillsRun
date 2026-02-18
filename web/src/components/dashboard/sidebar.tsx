@@ -22,7 +22,7 @@ export function Sidebar() {
   return (
     <aside className="hidden md:flex md:w-64 md:flex-col md:border-r md:border-border bg-card">
       <div className="flex h-14 items-center gap-2 px-4">
-        <Mountain className="h-5 w-5 text-emerald-500" />
+        <Mountain className="h-5 w-5 text-primary" />
         <span className="text-lg font-bold">HillsRun</span>
       </div>
 

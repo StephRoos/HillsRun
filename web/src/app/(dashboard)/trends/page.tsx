@@ -56,7 +56,7 @@ export default function TrendsPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">
+              <CardTitle className="text-xs font-medium">
                 Distance
               </CardTitle>
               <Route className="h-4 w-4 text-muted-foreground" />
@@ -69,7 +69,7 @@ export default function TrendsPage() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">
+              <CardTitle className="text-xs font-medium">
                 Total elev.
               </CardTitle>
               <Mountain className="h-4 w-4 text-muted-foreground" />
@@ -82,7 +82,7 @@ export default function TrendsPage() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">
+              <CardTitle className="text-xs font-medium">
                 Time
               </CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
@@ -95,7 +95,7 @@ export default function TrendsPage() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">
+              <CardTitle className="text-xs font-medium">
                 Activities
               </CardTitle>
               <ActivityIcon className="h-4 w-4 text-muted-foreground" />

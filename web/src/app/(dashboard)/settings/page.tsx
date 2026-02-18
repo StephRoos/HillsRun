@@ -67,7 +67,7 @@ export default function SettingsPage() {
       {/* Profile */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardTitle className="text-sm font-medium">
             Profile
           </CardTitle>
         </CardHeader>
@@ -97,7 +97,7 @@ export default function SettingsPage() {
               Save
             </Button>
             {saved && (
-              <span className="text-sm text-emerald-500">Saved</span>
+              <span className="text-sm text-primary">Saved</span>
             )}
           </div>
         </CardContent>
@@ -106,7 +106,7 @@ export default function SettingsPage() {
       {/* Preferences */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardTitle className="text-sm font-medium">
             Preferences
           </CardTitle>
         </CardHeader>

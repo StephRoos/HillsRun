@@ -69,7 +69,7 @@ export function WeeklySummary() {
       {items.map((item) => (
         <Card key={item.label}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-sm font-medium">
               {item.label}
             </CardTitle>
             <item.icon className="h-4 w-4 text-muted-foreground" />

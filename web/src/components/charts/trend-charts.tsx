@@ -42,7 +42,7 @@ function ChartCard({
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardTitle className="text-sm font-medium">
             {title}
           </CardTitle>
           {average && (
@@ -67,7 +67,7 @@ export function WeeklyElevationChart({ data, average }: { data: WeeklyData[]; av
             x: data.map((d) => d.weekLabel),
             y: data.map((d) => Math.round(d.elevationGain)),
             type: "bar" as const,
-            marker: { color: "#22c55e" },
+            marker: { color: "#FF8C00" },
             hovertemplate: "%{y} m elev.<extra></extra>",
           },
         ]}
@@ -92,7 +92,7 @@ export function WeeklyVolumeChart({ data, average }: { data: WeeklyData[]; avera
             x: data.map((d) => d.weekLabel),
             y: data.map((d) => +(d.distance / 1000).toFixed(1)),
             type: "bar" as const,
-            marker: { color: "#3b82f6" },
+            marker: { color: "#0891B2" },
             hovertemplate: "%{y} km<extra></extra>",
           },
         ]}
@@ -122,7 +122,7 @@ export function Vo2MaxChart({ data }: { data: FitnessMetrics[] }) {
             y: filtered.map((d) => d.vo2_max_running),
             type: "scatter" as const,
             mode: "lines+markers" as const,
-            line: { color: "#8b5cf6", width: 2 },
+            line: { color: "#0EA5E9", width: 2 },
             marker: { size: 4 },
             hovertemplate: "%{y:.1f}<extra></extra>",
           },
@@ -156,7 +156,7 @@ export function HrvChart({ data }: { data: HrvData[] }) {
             type: "scatter" as const,
             mode: "lines" as const,
             name: "Weekly avg",
-            line: { color: "#06b6d4", width: 2 },
+            line: { color: "#10B981", width: 2 },
             hovertemplate: "%{y:.0f} ms<extra></extra>",
           },
         ]}

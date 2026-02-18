@@ -37,7 +37,7 @@ export default function LandingPage() {
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-4 max-w-6xl mx-auto">
         <div className="flex items-center gap-2">
-          <Mountain className="h-5 w-5 text-emerald-500" />
+          <Mountain className="h-5 w-5 text-primary" />
           <span className="text-lg font-bold">HillsRun</span>
         </div>
         <div className="flex gap-2">
@@ -59,7 +59,7 @@ export default function LandingPage() {
         <h1 className="text-4xl sm:text-6xl font-bold tracking-tight">
           Trail running essentials,
           <br />
-          <span className="text-emerald-500">for you and your crew.</span>
+          <span className="text-primary">for you and your crew.</span>
         </h1>
         <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
           Garmin shows 40+ metrics. You use 5. HillsRun shows you only what matters for trail running.
@@ -99,8 +99,8 @@ export default function LandingPage() {
             {features.map((f) => (
               <Card key={f.title}>
                 <CardContent className="pt-6 space-y-3">
-                  <div className="h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                    <f.icon className="h-5 w-5 text-emerald-500" />
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <f.icon className="h-5 w-5 text-primary" />
                   </div>
                   <h3 className="font-semibold">{f.title}</h3>
                   <p className="text-sm text-muted-foreground">
@@ -128,7 +128,7 @@ export default function LandingPage() {
                 { label: "Resting HR", value: "48 bpm", icon: Heart },
               ].map((m) => (
                 <div key={m.label} className="space-y-1">
-                  <m.icon className="h-5 w-5 mx-auto text-emerald-500" />
+                  <m.icon className="h-5 w-5 mx-auto text-primary" />
                   <p className="text-2xl font-bold">{m.value}</p>
                   <p className="text-xs text-muted-foreground">{m.label}</p>
                 </div>
@@ -160,7 +160,7 @@ export default function LandingPage() {
       <footer className="border-t border-border px-6 py-8">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
-            <Mountain className="h-4 w-4 text-emerald-500" />
+            <Mountain className="h-4 w-4 text-primary" />
             <span>HillsRun</span>
           </div>
           <p>&copy; {new Date().getFullYear()} HillsRun. Built for trail runners.</p>
