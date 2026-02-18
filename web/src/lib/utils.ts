@@ -34,7 +34,7 @@ export function formatElevation(meters: number | null): string {
 
 export function formatDate(isoString: string | null): string {
   if (!isoString) return "—";
-  return new Date(isoString).toLocaleDateString("fr-FR", {
+  return new Date(isoString).toLocaleDateString("en-US", {
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -42,18 +42,18 @@ export function formatDate(isoString: string | null): string {
 }
 
 const ACTIVITY_TYPE_LABELS: Record<string, string> = {
-  running: "Course",
+  running: "Running",
   trail_running: "Trail",
-  hiking: "Rando",
-  cycling: "Vélo",
-  swimming: "Natation",
-  strength_training: "Muscu",
+  hiking: "Hiking",
+  cycling: "Cycling",
+  swimming: "Swimming",
+  strength_training: "Strength",
   yoga: "Yoga",
-  walking: "Marche",
+  walking: "Walking",
   multi_sport: "Multi-sport",
 };
 
 export function activityTypeLabel(type: string | null): string {
-  if (!type) return "Activité";
+  if (!type) return "Activity";
   return ACTIVITY_TYPE_LABELS[type.toLowerCase()] ?? type.replace(/_/g, " ");
 }

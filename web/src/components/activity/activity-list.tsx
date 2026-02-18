@@ -7,10 +7,10 @@ import { useActivities } from "@/hooks/use-activities";
 import { ActivityCard } from "./activity-card";
 
 const FILTERS = [
-  { label: "Toutes", value: undefined },
+  { label: "All", value: undefined },
   { label: "Running", value: "running" },
   { label: "Trail", value: "trail_running" },
-  { label: "Muscu", value: "strength_training" },
+  { label: "Strength", value: "strength_training" },
 ] as const;
 
 export function ActivityList() {
