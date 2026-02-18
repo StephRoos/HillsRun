@@ -159,12 +159,16 @@ async def connect_garmin_mfa(request: MfaRequest, db=Depends(get_db)):
         raise HTTPException(status_code=403, detail="MFA session does not match user")
 
     try:
-        garth.sso.resume_login(session["client_state"], request.mfa_code)
+        oauth1, oauth2 = garth.sso.resume_login(session["client_state"], request.mfa_code)
     except Exception as e:
         logger.exception("MFA verification failed")
         raise HTTPException(status_code=401, detail=f"MFA verification failed: {e}")
 
     garmin_client = session["garmin_client"]
+    # Set the real OAuth tokens (login() with return_on_mfa stored intermediate state)
+    garmin_client.garth.oauth1_token = oauth1
+    garmin_client.garth.oauth2_token = oauth2
+
     # Load profile after MFA completion
     try:
         prof = garmin_client.garth.connectapi(
