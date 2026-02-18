@@ -15,15 +15,22 @@ export const auth = betterAuth({
   },
   hooks: {
     after: createAuthMiddleware(async (ctx) => {
-      if (ctx.path.startsWith("/sign-in")) {
-        // Fire-and-forget sync trigger on login
+      const isSignUp = ctx.path.startsWith("/sign-up");
+      const isSignIn = ctx.path.startsWith("/sign-in");
+
+      if (isSignIn || isSignUp) {
+        // Full sync for new users (1 year), incremental for returning users
+        const body = isSignUp
+          ? JSON.stringify({ mode: "full", days_back: 365 })
+          : "{}";
+
         fetch(`${GARMIN_API_BASE}/api/v1/sync/trigger`, {
           method: "POST",
           headers: {
             "X-API-Key": GARMIN_API_KEY ?? "",
             "Content-Type": "application/json",
           },
-          body: "{}",
+          body,
         }).catch(() => {
           // Silently ignore errors (409 = sync already running, network issues, etc.)
         });
