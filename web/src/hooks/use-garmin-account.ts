@@ -8,6 +8,22 @@ interface GarminAccountStatus {
   last_sync: string | null;
 }
 
+interface ConnectResult {
+  connected: boolean;
+  needs_mfa?: boolean;
+  mfa_session_id?: string;
+  garmin_display_name?: string | null;
+  user_id?: number | null;
+}
+
+async function parseErrorResponse(res: Response): Promise<string> {
+  const text = await res.text();
+  console.error("[garmin-auth] error response:", res.status, text);
+  let data: Record<string, unknown> = {};
+  try { data = JSON.parse(text); } catch { /* non-JSON */ }
+  return (data.detail as string) || (data.error as string) || `Request failed (${res.status})`;
+}
+
 export function useGarminAccount() {
   return useQuery<GarminAccountStatus>({
     queryKey: ["garmin-account"],
@@ -21,27 +37,47 @@ export function useGarminAccount() {
 
 export function useConnectGarmin() {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (credentials: { email: string; password: string }) => {
+  return useMutation<ConnectResult, Error, { email: string; password: string }>({
+    mutationFn: async (credentials) => {
       const res = await fetch("/api/garmin/auth/connect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(credentials),
       });
-      if (!res.ok) {
-        const text = await res.text();
-        console.error("[connect-garmin] error response:", res.status, text);
-        let data: Record<string, unknown> = {};
-        try { data = JSON.parse(text); } catch { /* non-JSON response */ }
-        const msg = (data.detail as string) || (data.error as string) || `Failed to connect Garmin account (${res.status})`;
-        throw new Error(msg);
-      }
+      if (!res.ok) throw new Error(await parseErrorResponse(res));
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.needs_mfa) return; // MFA step — don't show success yet
+      toast.success("Garmin account connected! Syncing your data...");
+      queryClient.invalidateQueries({ queryKey: ["garmin-account"] });
+      fetch("/api/garmin/sync/trigger", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "full", days_back: 365 }),
+      }).catch(() => {});
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}
+
+export function useSubmitMfa() {
+  const queryClient = useQueryClient();
+  return useMutation<ConnectResult, Error, { mfa_session_id: string; mfa_code: string }>({
+    mutationFn: async (payload) => {
+      const res = await fetch("/api/garmin/auth/connect/mfa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(await parseErrorResponse(res));
       return res.json();
     },
     onSuccess: () => {
       toast.success("Garmin account connected! Syncing your data...");
       queryClient.invalidateQueries({ queryKey: ["garmin-account"] });
-      // Trigger a sync
       fetch("/api/garmin/sync/trigger", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
