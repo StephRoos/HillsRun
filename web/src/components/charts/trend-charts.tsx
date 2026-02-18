@@ -18,7 +18,7 @@ const LAYOUT_BASE: Record<string, unknown> = {
   paper_bgcolor: "transparent",
   plot_bgcolor: "transparent",
   font: { color: "#94a3b8", size: 11 },
-  margin: { t: 10, r: 20, b: 55, l: 50 },
+  margin: { t: 10, r: 20, b: 70, l: 50 },
   xaxis: { showgrid: false, type: "category", tickangle: -45 },
   yaxis: { gridcolor: "rgba(148,163,184,0.15)" },
   height: 280,
@@ -42,20 +42,26 @@ function buildTickConfig(ticks?: WeekTick[]) {
   const tickvals = useTicks.map((t) => t.label);
   const ticktext = useTicks.map((t) => t.label);
 
-  // Year annotations at year boundaries
-  const annotations: Record<string, unknown>[] = [];
+  // Group ticks by year, place annotation at center of each group
+  const yearGroups = new Map<number, string[]>();
   for (const t of ticks) {
-    if (t.isYearStart) {
-      annotations.push({
-        x: t.label,
-        y: -0.18,
-        xref: "x",
-        yref: "paper",
-        text: `<b>${t.year}</b>`,
-        showarrow: false,
-        font: { size: 10, color: "#64748b" },
-      });
-    }
+    const labels = yearGroups.get(t.year) ?? [];
+    labels.push(t.label);
+    yearGroups.set(t.year, labels);
+  }
+
+  const annotations: Record<string, unknown>[] = [];
+  for (const [year, labels] of yearGroups) {
+    const midLabel = labels[Math.floor(labels.length / 2)];
+    annotations.push({
+      x: midLabel,
+      y: -0.32,
+      xref: "x",
+      yref: "paper",
+      text: `<b>${year}</b>`,
+      showarrow: false,
+      font: { size: 10, color: "#64748b" },
+    });
   }
 
   return {

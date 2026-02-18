@@ -65,7 +65,9 @@ cd dashboard && API_BASE_URL=https://api.hillsrun.com API_KEY=ADD3F7ELUifY37coN6
 - **ORM**: Prisma 7 with `@prisma/adapter-pg` (PostgreSQL driver adapter)
 - **State**: TanStack Query (React Query) for server state
 - **UI**: shadcn/ui + Tailwind CSS v4 + Lucide icons
-- **Charts**: Plotly.js (dynamic import, SSR disabled)
+- **Charts**: Plotly.js (dynamic import, SSR disabled) with trend lines + shared week ticks
+- **Toasts**: Sonner (dark theme, bottom-right)
+- **PWA**: manifest.json + icons (standalone, installable)
 
 ### Fichiers cles (web/src/)
 - `lib/auth.ts` — Better-Auth server config (Prisma adapter, sync-on-login hook)
@@ -75,18 +77,22 @@ cd dashboard && API_BASE_URL=https://api.hillsrun.com API_KEY=ADD3F7ELUifY37coN6
 - `lib/garmin-db.ts` — Raw SQL queries pour les donnees Garmin via Prisma
 - `types/garmin.ts` — Types TypeScript miroir des schemas Pydantic
 - `hooks/use-activities.ts` — TanStack Query hooks (useActivities, useActivity, useActivitySplits)
-- `hooks/use-metrics.ts` — Hooks metrics (useTrainingReadiness, useHrv, useFitnessMetrics, etc.)
-- `hooks/use-trends.ts` — Aggregation hebdo + filtrage par periode
+- `hooks/use-metrics.ts` — Hooks metrics (useTrainingReadiness, useHrv, useFitnessMetrics, useSleep, useBodyComposition, useStress)
+- `hooks/use-trends.ts` — Aggregation hebdo + filtrage par periode + WeekTick[] for shared x-axis
+- `components/charts/trend-charts.tsx` — 8 Plotly charts (weekly bars + daily scatter with trend lines + year annotations)
+- `components/dashboard/activity-calendar.tsx` — Monthly calendar grid with colored activity dots
+- `components/activity/similar-activities.tsx` — Similar activities by type and distance (±20%)
+- `components/providers.tsx` — QueryClientProvider + Sonner Toaster
 - `app/api/garmin/[...path]/route.ts` — Proxy GET+POST vers FastAPI (ajoute X-API-Key server-side)
 - `app/api/auth/[...all]/route.ts` — Better-Auth catch-all handler
 
 ### Pages
 - `/` — Landing page
 - `/login`, `/signup` — Auth pages
-- `/dashboard` — Dashboard principal (weekly summary, readiness, activity list)
-- `/activity/[id]` — Detail activite (metrics, splits, charts Plotly)
-- `/trends` — Tendances (6 charts, filtre 4w/3m/6m/1y)
-- `/settings` — Profil, unites, suppression compte
+- `/dashboard` — Dashboard principal (weekly summary, readiness gauge, activity list/calendar toggle)
+- `/activity/[id]` — Detail activite (metrics, splits, charts Plotly, PR/fav badges, device, similar activities)
+- `/trends` — Tendances (8 charts: distance, D+, VO2max, HRV, training load, sleep, weight, stress) + trend lines + year axis + filtre 4w/3m/6m/1y
+- `/settings` — Profil (connected to Better-Auth updateUser), suppression compte (deleteUser)
 
 ### Prisma
 - Schema: `web/prisma/schema.prisma` (auth tables only — User, Session, Account, Verification)
@@ -102,30 +108,31 @@ cd dashboard && API_BASE_URL=https://api.hillsrun.com API_KEY=ADD3F7ELUifY37coN6
 ## Current State (2026-02-18)
 
 ### Implemented
-- Landing page avec hero, features, CTA
+- Landing page avec gradient hero, features section, "3 steps" section
 - Auth (login/signup) avec Better-Auth + Prisma
-- Dashboard: weekly summary (D+, distance, temps, sorties), readiness card, activity list avec filtres
-- Activity detail: metrics, secondary metrics, splits table, charts Plotly (elevation, pace, HR)
-- Trends: 6 charts hebdo (distance, D+, duree, FC repos, HRV, VO2max) + filtre periode
-- Settings: profil, unites, danger zone
+- Dashboard: weekly summary, readiness SVG arc gauge, activity list avec filtres, calendar view toggle
+- Activity detail: metrics, secondary metrics, splits table, charts Plotly, PR/favorite badges, device name, description, similar activities
+- Trends: 8 charts (2 weekly bars + 6 daily scatter with linear regression trend lines), shared WeekTick x-axis with year annotations, filtre 4w/3m/6m/1y
+- Settings: profil (save connected to authClient.updateUser), delete account (authClient.deleteUser)
+- Toast notifications (sonner) for sync, rename, settings, errors
 - Error boundary, 404 page, loading skeletons
 - Mobile responsive (bottom nav + sidebar desktop)
 - Sync-on-login: Better-Auth after hook triggers Garmin sync on sign-in (fire-and-forget, anti-flood via API 409)
+- PWA: manifest.json, SVG icon, installable on mobile (standalone mode)
+- sport_type fixed: fetcher falls back to activityType.typeKey when sport_type is uncategorized
 
 ### Known Issues
 - Splits data vide en API (pas encore synce) — charts activite ne montrent rien
-- `sport_type` = 'uncategorized' pour toutes les activites (utiliser `activity_type` a la place)
 - BETTER_AUTH_SECRET a changer pour la production
 - score_feedback, hrv_status, chronic_load dans training_readiness sont null cote Garmin
 
 ### Prochaines etapes
-- Ameliorer le design (couleurs, polish)
 - Ajouter comparaison semaine precedente
-- Calendar view
-- PWA support
+- Deploiement Vercel
+- Offline mode PWA (service worker)
 
 ## Conventions
-- Langue: francais pour les echanges et l'UI, anglais pour le code
+- Langue: francais pour les echanges, anglais pour le code et l'UI
 - Plotly avec axes, markers, day labels pour les trend charts
 - Colonnes dynamiques: n'afficher que si la donnee existe
 - pnpm comme package manager
