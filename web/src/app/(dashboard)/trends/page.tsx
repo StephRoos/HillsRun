@@ -1,0 +1,129 @@
+"use client";
+
+import { useState } from "react";
+import { Mountain, Route, Clock, Activity as ActivityIcon } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useTrends, type Period } from "@/hooks/use-trends";
+import { formatDuration, formatDistance, formatElevation } from "@/lib/utils";
+import {
+  WeeklyElevationChart,
+  WeeklyVolumeChart,
+  Vo2MaxChart,
+  HrvChart,
+  ReadinessChart,
+  TrainingLoadChart,
+} from "@/components/charts/trend-charts";
+
+const PERIODS: { label: string; value: Period }[] = [
+  { label: "4 sem.", value: "4w" },
+  { label: "3 mois", value: "3m" },
+  { label: "6 mois", value: "6m" },
+  { label: "1 an", value: "1y" },
+];
+
+export default function TrendsPage() {
+  const [period, setPeriod] = useState<Period>("3m");
+  const { weeklyData, periodSummary, readiness, hrv, fitness, isPending } =
+    useTrends(period);
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Tendances</h1>
+        <div className="flex gap-1">
+          {PERIODS.map((p) => (
+            <Button
+              key={p.value}
+              variant={period === p.value ? "default" : "ghost"}
+              size="sm"
+              className="text-xs"
+              onClick={() => setPeriod(p.value)}
+            >
+              {p.label}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {isPending ? (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-20" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                D+ total
+              </CardTitle>
+              <Mountain className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-xl font-bold">
+                {formatElevation(periodSummary.totalElevation)}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                Distance
+              </CardTitle>
+              <Route className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-xl font-bold">
+                {formatDistance(periodSummary.totalDistance)}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                Temps
+              </CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-xl font-bold">
+                {formatDuration(periodSummary.totalDuration)}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                Sorties
+              </CardTitle>
+              <ActivityIcon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-xl font-bold">{periodSummary.totalActivities}</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {isPending ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-72" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <WeeklyElevationChart data={weeklyData} />
+          <WeeklyVolumeChart data={weeklyData} />
+          <Vo2MaxChart data={fitness} />
+          <HrvChart data={hrv} />
+          <ReadinessChart data={readiness} />
+          <TrainingLoadChart data={readiness} />
+        </div>
+      )}
+    </div>
+  );
+}
