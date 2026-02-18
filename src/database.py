@@ -683,7 +683,7 @@ class Database:
                 $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38,
                 $39, $40, $41, $42, $43, $44, $45, $46, $47
             )
-            ON CONFLICT (activity_id) DO UPDATE SET
+            ON CONFLICT (user_id, activity_id) DO UPDATE SET
                 activity_name = EXCLUDED.activity_name,
                 activity_type = EXCLUDED.activity_type,
                 sport_type = EXCLUDED.sport_type,
