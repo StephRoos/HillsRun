@@ -12,10 +12,24 @@ const LAYOUT_BASE: Record<string, unknown> = {
   plot_bgcolor: "transparent",
   font: { color: "#94a3b8", size: 11 },
   margin: { t: 10, r: 20, b: 40, l: 50 },
-  xaxis: { showgrid: false },
+  xaxis: { showgrid: false, type: "category" },
   yaxis: { gridcolor: "rgba(148,163,184,0.15)" },
   height: 280,
 };
+
+const DATE_LAYOUT: Record<string, unknown> = {
+  ...LAYOUT_BASE,
+  xaxis: { showgrid: false, type: "category", tickangle: -45 },
+};
+
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("en-US", { day: "numeric", month: "short" });
+}
+
+function sortByDate<T extends { calendar_date: string }>(data: T[]): T[] {
+  return [...data].sort((a, b) => a.calendar_date.localeCompare(b.calendar_date));
+}
 
 const CONFIG = { displayModeBar: false, responsive: true } as const;
 const STYLE = { width: "100%", height: "280px" };
@@ -42,20 +56,20 @@ function ChartCard({
 export function WeeklyElevationChart({ data }: { data: WeeklyData[] }) {
   if (data.length === 0) return null;
   return (
-    <ChartCard title="D+ hebdomadaire">
+    <ChartCard title="Weekly elevation gain">
       <Plot
         data={[
           {
-            x: data.map((d) => d.week),
+            x: data.map((d) => d.weekLabel),
             y: data.map((d) => Math.round(d.elevationGain)),
             type: "bar" as const,
             marker: { color: "#22c55e" },
-            hovertemplate: "%{y} m D+<extra></extra>",
+            hovertemplate: "%{y} m elev.<extra></extra>",
           },
         ]}
         layout={{
           ...LAYOUT_BASE,
-          yaxis: { ...LAYOUT_BASE.yaxis as object, title: { text: "D+ (m)" } },
+          yaxis: { ...LAYOUT_BASE.yaxis as object, title: { text: "Elev. (m)" } },
         }}
         config={CONFIG}
         style={STYLE}
@@ -67,11 +81,11 @@ export function WeeklyElevationChart({ data }: { data: WeeklyData[] }) {
 export function WeeklyVolumeChart({ data }: { data: WeeklyData[] }) {
   if (data.length === 0) return null;
   return (
-    <ChartCard title="Volume hebdomadaire">
+    <ChartCard title="Weekly volume">
       <Plot
         data={[
           {
-            x: data.map((d) => d.week),
+            x: data.map((d) => d.weekLabel),
             y: data.map((d) => +(d.distance / 1000).toFixed(1)),
             type: "bar" as const,
             marker: { color: "#3b82f6" },
@@ -90,7 +104,7 @@ export function WeeklyVolumeChart({ data }: { data: WeeklyData[] }) {
 }
 
 export function Vo2MaxChart({ data }: { data: FitnessMetrics[] }) {
-  const filtered = data.filter((d) => d.vo2_max_running != null);
+  const filtered = sortByDate(data.filter((d) => d.vo2_max_running != null));
   if (filtered.length === 0) return null;
 
   return (
@@ -98,7 +112,7 @@ export function Vo2MaxChart({ data }: { data: FitnessMetrics[] }) {
       <Plot
         data={[
           {
-            x: filtered.map((d) => d.calendar_date),
+            x: filtered.map((d) => formatDate(d.calendar_date)),
             y: filtered.map((d) => d.vo2_max_running),
             type: "scatter" as const,
             mode: "lines+markers" as const,
@@ -108,7 +122,7 @@ export function Vo2MaxChart({ data }: { data: FitnessMetrics[] }) {
           },
         ]}
         layout={{
-          ...LAYOUT_BASE,
+          ...DATE_LAYOUT,
           yaxis: { ...LAYOUT_BASE.yaxis as object, title: { text: "VO2 Max" } },
         }}
         config={CONFIG}
@@ -119,9 +133,9 @@ export function Vo2MaxChart({ data }: { data: FitnessMetrics[] }) {
 }
 
 export function HrvChart({ data }: { data: HrvData[] }) {
-  const filtered = data.filter(
+  const filtered = sortByDate(data.filter(
     (d) => d.weekly_avg != null || d.last_night_avg != null
-  );
+  ));
   if (filtered.length === 0) return null;
 
   return (
@@ -129,7 +143,7 @@ export function HrvChart({ data }: { data: HrvData[] }) {
       <Plot
         data={[
           {
-            x: filtered.map((d) => d.calendar_date),
+            x: filtered.map((d) => formatDate(d.calendar_date)),
             y: filtered.map((d) => d.weekly_avg ?? d.last_night_avg),
             type: "scatter" as const,
             mode: "lines+markers" as const,
@@ -140,7 +154,7 @@ export function HrvChart({ data }: { data: HrvData[] }) {
           },
         ]}
         layout={{
-          ...LAYOUT_BASE,
+          ...DATE_LAYOUT,
           yaxis: { ...LAYOUT_BASE.yaxis as object, title: { text: "HRV (ms)" } },
           showlegend: false,
         }}
@@ -152,7 +166,7 @@ export function HrvChart({ data }: { data: HrvData[] }) {
 }
 
 export function ReadinessChart({ data }: { data: TrainingReadiness[] }) {
-  const filtered = data.filter((d) => d.score != null);
+  const filtered = sortByDate(data.filter((d) => d.score != null));
   if (filtered.length === 0) return null;
 
   return (
@@ -160,7 +174,7 @@ export function ReadinessChart({ data }: { data: TrainingReadiness[] }) {
       <Plot
         data={[
           {
-            x: filtered.map((d) => d.calendar_date),
+            x: filtered.map((d) => formatDate(d.calendar_date)),
             y: filtered.map((d) => d.score),
             type: "scatter" as const,
             mode: "lines+markers" as const,
@@ -172,7 +186,7 @@ export function ReadinessChart({ data }: { data: TrainingReadiness[] }) {
           },
         ]}
         layout={{
-          ...LAYOUT_BASE,
+          ...DATE_LAYOUT,
           yaxis: { ...LAYOUT_BASE.yaxis as object, title: { text: "Score" }, range: [0, 100] },
           showlegend: false,
         }}
@@ -184,37 +198,37 @@ export function ReadinessChart({ data }: { data: TrainingReadiness[] }) {
 }
 
 export function TrainingLoadChart({ data }: { data: TrainingReadiness[] }) {
-  const filtered = data.filter(
+  const filtered = sortByDate(data.filter(
     (d) => d.acute_load != null || d.chronic_load != null
-  );
+  ));
   if (filtered.length === 0) return null;
 
   return (
-    <ChartCard title="Charge d'entraînement">
+    <ChartCard title="Training load">
       <Plot
         data={[
           {
-            x: filtered.map((d) => d.calendar_date),
+            x: filtered.map((d) => formatDate(d.calendar_date)),
             y: filtered.map((d) => d.acute_load),
             type: "scatter" as const,
             mode: "lines" as const,
-            name: "Charge aiguë",
+            name: "Acute load",
             line: { color: "#ef4444", width: 2 },
-            hovertemplate: "%{y:.0f}<extra>Aiguë</extra>",
+            hovertemplate: "%{y:.0f}<extra>Acute</extra>",
           },
           {
-            x: filtered.map((d) => d.calendar_date),
+            x: filtered.map((d) => formatDate(d.calendar_date)),
             y: filtered.map((d) => d.chronic_load),
             type: "scatter" as const,
             mode: "lines" as const,
-            name: "Charge chronique",
+            name: "Chronic load",
             line: { color: "#22c55e", width: 2 },
-            hovertemplate: "%{y:.0f}<extra>Chronique</extra>",
+            hovertemplate: "%{y:.0f}<extra>Chronic</extra>",
           },
         ]}
         layout={{
-          ...LAYOUT_BASE,
-          yaxis: { ...LAYOUT_BASE.yaxis as object, title: { text: "Charge" } },
+          ...DATE_LAYOUT,
+          yaxis: { ...LAYOUT_BASE.yaxis as object, title: { text: "Load" } },
           legend: {
             orientation: "h" as const,
             y: -0.2,

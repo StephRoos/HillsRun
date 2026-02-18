@@ -20,17 +20,21 @@ function getStartDate(period: Period): string {
   return d.toISOString().slice(0, 10);
 }
 
-function getISOWeek(dateStr: string): string {
+function getWeekMonday(dateStr: string): string {
   const d = new Date(dateStr);
   const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-  return `${d.getUTCFullYear()}-W${weekNo.toString().padStart(2, "0")}`;
+  d.setUTCDate(d.getUTCDate() - (dayNum - 1));
+  return d.toISOString().slice(0, 10);
+}
+
+function formatWeekLabel(mondayStr: string): string {
+  const d = new Date(mondayStr);
+  return d.toLocaleDateString("en-US", { day: "numeric", month: "short" });
 }
 
 export interface WeeklyData {
   week: string;
+  weekLabel: string;
   elevationGain: number;
   distance: number;
   duration: number;
@@ -42,9 +46,10 @@ function aggregateWeekly(activities: Activity[]): WeeklyData[] {
 
   for (const a of activities) {
     if (!a.start_timestamp) continue;
-    const week = getISOWeek(a.start_timestamp);
-    const existing = weeks.get(week) ?? {
-      week,
+    const monday = getWeekMonday(a.start_timestamp);
+    const existing = weeks.get(monday) ?? {
+      week: monday,
+      weekLabel: formatWeekLabel(monday),
       elevationGain: 0,
       distance: 0,
       duration: 0,
@@ -54,7 +59,7 @@ function aggregateWeekly(activities: Activity[]): WeeklyData[] {
     existing.distance += a.distance_meters ?? 0;
     existing.duration += a.duration_seconds ?? 0;
     existing.count += 1;
-    weeks.set(week, existing);
+    weeks.set(monday, existing);
   }
 
   return Array.from(weeks.values()).sort((a, b) => a.week.localeCompare(b.week));

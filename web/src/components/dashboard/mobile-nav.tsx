@@ -7,8 +7,8 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Tendances", href: "/trends", icon: TrendingUp },
-  { label: "Réglages", href: "/settings", icon: Settings },
+  { label: "Trends", href: "/trends", icon: TrendingUp },
+  { label: "Settings", href: "/settings", icon: Settings },
 ];
 
 export function MobileNav() {

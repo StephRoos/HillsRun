@@ -17,10 +17,10 @@ import {
 } from "@/components/charts/trend-charts";
 
 const PERIODS: { label: string; value: Period }[] = [
-  { label: "4 sem.", value: "4w" },
-  { label: "3 mois", value: "3m" },
-  { label: "6 mois", value: "6m" },
-  { label: "1 an", value: "1y" },
+  { label: "4w", value: "4w" },
+  { label: "3m", value: "3m" },
+  { label: "6m", value: "6m" },
+  { label: "1y", value: "1y" },
 ];
 
 export default function TrendsPage() {
@@ -31,7 +31,7 @@ export default function TrendsPage() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Tendances</h1>
+        <h1 className="text-2xl font-bold">Trends</h1>
         <div className="flex gap-1">
           {PERIODS.map((p) => (
             <Button
@@ -58,7 +58,7 @@ export default function TrendsPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-xs font-medium text-muted-foreground">
-                D+ total
+                Total elev.
               </CardTitle>
               <Mountain className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -84,7 +84,7 @@ export default function TrendsPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-xs font-medium text-muted-foreground">
-                Temps
+                Time
               </CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -97,7 +97,7 @@ export default function TrendsPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-xs font-medium text-muted-foreground">
-                Sorties
+                Activities
               </CardTitle>
               <ActivityIcon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>

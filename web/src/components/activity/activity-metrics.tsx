@@ -45,7 +45,7 @@ export function ActivityMetrics({ activity }: { activity: ActivityDetail }) {
       icon: Route,
     },
     {
-      label: "Durée",
+      label: "Duration",
       value: formatDuration(activity.duration_seconds),
       icon: Clock,
     },

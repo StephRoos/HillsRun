@@ -16,11 +16,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "HillsRun — L'essentiel du trail",
   description:
-    "Dashboard trail-focused pour tes données Garmin. Uniquement les métriques qui comptent.",
+    "Trail-focused dashboard for your Garmin data. Only the metrics that matter.",
   openGraph: {
     title: "HillsRun — L'essentiel du trail",
     description:
-      "Dashboard trail-focused pour tes données Garmin. Uniquement les métriques qui comptent.",
+      "Trail-focused dashboard for your Garmin data. Only the metrics that matter.",
     type: "website",
   },
 };

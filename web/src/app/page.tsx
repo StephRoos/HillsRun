@@ -15,19 +15,19 @@ const features = [
     icon: Mountain,
     title: "Dashboard trail",
     description:
-      "D+, D-, allure montée/descente, temps sur les pieds. Uniquement ce qui compte pour le trail.",
+      "Elevation gain/loss, uphill/downhill pace, time on feet. Only what matters for trail.",
   },
   {
     icon: BarChart3,
-    title: "Métriques essentielles",
+    title: "Key metrics",
     description:
-      "Training Readiness, HRV, Sleep Score, Body Battery. Le strict nécessaire pour piloter ta forme.",
+      "Training Readiness, HRV, Sleep Score, Body Battery. Just what you need to manage your fitness.",
   },
   {
     icon: TrendingUp,
-    title: "Tendances",
+    title: "Trends",
     description:
-      "D+ hebdo, VO2max, charge d'entraînement. Visualise ta progression sur 4 semaines à 1 an.",
+      "Weekly elevation, VO2max, training load. Track your progress from 4 weeks to 1 year.",
   },
 ];
 
@@ -42,10 +42,10 @@ export default function LandingPage() {
         </div>
         <div className="flex gap-2">
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/login">Se connecter</Link>
+            <Link href="/login">Sign in</Link>
           </Button>
           <Button size="sm" asChild>
-            <Link href="/signup">S&apos;inscrire</Link>
+            <Link href="/signup">Sign up</Link>
           </Button>
         </div>
       </header>
@@ -54,26 +54,25 @@ export default function LandingPage() {
       <section className="px-6 py-24 text-center max-w-4xl mx-auto space-y-6">
         <div className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-1.5 text-sm text-muted-foreground">
           <Gauge className="h-3.5 w-3.5" />
-          Dashboard Garmin pour traileurs
+          Garmin dashboard for trail runners
         </div>
         <h1 className="text-4xl sm:text-6xl font-bold tracking-tight">
-          L&apos;essentiel du trail,
+          Trail running essentials,
           <br />
-          <span className="text-emerald-500">pour toi et ton crew.</span>
+          <span className="text-emerald-500">for you and your crew.</span>
         </h1>
         <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
-          Garmin affiche 40+ métriques. Tu en utilises 5. HillsRun te montre
-          uniquement ce qui compte pour le trail.
+          Garmin shows 40+ metrics. You use 5. HillsRun shows you only what matters for trail running.
         </p>
         <div className="flex gap-3 justify-center pt-4">
           <Button size="lg" asChild>
             <Link href="/signup">
-              Commence gratuitement
+              Get started free
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
           <Button size="lg" variant="outline" asChild>
-            <Link href="/login">Se connecter</Link>
+            <Link href="/login">Sign in</Link>
           </Button>
         </div>
       </section>
@@ -82,12 +81,10 @@ export default function LandingPage() {
       <section className="px-6 py-16 border-t border-border">
         <div className="max-w-4xl mx-auto text-center space-y-4">
           <h2 className="text-2xl sm:text-3xl font-bold">
-            Garmin Connect, c&apos;est trop.
+            Garmin Connect is too much.
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            40 métriques par activité. Des graphiques que personne ne lit. Des
-            données noyées dans du bruit. Pour le trail, tu as besoin de D+,
-            d&apos;allure, de FC et de ta forme du jour. Point.
+            40 metrics per activity. Charts nobody reads. Data buried in noise. For trail running, you need elevation gain, pace, HR and daily readiness. That&apos;s it.
           </p>
         </div>
       </section>
@@ -96,7 +93,7 @@ export default function LandingPage() {
       <section className="px-6 py-16">
         <div className="max-w-5xl mx-auto space-y-8">
           <h2 className="text-2xl sm:text-3xl font-bold text-center">
-            Ce que HillsRun te montre
+            What HillsRun shows you
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {features.map((f) => (
@@ -120,7 +117,7 @@ export default function LandingPage() {
       <section className="px-6 py-16 border-t border-border">
         <div className="max-w-4xl mx-auto text-center space-y-8">
           <h2 className="text-2xl sm:text-3xl font-bold">
-            Un dashboard qui va droit au but
+            A dashboard that cuts to the chase
           </h2>
           <div className="rounded-xl border border-border bg-card p-6 sm:p-8">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
@@ -128,7 +125,7 @@ export default function LandingPage() {
                 { label: "D+", value: "1 240 m", icon: Mountain },
                 { label: "Distance", value: "42.3 km", icon: TrendingUp },
                 { label: "Readiness", value: "72", icon: Gauge },
-                { label: "FC repos", value: "48 bpm", icon: Heart },
+                { label: "Resting HR", value: "48 bpm", icon: Heart },
               ].map((m) => (
                 <div key={m.label} className="space-y-1">
                   <m.icon className="h-5 w-5 mx-auto text-emerald-500" />
@@ -145,14 +142,14 @@ export default function LandingPage() {
       <section className="px-6 py-20">
         <div className="max-w-3xl mx-auto text-center space-y-6">
           <h2 className="text-2xl sm:text-3xl font-bold">
-            Prêt à simplifier ton suivi trail ?
+            Ready to simplify your trail tracking?
           </h2>
           <p className="text-muted-foreground">
-            Gratuit. Connecte ta montre Garmin et commence maintenant.
+            Free. Connect your Garmin watch and start now.
           </p>
           <Button size="lg" asChild>
             <Link href="/signup">
-              Créer mon compte
+              Create my account
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
@@ -166,7 +163,7 @@ export default function LandingPage() {
             <Mountain className="h-4 w-4 text-emerald-500" />
             <span>HillsRun</span>
           </div>
-          <p>&copy; {new Date().getFullYear()} HillsRun. Fait pour les traileurs.</p>
+          <p>&copy; {new Date().getFullYear()} HillsRun. Built for trail runners.</p>
         </div>
       </footer>
     </div>

@@ -24,7 +24,7 @@ export function ActivityList() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Activités récentes</h2>
+        <h2 className="text-lg font-semibold">Recent activities</h2>
         <div className="flex gap-1">
           {FILTERS.map((f) => (
             <Button
@@ -50,13 +50,13 @@ export function ActivityList() {
 
       {isError && (
         <p className="text-sm text-destructive">
-          Erreur lors du chargement des activités.
+          Error loading activities.
         </p>
       )}
 
       {data && data.data.length === 0 && (
         <p className="text-sm text-muted-foreground py-8 text-center">
-          Aucune activité trouvée.
+          No activities found.
         </p>
       )}
 

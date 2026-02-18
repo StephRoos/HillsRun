@@ -27,7 +27,7 @@ export default function LoginPage() {
     });
 
     if (result.error) {
-      setError(result.error.message || "Erreur de connexion");
+      setError(result.error.message || "Login failed");
       setLoading(false);
     } else {
       router.push("/dashboard");
@@ -38,9 +38,9 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Se connecter</CardTitle>
+          <CardTitle className="text-2xl">Sign in</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Accède à ton dashboard trail
+            Access your trail dashboard
           </p>
         </CardHeader>
         <CardContent>
@@ -57,7 +57,7 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Mot de passe</Label>
+              <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
                 type="password"
@@ -72,14 +72,14 @@ export default function LoginPage() {
             )}
 
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Connexion..." : "Se connecter"}
+              {loading ? "Signing in..." : "Sign in"}
             </Button>
           </form>
 
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            Pas encore de compte ?{" "}
+            Don&apos;t have an account?{" "}
             <Link href="/signup" className="text-primary underline">
-              S&apos;inscrire
+              Sign up
             </Link>
           </p>
         </CardContent>

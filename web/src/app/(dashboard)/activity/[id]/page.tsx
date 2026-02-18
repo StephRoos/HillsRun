@@ -39,7 +39,7 @@ export default function ActivityPage({
   if (isError || !activity) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <p className="text-muted-foreground">Activité introuvable.</p>
+        <p className="text-muted-foreground">Activity not found.</p>
       </div>
     );
   }

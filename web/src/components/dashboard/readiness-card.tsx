@@ -58,7 +58,7 @@ export function ReadinessCard() {
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-medium text-muted-foreground">
-          Readiness du jour
+          Today&apos;s readiness
         </CardTitle>
         <p className={`text-4xl font-bold ${scoreColor}`}>
           {score ?? "—"}

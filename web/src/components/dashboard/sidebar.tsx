@@ -10,8 +10,8 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Tendances", href: "/trends", icon: TrendingUp },
-  { label: "Réglages", href: "/settings", icon: Settings },
+  { label: "Trends", href: "/trends", icon: TrendingUp },
+  { label: "Settings", href: "/settings", icon: Settings },
 ];
 
 export function Sidebar() {
@@ -67,7 +67,7 @@ export function Sidebar() {
           }}
         >
           <LogOut className="h-4 w-4" />
-          Se déconnecter
+          Sign out
         </Button>
       </div>
     </aside>

@@ -34,7 +34,7 @@ export function SecondaryMetrics({ activity }: { activity: ActivityDetail }) {
         : null,
     },
     {
-      label: "Longueur de foulée",
+      label: "Stride length",
       value: activity.avg_stride_length
         ? `${(activity.avg_stride_length / 100).toFixed(2)} m`
         : null,
@@ -46,19 +46,19 @@ export function SecondaryMetrics({ activity }: { activity: ActivityDetail }) {
         : null,
     },
     {
-      label: "Training Effect (aérobie)",
+      label: "Training Effect (aerobic)",
       value: activity.aerobic_training_effect
         ? `${activity.aerobic_training_effect.toFixed(1)}`
         : null,
     },
     {
-      label: "Training Effect (anaérobie)",
+      label: "Training Effect (anaerobic)",
       value: activity.anaerobic_training_effect
         ? `${activity.anaerobic_training_effect.toFixed(1)}`
         : null,
     },
     {
-      label: "VO2max estimé",
+      label: "Estimated VO2max",
       value: activity.vo2_max_value
         ? `${activity.vo2_max_value.toFixed(1)}`
         : null,
@@ -75,7 +75,7 @@ export function SecondaryMetrics({ activity }: { activity: ActivityDetail }) {
           : null,
     },
     {
-      label: "Température",
+      label: "Temperature",
       value: activity.average_temperature
         ? `${activity.average_temperature.toFixed(1)}°C`
         : null,
@@ -90,7 +90,7 @@ export function SecondaryMetrics({ activity }: { activity: ActivityDetail }) {
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">
-          Métriques détaillées
+          Detailed metrics
         </CardTitle>
       </CardHeader>
       <CardContent className="divide-y divide-border">

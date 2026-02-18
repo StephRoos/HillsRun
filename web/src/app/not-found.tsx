@@ -11,7 +11,7 @@ export default function NotFound() {
         Ce sentier n&apos;existe pas.
       </p>
       <Button asChild>
-        <Link href="/">Retour à l&apos;accueil</Link>
+        <Link href="/">Back to home</Link>
       </Button>
     </div>
   );

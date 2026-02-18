@@ -21,7 +21,7 @@ export function SplitsTable({ splits }: { splits: ActivitySplit[] }) {
               <tr className="border-b border-border text-muted-foreground">
                 <th className="py-2 text-left font-medium">#</th>
                 <th className="py-2 text-right font-medium">Distance</th>
-                <th className="py-2 text-right font-medium">Durée</th>
+                <th className="py-2 text-right font-medium">Duration</th>
                 <th className="py-2 text-right font-medium">Allure</th>
                 <th className="py-2 text-right font-medium">D+</th>
                 <th className="py-2 text-right font-medium">FC moy</th>

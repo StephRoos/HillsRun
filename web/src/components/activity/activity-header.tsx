@@ -23,7 +23,7 @@ export function ActivityHeader({ activity }: { activity: ActivityDetail }) {
       </Button>
       <div className="flex items-center gap-3">
         <h1 className="text-2xl font-bold">
-          {activity.activity_name ?? "Activité"}
+          {activity.activity_name ?? "Activity"}
         </h1>
         <Badge variant="secondary">
           {activityTypeLabel(activity.activity_type)}

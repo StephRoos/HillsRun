@@ -62,13 +62,13 @@ export default function SettingsPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-2xl">
-      <h1 className="text-2xl font-bold">Réglages</h1>
+      <h1 className="text-2xl font-bold">Settings</h1>
 
       {/* Profile */}
       <Card>
         <CardHeader>
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            Profil
+            Profile
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -80,24 +80,24 @@ export default function SettingsPage() {
               className="opacity-60"
             />
             <p className="text-xs text-muted-foreground">
-              L&apos;email ne peut pas être modifié.
+              Email cannot be changed.
             </p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="name">Nom d&apos;affichage</Label>
+            <Label htmlFor="name">Display name</Label>
             <Input
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ton prénom"
+              placeholder="Your first name"
             />
           </div>
           <div className="flex items-center gap-2">
             <Button size="sm" onClick={handleSaveName}>
-              Enregistrer
+              Save
             </Button>
             {saved && (
-              <span className="text-sm text-emerald-500">Sauvegardé</span>
+              <span className="text-sm text-emerald-500">Saved</span>
             )}
           </div>
         </CardContent>
@@ -107,18 +107,18 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            Préférences
+            Preferences
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Unités de distance</Label>
+            <Label>Distance units</Label>
             <Select value={units} onValueChange={handleUnitsChange}>
               <SelectTrigger className="w-48">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="km">Kilomètres (km)</SelectItem>
+                <SelectItem value="km">Kilometers (km)</SelectItem>
                 <SelectItem value="mi">Miles (mi)</SelectItem>
               </SelectContent>
             </Select>
@@ -132,35 +132,33 @@ export default function SettingsPage() {
       <Card className="border-destructive/50">
         <CardHeader>
           <CardTitle className="text-sm font-medium text-destructive">
-            Zone dangereuse
+            Danger zone
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            La suppression de ton compte est irréversible. Toutes tes données
-            seront supprimées.
+            Deleting your account is irreversible. All your data will be deleted.
           </p>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" size="sm">
-                Supprimer mon compte
+                Delete my account
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Supprimer ton compte ?</AlertDialogTitle>
+                <AlertDialogTitle>Delete your account?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Cette action est irréversible. Ton compte et toutes tes
-                  données seront définitivement supprimés.
+                  This action is irreversible. Your account and all your data will be permanently deleted.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleDeleteAccount}
                   className="bg-destructive text-white hover:bg-destructive/90"
                 >
-                  Supprimer définitivement
+                  Delete permanently
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
