@@ -7,6 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useActivities } from "@/hooks/use-activities";
 import { formatDuration, formatDistance, formatElevation } from "@/lib/utils";
 
+const RUNNING_TYPES = new Set(["running", "trail_running"]);
+
 export function WeeklySummary() {
   const today = new Date();
   const monday = new Date(today);
@@ -26,11 +28,13 @@ export function WeeklySummary() {
       return d >= startDate && d <= endDate;
     });
 
+    const running = weekActivities.filter((a) => RUNNING_TYPES.has(a.activity_type ?? ""));
+
     return {
-      count: weekActivities.length,
-      totalDuration: weekActivities.reduce((s, a) => s + (a.duration_seconds ?? 0), 0),
-      totalDistance: weekActivities.reduce((s, a) => s + (a.distance_meters ?? 0), 0),
-      totalElevation: weekActivities.reduce((s, a) => s + (a.elevation_gain_meters ?? 0), 0),
+      count: running.length,
+      totalDuration: running.reduce((s, a) => s + (a.duration_seconds ?? 0), 0),
+      totalDistance: running.reduce((s, a) => s + (a.distance_meters ?? 0), 0),
+      totalElevation: running.reduce((s, a) => s + (a.elevation_gain_meters ?? 0), 0),
     };
   }, [data, startDate, endDate]);
 
@@ -52,14 +56,16 @@ export function WeeklySummary() {
   }
 
   const items = [
-    { label: "D+", value: formatElevation(stats?.totalElevation ?? 0), icon: Mountain },
     { label: "Distance", value: formatDistance(stats?.totalDistance ?? 0), icon: Route },
-    { label: "Temps", value: formatDuration(stats?.totalDuration ?? 0), icon: Clock },
-    { label: "Sorties", value: String(stats?.count ?? 0), icon: ActivityIcon },
+    { label: "Elevation", value: formatElevation(stats?.totalElevation ?? 0), icon: Mountain },
+    { label: "Time", value: formatDuration(stats?.totalDuration ?? 0), icon: Clock },
+    { label: "Runs", value: String(stats?.count ?? 0), icon: ActivityIcon },
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div className="space-y-3">
+      <h2 className="text-lg font-semibold">This week running</h2>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       {items.map((item) => (
         <Card key={item.label}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -73,6 +79,7 @@ export function WeeklySummary() {
           </CardContent>
         </Card>
       ))}
+      </div>
     </div>
   );
 }

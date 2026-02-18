@@ -5,6 +5,8 @@ import type { Activity } from "@/types/garmin";
 
 export type Period = "4w" | "3m" | "6m" | "1y";
 
+const RUNNING_TYPES = new Set(["running", "trail_running"]);
+
 function periodToDays(period: Period): number {
   switch (period) {
     case "4w": return 28;
@@ -12,6 +14,10 @@ function periodToDays(period: Period): number {
     case "6m": return 180;
     case "1y": return 365;
   }
+}
+
+function periodToWeeks(period: Period): number {
+  return Math.round(periodToDays(period) / 7);
 }
 
 function getStartDate(period: Period): string {
@@ -35,6 +41,13 @@ function formatWeekLabel(mondayStr: string): string {
 export interface WeeklyData {
   week: string;
   weekLabel: string;
+  elevationGain: number;
+  distance: number;
+  duration: number;
+  count: number;
+}
+
+export interface WeeklyAverages {
   elevationGain: number;
   distance: number;
   duration: number;
@@ -65,11 +78,22 @@ function aggregateWeekly(activities: Activity[]): WeeklyData[] {
   return Array.from(weeks.values()).sort((a, b) => a.week.localeCompare(b.week));
 }
 
+function computeWeeklyAverages(weeklyData: WeeklyData[], numWeeks: number): WeeklyAverages {
+  const weeks = numWeeks || weeklyData.length || 1;
+  return {
+    elevationGain: weeklyData.reduce((s, w) => s + w.elevationGain, 0) / weeks,
+    distance: weeklyData.reduce((s, w) => s + w.distance, 0) / weeks,
+    duration: weeklyData.reduce((s, w) => s + w.duration, 0) / weeks,
+    count: weeklyData.reduce((s, w) => s + w.count, 0) / weeks,
+  };
+}
+
 export function useTrends(period: Period) {
   const startDate = getStartDate(period);
+  const numWeeks = periodToWeeks(period);
   const params = { start_date: startDate, limit: 200 };
 
-  const activities = useActivities({ limit: 200 });
+  const activities = useActivities({ limit: 200, start_date: startDate });
   const readiness = useTrainingReadiness({ ...params });
   const hrv = useHrv({ ...params });
   const fitness = useFitnessMetrics({ ...params });
@@ -77,13 +101,21 @@ export function useTrends(period: Period) {
   const filteredActivities = useMemo(() => {
     if (!activities.data?.data) return [];
     return activities.data.data.filter(
-      (a) => a.start_timestamp && a.start_timestamp.slice(0, 10) >= startDate
+      (a) =>
+        a.start_timestamp &&
+        a.start_timestamp.slice(0, 10) >= startDate &&
+        RUNNING_TYPES.has(a.activity_type ?? "")
     );
   }, [activities.data, startDate]);
 
   const weeklyData = useMemo(
     () => aggregateWeekly(filteredActivities),
     [filteredActivities]
+  );
+
+  const weeklyAverages = useMemo(
+    () => computeWeeklyAverages(weeklyData, numWeeks),
+    [weeklyData, numWeeks]
   );
 
   const periodSummary = useMemo(() => {
@@ -97,6 +129,7 @@ export function useTrends(period: Period) {
 
   return {
     weeklyData,
+    weeklyAverages,
     periodSummary,
     readiness: readiness.data?.data ?? [],
     hrv: hrv.data?.data ?? [],

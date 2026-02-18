@@ -12,7 +12,6 @@ import {
   WeeklyVolumeChart,
   Vo2MaxChart,
   HrvChart,
-  ReadinessChart,
   TrainingLoadChart,
 } from "@/components/charts/trend-charts";
 
@@ -25,7 +24,7 @@ const PERIODS: { label: string; value: Period }[] = [
 
 export default function TrendsPage() {
   const [period, setPeriod] = useState<Period>("3m");
-  const { weeklyData, periodSummary, readiness, hrv, fitness, isPending } =
+  const { weeklyData, weeklyAverages, periodSummary, readiness, hrv, fitness, isPending } =
     useTrends(period);
 
   return (
@@ -58,19 +57,6 @@ export default function TrendsPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-xs font-medium text-muted-foreground">
-                Total elev.
-              </CardTitle>
-              <Mountain className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <p className="text-xl font-bold">
-                {formatElevation(periodSummary.totalElevation)}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">
                 Distance
               </CardTitle>
               <Route className="h-4 w-4 text-muted-foreground" />
@@ -78,6 +64,19 @@ export default function TrendsPage() {
             <CardContent>
               <p className="text-xl font-bold">
                 {formatDistance(periodSummary.totalDistance)}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                Total elev.
+              </CardTitle>
+              <Mountain className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-xl font-bold">
+                {formatElevation(periodSummary.totalElevation)}
               </p>
             </CardContent>
           </Card>
@@ -116,11 +115,10 @@ export default function TrendsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <WeeklyElevationChart data={weeklyData} />
-          <WeeklyVolumeChart data={weeklyData} />
+          <WeeklyVolumeChart data={weeklyData} average={weeklyAverages.distance} />
+          <WeeklyElevationChart data={weeklyData} average={weeklyAverages.elevationGain} />
           <Vo2MaxChart data={fitness} />
           <HrvChart data={hrv} />
-          <ReadinessChart data={readiness} />
           <TrainingLoadChart data={readiness} />
         </div>
       )}

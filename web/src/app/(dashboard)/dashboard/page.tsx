@@ -2,6 +2,7 @@
 
 import { WeeklySummary } from "@/components/dashboard/weekly-summary";
 import { ReadinessCard } from "@/components/dashboard/readiness-card";
+import { TodayActivities } from "@/components/dashboard/today-activities";
 import { ActivityList } from "@/components/activity/activity-list";
 import { SyncButton } from "@/components/dashboard/sync-button";
 
@@ -17,7 +18,8 @@ export default function DashboardPage() {
         <div className="lg:col-span-2">
           <ActivityList />
         </div>
-        <div>
+        <div className="space-y-6">
+          <TodayActivities />
           <ReadinessCard />
         </div>
       </div>

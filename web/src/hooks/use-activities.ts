@@ -5,11 +5,13 @@ export function useActivities(params?: {
   limit?: number;
   offset?: number;
   activity_type?: string;
+  start_date?: string;
 }) {
   const queryParams: Record<string, string> = {};
   if (params?.limit) queryParams.limit = String(params.limit);
   if (params?.offset) queryParams.offset = String(params.offset);
   if (params?.activity_type) queryParams.activity_type = params.activity_type;
+  if (params?.start_date) queryParams.start_date = params.start_date;
 
   return useQuery({
     queryKey: ["activities", queryParams],
