@@ -1,6 +1,13 @@
 import { useMemo } from "react";
 import { useActivities } from "./use-activities";
-import { useTrainingReadiness, useHrv, useFitnessMetrics } from "./use-metrics";
+import {
+  useTrainingReadiness,
+  useHrv,
+  useFitnessMetrics,
+  useSleep,
+  useBodyComposition,
+  useStress,
+} from "./use-metrics";
 import type { Activity } from "@/types/garmin";
 
 export type Period = "4w" | "3m" | "6m" | "1y";
@@ -36,6 +43,31 @@ function getWeekMonday(dateStr: string): string {
 function formatWeekLabel(mondayStr: string): string {
   const d = new Date(mondayStr);
   return d.toLocaleDateString("en-US", { day: "numeric", month: "short" });
+}
+
+export interface WeekTick {
+  label: string;     // e.g. "Nov 3"
+  year: number;      // e.g. 2025
+  isYearStart: boolean; // true on first tick and year boundaries
+}
+
+/** Generate all Monday ticks from startDate to today */
+function generateAllWeekTicks(startDate: string): WeekTick[] {
+  const ticks: WeekTick[] = [];
+  const start = new Date(startDate);
+  const dayNum = start.getUTCDay() || 7;
+  start.setUTCDate(start.getUTCDate() - (dayNum - 1));
+  const now = new Date();
+  const cursor = new Date(start);
+  let lastYear = -1;
+  while (cursor <= now) {
+    const year = cursor.getUTCFullYear();
+    const label = formatWeekLabel(cursor.toISOString().slice(0, 10));
+    ticks.push({ label, year, isYearStart: year !== lastYear });
+    lastYear = year;
+    cursor.setUTCDate(cursor.getUTCDate() + 7);
+  }
+  return ticks;
 }
 
 export interface WeeklyData {
@@ -97,6 +129,9 @@ export function useTrends(period: Period) {
   const readiness = useTrainingReadiness({ ...params });
   const hrv = useHrv({ ...params });
   const fitness = useFitnessMetrics({ ...params });
+  const sleep = useSleep({ ...params });
+  const weight = useBodyComposition({ ...params });
+  const stress = useStress({ ...params });
 
   const filteredActivities = useMemo(() => {
     if (!activities.data?.data) return [];
@@ -107,6 +142,11 @@ export function useTrends(period: Period) {
         RUNNING_TYPES.has(a.activity_type ?? "")
     );
   }, [activities.data, startDate]);
+
+  const weekTicks = useMemo(
+    () => generateAllWeekTicks(startDate),
+    [startDate]
+  );
 
   const weeklyData = useMemo(
     () => aggregateWeekly(filteredActivities),
@@ -130,10 +170,21 @@ export function useTrends(period: Period) {
   return {
     weeklyData,
     weeklyAverages,
+    weekTicks,
     periodSummary,
     readiness: readiness.data?.data ?? [],
     hrv: hrv.data?.data ?? [],
     fitness: fitness.data?.data ?? [],
-    isPending: activities.isPending || readiness.isPending || hrv.isPending || fitness.isPending,
+    sleep: sleep.data?.data ?? [],
+    weight: weight.data?.data ?? [],
+    stress: stress.data?.data ?? [],
+    isPending:
+      activities.isPending ||
+      readiness.isPending ||
+      hrv.isPending ||
+      fitness.isPending ||
+      sleep.isPending ||
+      weight.isPending ||
+      stress.isPending,
   };
 }

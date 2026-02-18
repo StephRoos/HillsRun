@@ -112,3 +112,19 @@ export function useBodyComposition(params?: {
     queryFn: () => garminApi.getBodyComposition(queryParams),
   });
 }
+
+export function useStress(params?: {
+  start_date?: string;
+  end_date?: string;
+  limit?: number;
+}) {
+  const queryParams: Record<string, string> = {};
+  if (params?.start_date) queryParams.start_date = params.start_date;
+  if (params?.end_date) queryParams.end_date = params.end_date;
+  if (params?.limit) queryParams.limit = String(params.limit);
+
+  return useQuery({
+    queryKey: ["stress", queryParams],
+    queryFn: () => garminApi.getStress(queryParams),
+  });
+}

@@ -50,12 +50,12 @@ export function ActivityMetrics({ activity }: { activity: ActivityDetail }) {
       icon: Clock,
     },
     {
-      label: "Allure moy.",
+      label: "Avg pace",
       value: formatPace(activity.average_speed),
       icon: Zap,
     },
     {
-      label: "FC moy / max",
+      label: "Avg / max HR",
       value:
         activity.average_hr != null
           ? `${activity.average_hr} / ${activity.max_hr ?? "—"} bpm`

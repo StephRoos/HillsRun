@@ -1,0 +1,17 @@
+{
+  "name": "HillsRun",
+  "short_name": "HillsRun",
+  "description": "Trail running essentials from your Garmin data",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0F1419",
+  "theme_color": "#FF8C00",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

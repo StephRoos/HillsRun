@@ -13,6 +13,9 @@ import {
   Vo2MaxChart,
   HrvChart,
   TrainingLoadChart,
+  SleepScoreChart,
+  WeightChart,
+  StressChart,
 } from "@/components/charts/trend-charts";
 
 const PERIODS: { label: string; value: Period }[] = [
@@ -24,8 +27,19 @@ const PERIODS: { label: string; value: Period }[] = [
 
 export default function TrendsPage() {
   const [period, setPeriod] = useState<Period>("3m");
-  const { weeklyData, weeklyAverages, periodSummary, readiness, hrv, fitness, isPending } =
-    useTrends(period);
+  const {
+    weeklyData,
+    weeklyAverages,
+    weekTicks,
+    periodSummary,
+    readiness,
+    hrv,
+    fitness,
+    sleep,
+    weight,
+    stress,
+    isPending,
+  } = useTrends(period);
 
   return (
     <div className="p-6 space-y-6">
@@ -109,17 +123,20 @@ export default function TrendsPage() {
 
       {isPending ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
+          {Array.from({ length: 8 }).map((_, i) => (
             <Skeleton key={i} className="h-72" />
           ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <WeeklyVolumeChart data={weeklyData} average={weeklyAverages.distance} />
-          <WeeklyElevationChart data={weeklyData} average={weeklyAverages.elevationGain} />
-          <Vo2MaxChart data={fitness} />
-          <HrvChart data={hrv} />
-          <TrainingLoadChart data={readiness} />
+          <WeeklyVolumeChart data={weeklyData} average={weeklyAverages.distance} weekTicks={weekTicks} />
+          <WeeklyElevationChart data={weeklyData} average={weeklyAverages.elevationGain} weekTicks={weekTicks} />
+          <Vo2MaxChart data={fitness} weekTicks={weekTicks} />
+          <HrvChart data={hrv} weekTicks={weekTicks} />
+          <TrainingLoadChart data={readiness} weekTicks={weekTicks} />
+          <SleepScoreChart data={sleep} weekTicks={weekTicks} />
+          <WeightChart data={weight} weekTicks={weekTicks} />
+          <StressChart data={stress} weekTicks={weekTicks} />
         </div>
       )}
     </div>

@@ -104,7 +104,11 @@ class ActivitiesFetcher(BaseFetcher):
             "activity_id": data.get("activityId"),
             "activity_name": data.get("activityName"),
             "activity_type": data.get("activityType", {}).get("typeKey") if isinstance(data.get("activityType"), dict) else data.get("activityType"),
-            "sport_type": data.get("sportTypeKey") or data.get("eventType", {}).get("typeKey"),
+            "sport_type": (
+                (data.get("sportTypeKey") if data.get("sportTypeKey") not in (None, "uncategorized") else None)
+                or (data.get("activityType", {}).get("typeKey") if isinstance(data.get("activityType"), dict) else data.get("activityType"))
+                or data.get("eventType", {}).get("typeKey")
+            ),
             "start_timestamp": start_ts,
             "duration_seconds": data.get("duration") or data.get("elapsedDuration"),
             "distance_meters": data.get("distance"),

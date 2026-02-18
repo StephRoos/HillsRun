@@ -8,7 +8,7 @@ export default function NotFound() {
       <Mountain className="h-16 w-16 text-muted-foreground" />
       <h1 className="text-4xl font-bold">404</h1>
       <p className="text-muted-foreground">
-        Ce sentier n&apos;existe pas.
+        This trail doesn&apos;t exist.
       </p>
       <Button asChild>
         <Link href="/">Back to home</Link>

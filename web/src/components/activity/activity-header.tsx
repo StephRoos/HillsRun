@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft, Pencil, Trophy, Star, Watch } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -79,7 +79,7 @@ export function ActivityHeader({ activity }: { activity: ActivityDetail }) {
         <ArrowLeft className="h-4 w-4" />
         Dashboard
       </Button>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         {editing ? (
           <Input
             ref={inputRef}
@@ -105,10 +105,33 @@ export function ActivityHeader({ activity }: { activity: ActivityDetail }) {
         <Badge variant="secondary">
           {activityTypeLabel(activity.activity_type)}
         </Badge>
+        {activity.pr && (
+          <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">
+            <Trophy className="h-3 w-3 mr-1" />
+            PR
+          </Badge>
+        )}
+        {activity.favorite && (
+          <Badge className="bg-pink-500/10 text-pink-500 border-pink-500/20">
+            <Star className="h-3 w-3 mr-1" />
+            Favorite
+          </Badge>
+        )}
       </div>
-      <p className="text-sm text-muted-foreground">
-        {formatDate(activity.start_timestamp)}
-      </p>
+      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+        <span>{formatDate(activity.start_timestamp)}</span>
+        {activity.device_name && (
+          <span className="flex items-center gap-1">
+            <Watch className="h-3.5 w-3.5" />
+            {activity.device_name}
+          </span>
+        )}
+      </div>
+      {activity.description && (
+        <p className="text-sm text-muted-foreground bg-accent/30 rounded-md px-3 py-2 mt-2">
+          {activity.description}
+        </p>
+      )}
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSession, signOut } from "@/lib/auth-client";
+import { useSession, signOut, authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -26,24 +26,30 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
 
 export default function SettingsPage() {
   const router = useRouter();
   const { data: session } = useSession();
   const [name, setName] = useState(session?.user?.name ?? "");
+  const [saving, setSaving] = useState(false);
   const [units, setUnits] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("hillsrun-units") ?? "km";
     }
     return "km";
   });
-  const [saved, setSaved] = useState(false);
 
-  function handleSaveName() {
-    // For MVP, name update would call Better-Auth's update profile
-    // For now, just show feedback
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  async function handleSaveName() {
+    setSaving(true);
+    try {
+      await authClient.updateUser({ name });
+      toast.success("Display name updated");
+    } catch {
+      toast.error("Failed to update display name");
+    } finally {
+      setSaving(false);
+    }
   }
 
   function handleUnitsChange(value: string) {
@@ -51,13 +57,19 @@ export default function SettingsPage() {
     if (typeof window !== "undefined") {
       localStorage.setItem("hillsrun-units", value);
     }
+    toast.success(`Units set to ${value === "km" ? "kilometers" : "miles"}`);
   }
 
   async function handleDeleteAccount() {
-    // In MVP, sign out and redirect
-    // Full account deletion would require a server action
-    await signOut();
-    router.push("/");
+    try {
+      await authClient.deleteUser();
+      toast.success("Account deleted");
+      router.push("/");
+    } catch {
+      // Fallback: sign out if deletion not supported
+      await signOut();
+      router.push("/");
+    }
   }
 
   return (
@@ -92,14 +104,9 @@ export default function SettingsPage() {
               placeholder="Your first name"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <Button size="sm" onClick={handleSaveName}>
-              Save
-            </Button>
-            {saved && (
-              <span className="text-sm text-primary">Saved</span>
-            )}
-          </div>
+          <Button size="sm" onClick={handleSaveName} disabled={saving}>
+            {saving ? "Saving..." : "Save"}
+          </Button>
         </CardContent>
       </Card>
 

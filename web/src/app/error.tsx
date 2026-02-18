@@ -15,7 +15,7 @@ export default function Error({
       <AlertTriangle className="h-12 w-12 text-destructive" />
       <h2 className="text-xl font-semibold">Something went wrong</h2>
       <p className="text-sm text-muted-foreground text-center max-w-md">
-        {error.message || "Une erreur inattendue est survenue."}
+        {error.message || "An unexpected error occurred."}
       </p>
       <Button onClick={reset}>Try again</Button>
     </div>

@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ActivityHeader } from "@/components/activity/activity-header";
 import { ActivityMetrics } from "@/components/activity/activity-metrics";
 import { SecondaryMetrics } from "@/components/activity/secondary-metrics";
+import { SimilarActivities } from "@/components/activity/similar-activities";
 import { SplitsTable } from "@/components/activity/splits-table";
 import {
   SplitsElevationChart,
@@ -62,6 +63,7 @@ export default function ActivityPage({
 
       <SplitsTable splits={splits} />
       <SecondaryMetrics activity={activity} />
+      <SimilarActivities activity={activity} />
     </div>
   );
 }

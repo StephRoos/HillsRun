@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { garminApi } from "@/lib/garmin-api";
+import { toast } from "sonner";
 
 export function useActivities(params?: {
   limit?: number;
@@ -54,6 +55,7 @@ export function useUpdateActivity(id: string) {
       if (context?.previous) {
         queryClient.setQueryData(["activity", id], context.previous);
       }
+      toast.error("Failed to rename activity");
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["activity", id] });

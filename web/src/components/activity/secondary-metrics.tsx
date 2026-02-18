@@ -16,19 +16,19 @@ function Row({ label, value }: { label: string; value: string | null }) {
 export function SecondaryMetrics({ activity }: { activity: ActivityDetail }) {
   const rows = [
     {
-      label: "Cadence moy.",
+      label: "Avg cadence",
       value: activity.average_running_cadence
         ? `${Math.round(activity.average_running_cadence)} spm`
         : null,
     },
     {
-      label: "Oscillation verticale",
+      label: "Vertical oscillation",
       value: activity.avg_vertical_oscillation
         ? `${activity.avg_vertical_oscillation.toFixed(1)} cm`
         : null,
     },
     {
-      label: "Temps de contact sol",
+      label: "Ground contact time",
       value: activity.avg_ground_contact_time
         ? `${Math.round(activity.avg_ground_contact_time)} ms`
         : null,
@@ -40,7 +40,7 @@ export function SecondaryMetrics({ activity }: { activity: ActivityDetail }) {
         : null,
     },
     {
-      label: "Puissance moy.",
+      label: "Avg power",
       value: activity.average_power
         ? `${Math.round(activity.average_power)} W`
         : null,
