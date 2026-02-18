@@ -56,10 +56,10 @@ export function WeeklySummary() {
   }
 
   const items = [
+    { label: "Runs", value: String(stats?.count ?? 0), icon: ActivityIcon },
     { label: "Distance", value: formatDistance(stats?.totalDistance ?? 0), icon: Route },
     { label: "Elevation", value: formatElevation(stats?.totalElevation ?? 0), icon: Mountain },
     { label: "Time", value: formatDuration(stats?.totalDuration ?? 0), icon: Clock },
-    { label: "Runs", value: String(stats?.count ?? 0), icon: ActivityIcon },
   ];
 
   return (
