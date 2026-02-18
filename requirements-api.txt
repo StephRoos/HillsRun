@@ -2,3 +2,10 @@ fastapi>=0.111.0
 uvicorn[standard]>=0.29.0
 asyncpg>=0.29.0
 pyyaml>=6.0
+# Sync dependencies (for in-process sync trigger)
+garminconnect>=0.2.19
+garth>=0.4.46
+requests>=2.31.0
+tenacity>=8.2.3
+python-dateutil>=2.8.2
+pytz>=2024.1
