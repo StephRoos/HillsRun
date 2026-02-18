@@ -33,7 +33,8 @@ export function useConnectGarmin() {
         console.error("[connect-garmin] error response:", res.status, text);
         let data: Record<string, unknown> = {};
         try { data = JSON.parse(text); } catch { /* non-JSON response */ }
-        throw new Error(data.detail || data.error || `Failed to connect Garmin account (${res.status})`);
+        const msg = (data.detail as string) || (data.error as string) || `Failed to connect Garmin account (${res.status})`;
+        throw new Error(msg);
       }
       return res.json();
     },
