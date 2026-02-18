@@ -69,7 +69,7 @@ export const garminApi = {
 
   // Sync
   triggerSync: async () => {
-    const res = await fetch("/api/garmin/sync/trigger", { method: "POST" });
+    const res = await fetch("/api/garmin/sync/trigger", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
     if (!res.ok && res.status !== 409) {
       throw new Error(`Sync trigger error: ${res.status}`);
     }

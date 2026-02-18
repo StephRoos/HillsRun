@@ -43,7 +43,7 @@ export async function POST(
       "X-API-Key": API_KEY ?? "",
       "Content-Type": "application/json",
     },
-    body: body || undefined,
+    body: body || "{}",
   });
 
   if (!res.ok) {

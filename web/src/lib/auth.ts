@@ -23,6 +23,7 @@ export const auth = betterAuth({
             "X-API-Key": GARMIN_API_KEY ?? "",
             "Content-Type": "application/json",
           },
+          body: "{}",
         }).catch(() => {
           // Silently ignore errors (409 = sync already running, network issues, etc.)
         });
