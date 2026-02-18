@@ -1,8 +1,8 @@
 """Shared FastAPI dependencies."""
 
 from datetime import date, timedelta
-from typing import Annotated, Optional
-from fastapi import Depends, Query, HTTPException, status, Request
+from typing import Optional
+from fastapi import Query, HTTPException, status, Request
 
 
 def get_db(request: Request):
@@ -10,9 +10,17 @@ def get_db(request: Request):
 
 
 async def get_user_id(request: Request) -> int:
+    """Resolve user_id: X-Garmin-User-Id header takes priority, then singleton fallback."""
+    header_value = request.headers.get("X-Garmin-User-Id")
+    if header_value:
+        try:
+            return int(header_value)
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid X-Garmin-User-Id header")
+
+    # Fallback: singleton user (backward compat for Streamlit dashboard, direct API)
     user_id = request.app.state.user_id
     if user_id is None:
-        # User may have been created by a sync after API startup — retry once
         db = request.app.state.db
         user_id = await db.query_first_user()
         if user_id is not None:

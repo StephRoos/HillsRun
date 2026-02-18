@@ -26,6 +26,7 @@ class GarminConfig:
     tokens_dir: Path = field(default_factory=lambda: Path.home() / ".garminconnect")
     email: Optional[str] = None
     password: Optional[str] = None
+    token_key: Optional[str] = None  # Fernet key for encrypting/decrypting DB tokens
 
 
 @dataclass
@@ -112,6 +113,7 @@ class Config:
             tokens_dir=Path(tokens_dir_str).expanduser(),
             email=cls._get_env_or_key(garmin_data, "email", "GARMIN_EMAIL", None),
             password=cls._get_env_or_key(garmin_data, "password", "GARMIN_PASSWORD", None),
+            token_key=cls._get_env_or_key(garmin_data, "token_key", "GARMIN_TOKEN_KEY", None),
         )
 
         # Sync config

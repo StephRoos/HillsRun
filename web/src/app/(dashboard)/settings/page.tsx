@@ -27,18 +27,30 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { GarminConnectForm } from "@/components/settings/garmin-connect-form";
+import {
+  useGarminAccount,
+  useDisconnectGarmin,
+} from "@/hooks/use-garmin-account";
+import { garminApi } from "@/lib/garmin-api";
+import { Loader2 } from "lucide-react";
 
 export default function SettingsPage() {
   const router = useRouter();
   const { data: session } = useSession();
   const [name, setName] = useState(session?.user?.name ?? "");
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [units, setUnits] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("hillsrun-units") ?? "km";
     }
     return "km";
   });
+
+  const { data: garminAccount, isLoading: garminLoading } =
+    useGarminAccount();
+  const disconnectMutation = useDisconnectGarmin();
 
   async function handleSaveName() {
     setSaving(true);
@@ -58,6 +70,20 @@ export default function SettingsPage() {
       localStorage.setItem("hillsrun-units", value);
     }
     toast.success(`Units set to ${value === "km" ? "kilometers" : "miles"}`);
+  }
+
+  async function handleSyncNow(full = false) {
+    setSyncing(true);
+    try {
+      await garminApi.triggerSync(
+        full ? { mode: "full", days_back: 365 } : undefined
+      );
+      toast.success(full ? "Full sync started" : "Sync started");
+    } catch {
+      toast.error("Failed to trigger sync");
+    } finally {
+      setSyncing(false);
+    }
   }
 
   async function handleDeleteAccount() {
@@ -107,6 +133,97 @@ export default function SettingsPage() {
           <Button size="sm" onClick={handleSaveName} disabled={saving}>
             {saving ? "Saving..." : "Save"}
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Garmin Account */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">
+            Garmin Account
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {garminLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading...
+            </div>
+          ) : garminAccount?.connected ? (
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <p className="text-sm">
+                  Connected as{" "}
+                  <span className="font-medium">
+                    {garminAccount.garmin_display_name}
+                  </span>
+                </p>
+                {garminAccount.last_sync && (
+                  <p className="text-xs text-muted-foreground">
+                    Last sync:{" "}
+                    {new Date(garminAccount.last_sync).toLocaleString()}
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleSyncNow(false)}
+                  disabled={syncing}
+                >
+                  {syncing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Syncing...
+                    </>
+                  ) : (
+                    "Sync now"
+                  )}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleSyncNow(true)}
+                  disabled={syncing}
+                >
+                  Full sync
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={disconnectMutation.isPending}
+                    >
+                      Disconnect
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        Disconnect Garmin account?
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Your synced data will remain but no new data will be
+                        fetched. You can reconnect anytime.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => disconnectMutation.mutate()}
+                      >
+                        Disconnect
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
+          ) : (
+            <GarminConnectForm />
+          )}
         </CardContent>
       </Card>
 

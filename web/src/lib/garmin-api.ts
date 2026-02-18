@@ -13,6 +13,13 @@ import type {
   BodyComposition,
 } from "@/types/garmin";
 
+export class GarminNotConnectedError extends Error {
+  constructor() {
+    super("Garmin account not connected");
+    this.name = "GarminNotConnectedError";
+  }
+}
+
 async function garminFetch<T>(
   path: string,
   params?: Record<string, string>
@@ -24,6 +31,9 @@ async function garminFetch<T>(
 
   const res = await fetch(url.toString());
   if (!res.ok) {
+    if (res.status === 403) {
+      throw new GarminNotConnectedError();
+    }
     throw new Error(`Garmin API error: ${res.status}`);
   }
   return res.json();
@@ -78,8 +88,12 @@ export const garminApi = {
   },
 
   // Sync
-  triggerSync: async () => {
-    const res = await fetch("/api/garmin/sync/trigger", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  triggerSync: async (options?: { mode?: string; days_back?: number }) => {
+    const res = await fetch("/api/garmin/sync/trigger", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(options ?? {}),
+    });
     if (!res.ok && res.status !== 409) {
       throw new Error(`Sync trigger error: ${res.status}`);
     }

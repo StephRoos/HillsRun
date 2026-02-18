@@ -87,22 +87,111 @@ class Database:
         user_id = await self.pool.fetchval(query, garmin_user_id, display_name, email)
         return user_id
 
+    async def get_user_by_better_auth_id(self, better_auth_user_id: str) -> Optional[int]:
+        """Get garmin user_id by Better-Auth user ID."""
+        return await self.pool.fetchval(
+            "SELECT user_id FROM garmin_user WHERE better_auth_user_id = $1",
+            better_auth_user_id,
+        )
+
+    async def get_or_create_user_with_link(
+        self,
+        garmin_user_id: str,
+        better_auth_user_id: str,
+        display_name: Optional[str] = None,
+        email: Optional[str] = None,
+    ) -> int:
+        """Get or create user linked to a Better-Auth account.
+
+        Uses a transaction to first clear any stale better_auth_user_id link
+        (from a different garmin_user row) before upserting, preventing
+        UNIQUE constraint violations when switching Garmin accounts.
+        """
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                # Clear stale link on OTHER garmin_user rows to avoid UNIQUE violation
+                await conn.execute(
+                    "UPDATE garmin_user SET better_auth_user_id = NULL WHERE better_auth_user_id = $1 AND garmin_user_id != $2",
+                    better_auth_user_id, garmin_user_id,
+                )
+                return await conn.fetchval("""
+                    INSERT INTO garmin_user (garmin_user_id, better_auth_user_id, display_name, email)
+                    VALUES ($1, $2, $3, $4)
+                    ON CONFLICT (garmin_user_id) DO UPDATE
+                    SET better_auth_user_id = COALESCE(EXCLUDED.better_auth_user_id, garmin_user.better_auth_user_id),
+                        display_name = COALESCE(EXCLUDED.display_name, garmin_user.display_name),
+                        email = COALESCE(EXCLUDED.email, garmin_user.email),
+                        updated_at = CURRENT_TIMESTAMP
+                    RETURNING user_id
+                """, garmin_user_id, better_auth_user_id, display_name, email)
+
+    async def link_better_auth_user(self, user_id: int, better_auth_user_id: str) -> None:
+        """Link an existing garmin_user to a Better-Auth account."""
+        await self.pool.execute(
+            "UPDATE garmin_user SET better_auth_user_id = $1 WHERE user_id = $2",
+            better_auth_user_id, user_id,
+        )
+
+    async def store_encrypted_tokens(self, user_id: int, encrypted_tokens: bytes) -> None:
+        """Store encrypted Garmin tokens for a user."""
+        await self.pool.execute(
+            "UPDATE garmin_user SET encrypted_tokens = $1, tokens_updated_at = CURRENT_TIMESTAMP WHERE user_id = $2",
+            encrypted_tokens, user_id,
+        )
+
+    async def get_encrypted_tokens(self, user_id: int) -> Optional[bytes]:
+        """Get encrypted Garmin tokens for a user."""
+        return await self.pool.fetchval(
+            "SELECT encrypted_tokens FROM garmin_user WHERE user_id = $1",
+            user_id,
+        )
+
+    async def get_user_info(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """Get user info (display_name, email, etc.)."""
+        row = await self.pool.fetchrow(
+            "SELECT user_id, garmin_user_id, display_name, email, better_auth_user_id, encrypted_tokens IS NOT NULL AS has_tokens, tokens_updated_at FROM garmin_user WHERE user_id = $1",
+            user_id,
+        )
+        if not row:
+            return None
+        info = dict(row)
+        # Map has_tokens to encrypted_tokens for backward compat check
+        info["encrypted_tokens"] = info.pop("has_tokens")
+        return info
+
+    async def clear_user_tokens(self, user_id: int) -> None:
+        """Clear encrypted tokens for a user (disconnect)."""
+        await self.pool.execute(
+            "UPDATE garmin_user SET encrypted_tokens = NULL, tokens_updated_at = NULL WHERE user_id = $1",
+            user_id,
+        )
+
+    async def unlink_better_auth_user(self, user_id: int) -> None:
+        """Unlink a Better-Auth account from a garmin_user."""
+        await self.pool.execute(
+            "UPDATE garmin_user SET better_auth_user_id = NULL, encrypted_tokens = NULL, tokens_updated_at = NULL WHERE user_id = $1",
+            user_id,
+        )
+
     # ============================================
     # Sync State Operations
     # ============================================
 
-    async def get_last_sync_date(self, category: str) -> Optional[date]:
+    async def get_last_sync_date(self, category: str, user_id: Optional[int] = None) -> Optional[date]:
         """Get last sync date for a category.
 
         Args:
             category: Sync category
+            user_id: Optional user ID for per-user sync state
 
         Returns:
             Last sync date or None if never synced
         """
+        if user_id is not None:
+            query = "SELECT last_sync_date FROM sync_state WHERE category = $1 AND user_id = $2"
+            return await self.pool.fetchval(query, category, user_id)
         query = "SELECT last_sync_date FROM sync_state WHERE category = $1"
-        result = await self.pool.fetchval(query, category)
-        return result
+        return await self.pool.fetchval(query, category)
 
     async def update_sync_state(
         self,
@@ -111,6 +200,7 @@ class Database:
         records_synced: int,
         sync_status: str = "success",
         error_message: Optional[str] = None,
+        user_id: Optional[int] = None,
     ) -> None:
         """Update sync state for a category.
 
@@ -120,25 +210,32 @@ class Database:
             records_synced: Number of records synced
             sync_status: Status (success, partial, failed)
             error_message: Optional error message
+            user_id: Optional user ID for per-user sync state
         """
-        query = """
-            INSERT INTO sync_state (category, last_sync_date, last_sync_timestamp, records_synced, sync_status, error_message)
-            VALUES ($1, $2, CURRENT_TIMESTAMP, $3, $4, $5)
-            ON CONFLICT (category) DO UPDATE
-            SET last_sync_date = EXCLUDED.last_sync_date,
-                last_sync_timestamp = CURRENT_TIMESTAMP,
-                records_synced = EXCLUDED.records_synced,
-                sync_status = EXCLUDED.sync_status,
-                error_message = EXCLUDED.error_message
-        """
-        await self.pool.execute(
-            query,
-            category,
-            last_sync_date,
-            records_synced,
-            sync_status,
-            error_message,
-        )
+        if user_id is not None:
+            query = """
+                INSERT INTO sync_state (user_id, category, last_sync_date, last_sync_timestamp, records_synced, sync_status, error_message)
+                VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, $5, $6)
+                ON CONFLICT (user_id, category) DO UPDATE
+                SET last_sync_date = EXCLUDED.last_sync_date,
+                    last_sync_timestamp = CURRENT_TIMESTAMP,
+                    records_synced = EXCLUDED.records_synced,
+                    sync_status = EXCLUDED.sync_status,
+                    error_message = EXCLUDED.error_message
+            """
+            await self.pool.execute(query, user_id, category, last_sync_date, records_synced, sync_status, error_message)
+        else:
+            query = """
+                INSERT INTO sync_state (category, last_sync_date, last_sync_timestamp, records_synced, sync_status, error_message)
+                VALUES ($1, $2, CURRENT_TIMESTAMP, $3, $4, $5)
+                ON CONFLICT (user_id, category) DO UPDATE
+                SET last_sync_date = EXCLUDED.last_sync_date,
+                    last_sync_timestamp = CURRENT_TIMESTAMP,
+                    records_synced = EXCLUDED.records_synced,
+                    sync_status = EXCLUDED.sync_status,
+                    error_message = EXCLUDED.error_message
+            """
+            await self.pool.execute(query, category, last_sync_date, records_synced, sync_status, error_message)
         logger.info(f"Updated sync state for {category}: {last_sync_date}, {records_synced} records")
 
     # ============================================
@@ -647,6 +744,31 @@ class Database:
             "manual_activity", "pr", "favorite", "auto_calc_calories", "num_laps", "activity_data"
         ]])
 
+    async def get_activity_ids_for_range(self, user_id: int, start_date: date, end_date: date) -> List[int]:
+        """Get all activity_ids in DB for a user within a date range."""
+        rows = await self.pool.fetch(
+            "SELECT activity_id FROM activities WHERE user_id=$1 AND start_timestamp::date BETWEEN $2 AND $3",
+            user_id, start_date, end_date,
+        )
+        return [r["activity_id"] for r in rows]
+
+    async def delete_activities(self, activity_ids: List[int], user_id: int) -> int:
+        """Delete activities by IDs for a specific user. Also deletes related splits."""
+        if not activity_ids:
+            return 0
+        await self.pool.execute(
+            "DELETE FROM activity_splits WHERE activity_id = ANY($1::bigint[]) "
+            "AND activity_id IN (SELECT activity_id FROM activities WHERE user_id = $2)",
+            activity_ids, user_id,
+        )
+        result = await self.pool.execute(
+            "DELETE FROM activities WHERE activity_id = ANY($1::bigint[]) AND user_id = $2",
+            activity_ids, user_id,
+        )
+        # result is like "DELETE 3"
+        count = int(result.split()[-1]) if result else 0
+        return count
+
     async def upsert_hydration_data(self, user_id: int, data: Dict[str, Any]) -> None:
         """Upsert hydration data."""
         query = """
@@ -858,12 +980,23 @@ class Database:
         )
         return rows, total
 
-    async def query_activity_by_id(self, activity_id: int):
+    async def query_activity_by_id(self, activity_id: int, user_id: Optional[int] = None):
+        if user_id is not None:
+            return await self.pool.fetchrow(
+                "SELECT * FROM activities WHERE activity_id=$1 AND user_id=$2", activity_id, user_id
+            )
         return await self.pool.fetchrow(
             "SELECT * FROM activities WHERE activity_id=$1", activity_id
         )
 
-    async def query_activity_splits(self, activity_id: int):
+    async def query_activity_splits(self, activity_id: int, user_id: Optional[int] = None):
+        if user_id is not None:
+            # Verify the activity belongs to the user before returning splits
+            activity = await self.pool.fetchval(
+                "SELECT activity_id FROM activities WHERE activity_id=$1 AND user_id=$2", activity_id, user_id
+            )
+            if activity is None:
+                return []
         return await self.pool.fetch(
             "SELECT * FROM activity_splits WHERE activity_id=$1 ORDER BY split_index",
             activity_id,
@@ -883,18 +1016,28 @@ class Database:
         )
         return rows, total
 
-    async def update_activity_custom_name(self, activity_id: int, custom_name: Optional[str]) -> bool:
+    async def update_activity_custom_name(self, activity_id: int, custom_name: Optional[str], user_id: Optional[int] = None) -> bool:
         """Update the custom_name of an activity.
 
         Returns True if the activity was found and updated.
         """
-        result = await self.pool.execute(
-            "UPDATE activities SET custom_name = $1 WHERE activity_id = $2",
-            custom_name, activity_id,
-        )
+        if user_id is not None:
+            result = await self.pool.execute(
+                "UPDATE activities SET custom_name = $1 WHERE activity_id = $2 AND user_id = $3",
+                custom_name, activity_id, user_id,
+            )
+        else:
+            result = await self.pool.execute(
+                "UPDATE activities SET custom_name = $1 WHERE activity_id = $2",
+                custom_name, activity_id,
+            )
         return result == "UPDATE 1"
 
-    async def query_sync_status(self):
+    async def query_sync_status(self, user_id: Optional[int] = None):
+        if user_id is not None:
+            return await self.pool.fetch(
+                "SELECT * FROM sync_state WHERE user_id = $1 ORDER BY category", user_id
+            )
         return await self.pool.fetch(
             "SELECT * FROM sync_state ORDER BY category"
         )

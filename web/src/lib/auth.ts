@@ -19,10 +19,22 @@ export const auth = betterAuth({
       const isSignIn = ctx.path.startsWith("/sign-in");
 
       if (isSignIn || isSignUp) {
+        // Extract user ID from the response body for per-user sync
+        let betterAuthUserId: string | undefined;
+        try {
+          const returned = ctx.context?.returned as Response | undefined;
+          if (returned && typeof returned.clone === "function") {
+            const body = await returned.clone().json();
+            betterAuthUserId = body?.user?.id;
+          }
+        } catch {
+          // Ignore parse errors
+        }
+
         // Full sync for new users (1 year), incremental for returning users
-        const body = isSignUp
-          ? JSON.stringify({ mode: "full", days_back: 365 })
-          : "{}";
+        const syncBody = isSignUp
+          ? { mode: "full", days_back: 365, better_auth_user_id: betterAuthUserId }
+          : { better_auth_user_id: betterAuthUserId };
 
         fetch(`${GARMIN_API_BASE}/api/v1/sync/trigger`, {
           method: "POST",
@@ -30,9 +42,9 @@ export const auth = betterAuth({
             "X-API-Key": GARMIN_API_KEY ?? "",
             "Content-Type": "application/json",
           },
-          body,
+          body: JSON.stringify(syncBody),
         }).catch(() => {
-          // Silently ignore errors (409 = sync already running, network issues, etc.)
+          // Silently ignore errors (409 = sync already running, 404 = no garmin linked, etc.)
         });
       }
     }),

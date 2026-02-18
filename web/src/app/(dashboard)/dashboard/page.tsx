@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { List, CalendarDays } from "lucide-react";
+import { List, CalendarDays, Link } from "lucide-react";
 import { WeeklySummary } from "@/components/dashboard/weekly-summary";
 import { ReadinessCard } from "@/components/dashboard/readiness-card";
 import { TodayActivities } from "@/components/dashboard/today-activities";
@@ -9,9 +9,33 @@ import { ActivityList } from "@/components/activity/activity-list";
 import { ActivityCalendar } from "@/components/dashboard/activity-calendar";
 import { SyncButton } from "@/components/dashboard/sync-button";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { useGarminAccount } from "@/hooks/use-garmin-account";
+import NextLink from "next/link";
 
 export default function DashboardPage() {
   const [view, setView] = useState<"list" | "calendar">("list");
+  const { data: garminAccount, isLoading } = useGarminAccount();
+
+  if (!isLoading && garminAccount && !garminAccount.connected) {
+    return (
+      <div className="p-6 space-y-6">
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center space-y-4">
+            <Link className="h-12 w-12 text-muted-foreground" />
+            <h2 className="text-lg font-semibold">Connect your Garmin account</h2>
+            <p className="text-sm text-muted-foreground max-w-md">
+              Link your Garmin Connect account to start syncing your activities, health metrics, and training data.
+            </p>
+            <Button asChild>
+              <NextLink href="/settings">Go to Settings</NextLink>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">

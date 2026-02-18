@@ -1,6 +1,7 @@
 """Sync manager for orchestrating data synchronization."""
 
 import logging
+import os
 from datetime import date
 from typing import Optional, Dict, Any, List
 
@@ -29,44 +30,77 @@ class SyncManager:
         self.db: Optional[Database] = None
         self.garmin_client: Optional[GarminClient] = None
         self.user_id: Optional[int] = None
+        self._tokens_from_db = False
 
-    async def initialize(self) -> None:
-        """Initialize database and Garmin connections."""
+    async def initialize(self, user_id: Optional[int] = None) -> None:
+        """Initialize database and Garmin connections.
+
+        Args:
+            user_id: Optional specific user_id to sync for (loads tokens from DB).
+                     If None, uses filesystem tokens (backward compat).
+        """
         logger.info("Initializing sync manager...")
 
         # Initialize database
         self.db = Database(self.config.database)
         await self.db.connect()
 
-        # Initialize Garmin client
-        self.garmin_client = GarminClient(
-            self.config.garmin,
-            rate_limit_delay=self.config.sync.rate_limit_delay,
-        )
-        self.garmin_client.connect()
+        if user_id is not None:
+            # Per-user mode: load tokens from DB
+            encrypted_tokens = await self.db.get_encrypted_tokens(user_id)
+            if not encrypted_tokens:
+                raise Exception(f"No encrypted tokens found for user_id={user_id}")
 
-        # Get or create user
-        success, profile, error = self.garmin_client.get_user_profile()
-        if not success:
-            raise Exception(f"Failed to get user profile: {error}")
+            token_key = os.environ.get("GARMIN_TOKEN_KEY", "")
+            if not token_key:
+                raise Exception("GARMIN_TOKEN_KEY environment variable is required")
 
-        # Extract user info - get_full_name() returns a string or dict
-        if isinstance(profile, dict):
-            garmin_user_id = str(profile.get("userId") or profile.get("displayName") or "unknown")
-            display_name = profile.get("displayName")
+            self.garmin_client = GarminClient.from_encrypted_tokens(
+                encrypted_tokens, token_key,
+                rate_limit_delay=self.config.sync.rate_limit_delay,
+            )
+            self.user_id = user_id
+            self._tokens_from_db = True
+            logger.info(f"Initialized for user_id={user_id} (tokens from DB)")
         else:
-            garmin_user_id = str(profile) if profile else "unknown"
-            display_name = str(profile) if profile else None
+            # Legacy mode: filesystem tokens
+            self.garmin_client = GarminClient(
+                self.config.garmin,
+                rate_limit_delay=self.config.sync.rate_limit_delay,
+            )
+            self.garmin_client.connect()
 
-        self.user_id = await self.db.get_or_create_user(
-            garmin_user_id=garmin_user_id,
-            display_name=display_name,
-        )
+            # Get or create user
+            success, profile, error = self.garmin_client.get_user_profile()
+            if not success:
+                raise Exception(f"Failed to get user profile: {error}")
 
-        logger.info(f"Initialized for user: {display_name} (ID: {self.user_id})")
+            if isinstance(profile, dict):
+                garmin_user_id = str(profile.get("userId") or profile.get("displayName") or "unknown")
+                display_name = profile.get("displayName")
+            else:
+                garmin_user_id = str(profile) if profile else "unknown"
+                display_name = str(profile) if profile else None
+
+            self.user_id = await self.db.get_or_create_user(
+                garmin_user_id=garmin_user_id,
+                display_name=display_name,
+            )
+            logger.info(f"Initialized for user: {display_name} (ID: {self.user_id})")
 
     async def cleanup(self) -> None:
-        """Clean up connections."""
+        """Clean up connections. Re-encrypt refreshed tokens if loaded from DB."""
+        if self._tokens_from_db and self.garmin_client and self.db and self.user_id:
+            try:
+                from .token_manager import TokenManager
+                token_key = os.environ.get("GARMIN_TOKEN_KEY", "")
+                refreshed = self.garmin_client.get_refreshed_tokens()
+                tm = TokenManager(token_key)
+                encrypted = tm.encrypt(refreshed)
+                await self.db.store_encrypted_tokens(self.user_id, encrypted)
+                logger.info(f"Re-encrypted refreshed tokens for user_id={self.user_id}")
+            except Exception as e:
+                logger.warning(f"Failed to re-encrypt tokens: {e}")
         if self.db:
             await self.db.disconnect()
         logger.info("Sync manager cleanup complete")

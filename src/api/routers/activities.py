@@ -28,8 +28,9 @@ async def list_activities(
 async def get_activity(
     activity_id: int,
     db=Depends(get_db),
+    user_id: int = Depends(get_user_id),
 ):
-    row = await db.query_activity_by_id(activity_id)
+    row = await db.query_activity_by_id(activity_id, user_id=user_id)
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Activity not found")
     return ActivityDetail.model_validate(dict(row))
@@ -40,11 +41,12 @@ async def update_activity(
     activity_id: int,
     body: ActivityUpdate,
     db=Depends(get_db),
+    user_id: int = Depends(get_user_id),
 ):
-    updated = await db.update_activity_custom_name(activity_id, body.custom_name)
+    updated = await db.update_activity_custom_name(activity_id, body.custom_name, user_id=user_id)
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Activity not found")
-    row = await db.query_activity_by_id(activity_id)
+    row = await db.query_activity_by_id(activity_id, user_id=user_id)
     return ActivityDetail.model_validate(dict(row))
 
 
@@ -52,6 +54,7 @@ async def update_activity(
 async def get_activity_splits(
     activity_id: int,
     db=Depends(get_db),
+    user_id: int = Depends(get_user_id),
 ):
-    rows = await db.query_activity_splits(activity_id)
+    rows = await db.query_activity_splits(activity_id, user_id=user_id)
     return {"data": [ActivitySplit.model_validate(dict(r)) for r in rows]}

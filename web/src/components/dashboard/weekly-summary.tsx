@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { Mountain, Route, Clock, Activity as ActivityIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DeltaBadge } from "@/components/ui/delta-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActivities } from "@/hooks/use-activities";
 import { formatDuration, formatDistance, formatElevation } from "@/lib/utils";
@@ -30,15 +31,6 @@ function computeStats(activities: Array<{ start_timestamp?: string | null; activ
     totalDistance: running.reduce((s, a) => s + (a.distance_meters ?? 0), 0),
     totalElevation: running.reduce((s, a) => s + (a.elevation_gain_meters ?? 0), 0),
   };
-}
-
-function DeltaBadge({ current, previous }: { current: number; previous: number }) {
-  if (previous === 0 && current === 0) return <span className="text-xs text-muted-foreground">—</span>;
-  if (previous === 0) return <span className="text-xs text-emerald-500">↑ new</span>;
-  const pct = Math.round(((current - previous) / previous) * 100);
-  if (pct === 0) return <span className="text-xs text-muted-foreground">—</span>;
-  if (pct > 0) return <span className="text-xs text-emerald-500">↑ {pct}%</span>;
-  return <span className="text-xs text-red-500">↓ {Math.abs(pct)}%</span>;
 }
 
 export function WeeklySummary() {

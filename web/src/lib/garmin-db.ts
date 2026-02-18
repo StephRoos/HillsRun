@@ -16,7 +16,19 @@ export interface GarminActivity {
   calories: number | null;
 }
 
-export async function getRecentActivities(limit = 20) {
+export async function getRecentActivities(limit = 20, userId?: number) {
+  if (userId != null) {
+    return prisma.$queryRaw<GarminActivity[]>`
+      SELECT activity_id, activity_name, activity_type, sport_type,
+             start_timestamp, duration_seconds, distance_meters,
+             elevation_gain_meters, elevation_loss_meters,
+             average_hr, max_hr, average_pace, calories
+      FROM activities
+      WHERE user_id = ${userId}
+      ORDER BY start_timestamp DESC
+      LIMIT ${limit}
+    `;
+  }
   return prisma.$queryRaw<GarminActivity[]>`
     SELECT activity_id, activity_name, activity_type, sport_type,
            start_timestamp, duration_seconds, distance_meters,
@@ -28,7 +40,19 @@ export async function getRecentActivities(limit = 20) {
   `;
 }
 
-export async function getTrailActivities(limit = 20) {
+export async function getTrailActivities(limit = 20, userId?: number) {
+  if (userId != null) {
+    return prisma.$queryRaw<GarminActivity[]>`
+      SELECT activity_id, activity_name, activity_type, sport_type,
+             start_timestamp, duration_seconds, distance_meters,
+             elevation_gain_meters, elevation_loss_meters,
+             average_hr, max_hr, average_pace, calories
+      FROM activities
+      WHERE user_id = ${userId} AND sport_type IN ('trail_running', 'running')
+      ORDER BY start_timestamp DESC
+      LIMIT ${limit}
+    `;
+  }
   return prisma.$queryRaw<GarminActivity[]>`
     SELECT activity_id, activity_name, activity_type, sport_type,
            start_timestamp, duration_seconds, distance_meters,
@@ -51,14 +75,26 @@ export interface TrainingReadiness {
   chronic_load: number | null;
 }
 
-export async function getLatestTrainingReadiness() {
-  const results = await prisma.$queryRaw<TrainingReadiness[]>`
-    SELECT calendar_date, score, score_feedback, hrv_status,
-           sleep_score, acute_load, chronic_load
-    FROM training_readiness
-    ORDER BY calendar_date DESC
-    LIMIT 1
-  `;
+export async function getLatestTrainingReadiness(userId?: number) {
+  let results: TrainingReadiness[];
+  if (userId != null) {
+    results = await prisma.$queryRaw<TrainingReadiness[]>`
+      SELECT calendar_date, score, score_feedback, hrv_status,
+             sleep_score, acute_load, chronic_load
+      FROM training_readiness
+      WHERE user_id = ${userId}
+      ORDER BY calendar_date DESC
+      LIMIT 1
+    `;
+  } else {
+    results = await prisma.$queryRaw<TrainingReadiness[]>`
+      SELECT calendar_date, score, score_feedback, hrv_status,
+             sleep_score, acute_load, chronic_load
+      FROM training_readiness
+      ORDER BY calendar_date DESC
+      LIMIT 1
+    `;
+  }
   return results[0] ?? null;
 }
 
@@ -71,7 +107,17 @@ export interface DailySummary {
   average_stress_level: number | null;
 }
 
-export async function getRecentDailySummaries(days = 7) {
+export async function getRecentDailySummaries(days = 7, userId?: number) {
+  if (userId != null) {
+    return prisma.$queryRaw<DailySummary[]>`
+      SELECT calendar_date, total_steps, total_distance_meters,
+             active_calories, resting_heart_rate, average_stress_level
+      FROM daily_summary
+      WHERE user_id = ${userId}
+      ORDER BY calendar_date DESC
+      LIMIT ${days}
+    `;
+  }
   return prisma.$queryRaw<DailySummary[]>`
     SELECT calendar_date, total_steps, total_distance_meters,
            active_calories, resting_heart_rate, average_stress_level

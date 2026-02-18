@@ -1,20 +1,50 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
+import { getGarminUserId } from "@/lib/garmin-user";
 
 const API_BASE = process.env.NEXT_PUBLIC_GARMIN_API_URL;
 const API_KEY = process.env.GARMIN_API_KEY;
+
+async function resolveGarminUserId(
+  request: NextRequest
+): Promise<{ userId: number | null; error?: NextResponse }> {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+    if (!session?.user?.id) {
+      return { userId: null, error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+    }
+
+    const garminUserId = await getGarminUserId(session.user.id);
+    if (!garminUserId) {
+      return { userId: null, error: NextResponse.json({ error: "Garmin account not connected" }, { status: 403 }) };
+    }
+
+    return { userId: garminUserId };
+  } catch {
+    return { userId: null, error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  }
+}
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
+  const { userId, error } = await resolveGarminUserId(request);
+  if (error) return error;
+
   const { path } = await params;
   const apiPath = `/api/v1/${path.join("/")}`;
   const searchParams = request.nextUrl.searchParams.toString();
   const url = `${API_BASE}${apiPath}${searchParams ? `?${searchParams}` : ""}`;
 
   const res = await fetch(url, {
-    headers: { "X-API-Key": API_KEY ?? "" },
+    headers: {
+      "X-API-Key": API_KEY ?? "",
+      "X-Garmin-User-Id": String(userId),
+    },
   });
 
   if (!res.ok) {
@@ -25,27 +55,6 @@ export async function GET(
   }
 
   const data = await res.json();
-
-  // Enrich activity listings with custom_name from DB
-  if (path.join("/") === "activities" && data.data && Array.isArray(data.data)) {
-    try {
-      const ids = data.data.map((a: { activity_id: number }) => BigInt(a.activity_id));
-      if (ids.length > 0) {
-        const rows = await prisma.$queryRaw<{ activity_id: bigint; custom_name: string | null }[]>`
-          SELECT activity_id, custom_name FROM activities
-          WHERE activity_id = ANY(${ids})
-          AND custom_name IS NOT NULL
-        `;
-        const nameMap = new Map(rows.map(r => [Number(r.activity_id), r.custom_name]));
-        for (const activity of data.data) {
-          activity.custom_name = nameMap.get(activity.activity_id) ?? null;
-        }
-      }
-    } catch {
-      // Column might not exist yet, ignore
-    }
-  }
-
   return NextResponse.json(data);
 }
 
@@ -53,6 +62,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
+  const { userId, error } = await resolveGarminUserId(request);
+  if (error) return error;
+
   const { path } = await params;
   const apiPath = `/api/v1/${path.join("/")}`;
   const url = `${API_BASE}${apiPath}`;
@@ -63,6 +75,7 @@ export async function POST(
     method: "POST",
     headers: {
       "X-API-Key": API_KEY ?? "",
+      "X-Garmin-User-Id": String(userId),
       "Content-Type": "application/json",
     },
     body: body || "{}",

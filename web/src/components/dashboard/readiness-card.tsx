@@ -120,14 +120,8 @@ export function ReadinessCard() {
       <CardContent className="space-y-3">
         <ReadinessGauge score={readiness?.score} />
         <MetricRow label="Sleep Score" value={sleep?.sleep_score ?? null} />
-        <MetricRow
-          label="Body Battery"
-          value={bb?.highest_value ?? bb?.charged_value ?? null}
-        />
-        <MetricRow
-          label="HRV"
-          value={hrv?.weekly_avg ?? hrv?.last_night_avg ?? null}
-        />
+        <MetricRow label="Body Battery" value={bb?.highest_value ?? bb?.charged_value ?? null} />
+        <MetricRow label="HRV" value={hrv?.weekly_avg ?? hrv?.last_night_avg ?? null} />
       </CardContent>
     </Card>
   );

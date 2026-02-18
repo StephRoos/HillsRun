@@ -61,8 +61,8 @@ class BaseFetcher(ABC):
 
         # Determine start date based on mode
         if mode == "incremental":
-            # Get last sync date for this category
-            last_sync = await self.db.get_last_sync_date(self.category)
+            # Get last sync date for this category (per-user if user_id is set)
+            last_sync = await self.db.get_last_sync_date(self.category, user_id=self.user_id)
 
             if last_sync:
                 # Start from day after last sync
@@ -125,4 +125,5 @@ class BaseFetcher(ABC):
             records_synced=records_count,
             sync_status=sync_status,
             error_message=error_message,
+            user_id=self.user_id,
         )

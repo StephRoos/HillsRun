@@ -272,6 +272,7 @@ class SyncTriggerRequest(BaseModel):
     start_date: Optional[date] = Field(None, description="Override start date")
     end_date: Optional[date] = Field(None, description="Override end date")
     dry_run: bool = Field(False, description="If true, show what would be synced without writing")
+    better_auth_user_id: Optional[str] = Field(None, description="Better-Auth user ID to sync for")
 
 
 class SyncJobStatus(str, Enum):

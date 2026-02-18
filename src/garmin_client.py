@@ -30,6 +30,45 @@ class GarminClient:
         self.client: Optional[Garmin] = None
         self._last_request_time = 0.0
 
+    @classmethod
+    def from_encrypted_tokens(cls, encrypted_tokens: bytes, token_key: str, rate_limit_delay: float = 0.5) -> "GarminClient":
+        """Create a GarminClient from encrypted tokens stored in DB.
+
+        Args:
+            encrypted_tokens: Fernet-encrypted garth token blob
+            token_key: Fernet key for decryption
+            rate_limit_delay: Delay between API calls in seconds
+
+        Returns:
+            Connected GarminClient instance
+        """
+        from .token_manager import TokenManager
+
+        tm = TokenManager(token_key)
+        token_data = tm.decrypt(encrypted_tokens)
+
+        garth_client = garth.Client()
+        garth_client.loads(token_data)
+
+        instance = cls.__new__(cls)
+        instance.config = None
+        instance.rate_limit_delay = rate_limit_delay
+        instance._last_request_time = 0.0
+
+        instance.client = Garmin()
+        instance.client.garth = garth_client
+
+        prof = garth_client.profile
+        instance.client.display_name = prof.get("displayName")
+        instance.client.full_name = prof.get("fullName")
+        logger.info(f"Connected to Garmin from DB tokens as {instance.client.display_name}")
+
+        return instance
+
+    def get_refreshed_tokens(self) -> str:
+        """Export current garth tokens as JSON string (after potential refresh)."""
+        return self.client.garth.dumps()
+
     def connect(self) -> None:
         """Connect to Garmin Connect using stored tokens."""
         try:

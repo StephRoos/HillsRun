@@ -2,8 +2,8 @@
 
 import logging
 import json
-from datetime import date, datetime
-from typing import Optional, Tuple, Dict, Any
+from datetime import date, datetime, timedelta
+from typing import Optional, Tuple, Dict, Any, Set
 
 from .base import BaseFetcher
 
@@ -40,6 +40,7 @@ class ActivitiesFetcher(BaseFetcher):
 
         records_count = 0
         errors = []
+        garmin_activity_ids: Set[int] = set()
 
         try:
             # Fetch activities for date range
@@ -51,20 +52,41 @@ class ActivitiesFetcher(BaseFetcher):
                 errors.append(error_msg)
                 return 0, error_msg
 
-            if not activities:
-                logger.info(f"No activities found from {start} to {end}")
-                await self.update_sync_state(end, 0, None)
-                return 0, None
+            if activities:
+                # Process each activity
+                for activity in activities:
+                    try:
+                        activity_id = activity.get("activityId")
+                        if activity_id:
+                            garmin_activity_ids.add(activity_id)
+                        await self._process_activity(activity)
+                        records_count += 1
+                    except Exception as e:
+                        error_msg = f"Error processing activity {activity.get('activityId')}: {e}"
+                        logger.error(error_msg)
+                        errors.append(error_msg)
 
-            # Process each activity
-            for activity in activities:
-                try:
-                    await self._process_activity(activity)
-                    records_count += 1
-                except Exception as e:
-                    error_msg = f"Error processing activity {activity.get('activityId')}: {e}"
-                    logger.error(error_msg)
-                    errors.append(error_msg)
+            # Remove activities deleted from Garmin.
+            # In incremental mode, the fetch range is narrow (last_sync+1 to today),
+            # so deletions outside that range would be missed. Use a broader range
+            # for the deletion check (last days_back days) with one extra API call.
+            if mode == "incremental" and start > end - timedelta(days=days_back):
+                deletion_start = end - timedelta(days=days_back)
+                logger.info(f"Checking deletions over broader range: {deletion_start} to {end}")
+                success_del, all_activities, err_del = self.garmin_client.get_activities_by_date(deletion_start, end)
+                if success_del and all_activities is not None:
+                    all_garmin_ids = {a.get("activityId") for a in all_activities if a.get("activityId")}
+                    db_ids = await self.db.get_activity_ids_for_range(self.user_id, deletion_start, end)
+                    to_delete = [aid for aid in db_ids if aid not in all_garmin_ids]
+                else:
+                    to_delete = []
+            else:
+                db_activity_ids = await self.db.get_activity_ids_for_range(self.user_id, start, end)
+                to_delete = [aid for aid in db_activity_ids if aid not in garmin_activity_ids]
+
+            if to_delete:
+                deleted = await self.db.delete_activities(to_delete, self.user_id)
+                logger.info(f"Deleted {deleted} activities removed from Garmin")
 
         except Exception as e:
             error_msg = f"Error fetching activities: {e}"

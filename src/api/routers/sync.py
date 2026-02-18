@@ -2,15 +2,16 @@
 
 import asyncio
 import logging
+import threading
 import uuid
 from collections import OrderedDict
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..auth import get_api_key
-from ..dependencies import get_db
+from ..dependencies import get_db, get_user_id
 from ..schemas import (
     SyncJobResponse,
     SyncJobStatus,
@@ -49,8 +50,27 @@ def _store_job(job: SyncJobResponse) -> None:
         _jobs.popitem(last=False)
 
 
-async def _run_sync(job: SyncJobResponse) -> None:
-    """Execute sync in background and update job status."""
+def _run_sync_in_thread(job: SyncJobResponse, target_user_id: Optional[int] = None) -> None:
+    """Run sync in a separate thread with its own event loop.
+
+    garminconnect/garth use synchronous HTTP calls that block the event loop.
+    Running in a thread prevents blocking FastAPI's main event loop.
+    """
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(_run_sync(job, target_user_id))
+    except Exception as e:
+        logger.exception(f"Sync thread failed for user_id={target_user_id}")
+        job.status = SyncJobStatus.failed
+        job.error = str(e)
+        job.finished_at = datetime.now(timezone.utc)
+    finally:
+        loop.close()
+
+
+async def _run_sync(job: SyncJobResponse, target_user_id: Optional[int] = None) -> None:
+    """Execute sync and update job status."""
     from ...config import Config
     from ...sync_manager import SyncManager
 
@@ -66,7 +86,7 @@ async def _run_sync(job: SyncJobResponse) -> None:
 
         config = Config.from_env()
         manager = SyncManager(config)
-        await manager.initialize()
+        await manager.initialize(user_id=target_user_id)
 
         try:
             req = job.request
@@ -95,21 +115,51 @@ async def _run_sync(job: SyncJobResponse) -> None:
 @router.get("/status")
 async def sync_status(
     db=Depends(get_db),
+    user_id: int = Depends(get_user_id),
 ):
-    rows = await db.query_sync_status()
+    rows = await db.query_sync_status(user_id=user_id)
     return {"data": [SyncStatus.model_validate(dict(r)) for r in rows]}
 
 
 @router.post("/trigger", response_model=SyncTriggerResponse)
-async def trigger_sync(request: SyncTriggerRequest):
+async def trigger_sync(
+    request: SyncTriggerRequest,
+    raw_request: Request,
+    db=Depends(get_db),
+):
     """Trigger an async sync job. Returns a job_id for polling."""
-    # Check if there's already a running job
+    # Resolve target user: body better_auth_user_id > X-Garmin-User-Id header > legacy singleton
+    target_user_id: Optional[int] = None
+
+    if request.better_auth_user_id:
+        target_user_id = await db.get_user_by_better_auth_id(request.better_auth_user_id)
+        if target_user_id is None:
+            raise HTTPException(status_code=404, detail="No Garmin account linked to this user")
+    else:
+        # Fallback: read X-Garmin-User-Id header (set by Next.js proxy)
+        header_value = raw_request.headers.get("X-Garmin-User-Id")
+        if header_value:
+            try:
+                target_user_id = int(header_value)
+            except ValueError:
+                pass
+
+    # Anti-flood: check if there's already a running job for this user
     for j in _jobs.values():
         if j.status in (SyncJobStatus.pending, SyncJobStatus.running):
-            raise HTTPException(
-                status_code=409,
-                detail=f"A sync job is already running (job_id={j.job_id})",
-            )
+            # Per-user anti-flood: if we know the target, only block same user
+            if target_user_id is not None:
+                if getattr(j, '_target_user_id', None) == target_user_id:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"A sync job is already running for this user (job_id={j.job_id})",
+                    )
+            else:
+                # Legacy mode: block any running job
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"A sync job is already running (job_id={j.job_id})",
+                )
 
     # Validate categories
     valid_categories = {"daily_health", "activities", "body_composition", "advanced_metrics", "wellness"}
@@ -124,9 +174,11 @@ async def trigger_sync(request: SyncTriggerRequest):
         created_at=datetime.now(timezone.utc),
         request=request,
     )
+    job._target_user_id = target_user_id  # type: ignore[attr-defined]
     _store_job(job)
 
-    asyncio.create_task(_run_sync(job))
+    thread = threading.Thread(target=_run_sync_in_thread, args=(job, target_user_id), daemon=True)
+    thread.start()
 
     return SyncTriggerResponse(job_id=job.job_id, message="Sync job started")
 
