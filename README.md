@@ -1,4 +1,15 @@
-# Garmin Connect to PostgreSQL Sync
+# HillsRun — Trail Running Dashboard
+
+Trail-focused Garmin dashboard that shows only what matters: D+, pace, HR, and daily readiness. Built for trail runners who find Garmin Connect too noisy.
+
+## Components
+
+- **Backend**: Python/FastAPI + PostgreSQL — Garmin Connect sync & REST API (deployed on NAS)
+- **Frontend**: Next.js 16 + Better-Auth + Prisma + shadcn/ui — Trail dashboard (see [web/](web/))
+
+---
+
+## Backend: Garmin Connect to PostgreSQL Sync
 
 Automatic synchronization of Garmin Connect data (health, activities, body composition, and advanced metrics) to a PostgreSQL database.
 
@@ -386,15 +397,53 @@ Successfully deployed on **Ugreen NAS** (ARM64) with automated daily sync:
 
 See [docs/SETUP.md](docs/SETUP.md#ugreen-nas-tested--deployed) for full NAS deployment guide.
 
+---
+
+## Frontend: Next.js Dashboard
+
+Trail-focused dashboard consuming the FastAPI backend.
+
+### Tech Stack
+
+- Next.js 16 (App Router, Turbopack)
+- Better-Auth (email/password authentication)
+- Prisma 7 (auth tables only, PostgreSQL)
+- TanStack Query (server state)
+- shadcn/ui + Tailwind CSS v4
+- Plotly.js (charts)
+
+### Quick Start
+
+```bash
+cd web
+pnpm install
+pnpm prisma generate
+
+# Start dev server
+pnpm dev
+```
+
+Requires:
+- PostgreSQL accessible (via cloudflared tunnel or local network)
+- FastAPI backend running at `NEXT_PUBLIC_GARMIN_API_URL`
+- `.env.local` with DATABASE_URL, GARMIN_API_KEY, BETTER_AUTH_SECRET
+
+### Pages
+
+| Route | Description |
+|-------|-------------|
+| `/` | Landing page |
+| `/login` | Sign in |
+| `/signup` | Create account |
+| `/dashboard` | Weekly summary, readiness, activities |
+| `/activity/:id` | Activity detail with metrics & charts |
+| `/trends` | Weekly trends (distance, D+, HR, HRV, VO2max) |
+| `/settings` | Profile, units, account |
+
+---
+
 ## Acknowledgments
 
 - Built with [python-garminconnect](https://github.com/cyberjunky/python-garminconnect)
 - Uses [asyncpg](https://github.com/MagicStack/asyncpg) for PostgreSQL
 - Deployed with Docker
-
-## Support
-
-For issues, questions, or suggestions:
-- Open an issue on GitHub
-- Check [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
-- Review logs in `logs/` directory

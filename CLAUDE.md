@@ -57,32 +57,75 @@ ssh Steph@192.168.129.21 "docker run --rm --network garmin-sync_garmin-network -
 cd dashboard && API_BASE_URL=https://api.hillsrun.com API_KEY=ADD3F7ELUifY37coN6ttuRF4SAcgnsHPKGBdWDkHcio streamlit run app.py
 ```
 
-## Current State (2026-02-17)
+## Web Frontend (Next.js)
 
-### Page Home — Implemented
-- **Today's Metrics**: Readiness Score, Sleep Score, Body Battery, HRV (4 colonnes, pas de delta)
-- **Weekly Summary**: Duration, distance + denivele par type d'activite, nombre d'activites, breakdown par type
-- **Recent Activities**: 7 dernieres activites (icone, nom, duree, distance)
-- **7-Day Trends**: 6 charts Plotly (Steps, Sleep Score, Resting HR, Body Battery, Weight, Training Readiness)
+### Stack
+- **Framework**: Next.js 16 (App Router, Turbopack)
+- **Auth**: Better-Auth (email/password) + Prisma adapter
+- **ORM**: Prisma 7 with `@prisma/adapter-pg` (PostgreSQL driver adapter)
+- **State**: TanStack Query (React Query) for server state
+- **UI**: shadcn/ui + Tailwind CSS v4 + Lucide icons
+- **Charts**: Plotly.js (dynamic import, SSR disabled)
 
-### Bugs fixes appliques
-- HRV fetcher: donnees sous `data["hrvSummary"]` (pas a la racine) — fixe
-- user_id mismatch: orphan user_id=1 supprime, dependency retry ajoutee
-- floors_descended: schema `int` -> `float` (Garmin renvoie Decimal)
-- Body Battery: fallback `charged_value` si `highest_value` null
-- Weight chart: `timestamp` au lieu de `calendar_date` pour body_composition
+### Fichiers cles (web/src/)
+- `lib/auth.ts` — Better-Auth server config (Prisma adapter)
+- `lib/auth-client.ts` — Better-Auth React client (useSession, signIn, signUp, signOut)
+- `lib/prisma.ts` — Singleton Prisma client with PG adapter
+- `lib/garmin-api.ts` — Client HTTP qui appelle le proxy `/api/garmin/*`
+- `lib/garmin-db.ts` — Raw SQL queries pour les donnees Garmin via Prisma
+- `types/garmin.ts` — Types TypeScript miroir des schemas Pydantic
+- `hooks/use-activities.ts` — TanStack Query hooks (useActivities, useActivity, useActivitySplits)
+- `hooks/use-metrics.ts` — Hooks metrics (useTrainingReadiness, useHrv, useFitnessMetrics, etc.)
+- `hooks/use-trends.ts` — Aggregation hebdo + filtrage par periode
+- `app/api/garmin/[...path]/route.ts` — Proxy vers FastAPI (ajoute X-API-Key server-side)
+- `app/api/auth/[...all]/route.ts` — Better-Auth catch-all handler
+
+### Pages
+- `/` — Landing page
+- `/login`, `/signup` — Auth pages
+- `/dashboard` — Dashboard principal (weekly summary, readiness, activity list)
+- `/activity/[id]` — Detail activite (metrics, splits, charts Plotly)
+- `/trends` — Tendances (6 charts, filtre 4w/3m/6m/1y)
+- `/settings` — Profil, unites, suppression compte
+
+### Prisma
+- Schema: `web/prisma/schema.prisma` (auth tables only — User, Session, Account, Verification)
+- Config: `web/prisma.config.ts` (Prisma 7 — defineConfig avec DATABASE_URL)
+- Les tables Garmin NE SONT PAS dans le schema Prisma (pour eviter que `db push` les supprime)
+- Auth tables creees via raw SQL (`prisma db execute`) pour ne pas toucher aux tables existantes
+
+### Important
+- **API Key security**: GARMIN_API_KEY est server-side only, jamais expose au client
+- **Proxy pattern**: Le frontend appelle `/api/garmin/*` qui forward vers FastAPI avec la cle
+- **DB access distant**: Via `cloudflared access tcp` (db.hillsrun.com -> localhost:15432)
+
+## Current State (2026-02-18)
+
+### Implemented
+- Landing page avec hero, features, CTA
+- Auth (login/signup) avec Better-Auth + Prisma
+- Dashboard: weekly summary (D+, distance, temps, sorties), readiness card, activity list avec filtres
+- Activity detail: metrics, secondary metrics, splits table, charts Plotly (elevation, pace, HR)
+- Trends: 6 charts hebdo (distance, D+, duree, FC repos, HRV, VO2max) + filtre periode
+- Settings: profil, unites, danger zone
+- Error boundary, 404 page, loading skeletons
+- Mobile responsive (bottom nav + sidebar desktop)
 
 ### Known Issues
-- Sync trigger 404: les routes sync/trigger et sync/jobs disparaissent apres rebuild API. Workaround: lancer le container sync directement.
+- Splits data vide en API (pas encore synce) — charts activite ne montrent rien
+- `sport_type` = 'uncategorized' pour toutes les activites (utiliser `activity_type` a la place)
+- Sync trigger 404: workaround = lancer sync container directement
+- BETTER_AUTH_SECRET a changer pour la production
 - score_feedback, hrv_status, chronic_load dans training_readiness sont null cote Garmin
 
-### Prochaines pages prevues
-- Calendar
-- Dashboard (PMC / Performance Management Chart)
-- ATP (Annual Training Plan)
+### Prochaines etapes
+- Ameliorer le design (couleurs, polish)
+- Ajouter comparaison semaine precedente
+- Calendar view
+- PWA support
 
 ## Conventions
-- Langue: francais pour les echanges, anglais pour le code
-- Pas de CSS custom complexe pour l'instant
+- Langue: francais pour les echanges et l'UI, anglais pour le code
 - Plotly avec axes, markers, day labels pour les trend charts
 - Colonnes dynamiques: n'afficher que si la donnee existe
+- pnpm comme package manager

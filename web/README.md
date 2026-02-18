@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# HillsRun Web — Trail Running Dashboard
 
-## Getting Started
+Next.js frontend for HillsRun. Consumes the FastAPI backend to display trail-focused Garmin data.
 
-First, run the development server:
+## Stack
+
+- **Next.js 16** (App Router, Turbopack)
+- **Better-Auth** (email/password auth)
+- **Prisma 7** (auth tables, PG driver adapter)
+- **TanStack Query** (data fetching)
+- **shadcn/ui** + Tailwind CSS v4
+- **Plotly.js** (charts)
+
+## Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
+pnpm prisma generate
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Create `.env.local`:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```env
+DATABASE_URL="postgresql://garmin:xxx@localhost:15432/garmin_connect"
+NEXT_PUBLIC_GARMIN_API_URL="https://api.hillsrun.com"
+GARMIN_API_KEY="your-api-key"
+BETTER_AUTH_SECRET="generate-a-real-secret"
+BETTER_AUTH_URL="http://localhost:3000"
+NEXT_PUBLIC_BETTER_AUTH_URL="http://localhost:3000"
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Development
 
-## Learn More
+```bash
+pnpm dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+If database is remote (via Cloudflare Tunnel):
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+# Start TCP proxy for PostgreSQL
+cloudflared access tcp --hostname db.hillsrun.com --url localhost:15432
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Project Structure
 
-## Deploy on Vercel
+```
+src/
+├── app/
+│   ├── page.tsx                    # Landing page
+│   ├── (auth)/                     # Login, signup
+│   ├── (dashboard)/                # Protected pages
+│   │   ├── dashboard/page.tsx      # Main dashboard
+│   │   ├── activity/[id]/page.tsx  # Activity detail
+│   │   ├── trends/page.tsx         # Trends charts
+│   │   └── settings/page.tsx       # Settings
+│   └── api/
+│       ├── auth/[...all]/          # Better-Auth handler
+│       └── garmin/[...path]/       # Proxy to FastAPI
+├── components/
+│   ├── ui/                         # shadcn/ui components
+│   ├── dashboard/                  # Sidebar, nav, summary cards
+│   ├── activity/                   # Activity cards, metrics, splits
+│   └── charts/                     # Plotly charts
+├── hooks/                          # TanStack Query hooks
+├── lib/                            # Auth, Prisma, API client, utils
+└── types/                          # TypeScript types
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Architecture
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **API Key security**: `GARMIN_API_KEY` is server-side only. Frontend calls `/api/garmin/*` proxy which adds the key.
+- **Auth tables**: Managed by Prisma. Garmin tables are NOT in the Prisma schema to prevent `db push` from dropping them.
+- **DB access**: Via `cloudflared access tcp` tunnel for remote development.
