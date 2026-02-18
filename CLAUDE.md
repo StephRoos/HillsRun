@@ -50,7 +50,7 @@ ssh Steph@192.168.129.21 "docker run --rm --network garmin-sync_garmin-network -
 - `https://api.hillsrun.com` (via Cloudflare Tunnel)
 - API Key header: `X-API-Key`
 - Data endpoints: `/api/v1/daily/{summary,sleep,stress,body-battery,heart-rate}`, `/api/v1/body/composition`, `/api/v1/metrics/{hrv,spo2,fitness,respiration,training-readiness}`, `/api/v1/activities`
-- Sync: `/api/v1/sync/{status,trigger,jobs}` (trigger 404 bug non resolu - workaround: lancer sync container directement)
+- Sync: `/api/v1/sync/{status,trigger,jobs}`
 
 ### Dashboard local
 ```bash
@@ -68,7 +68,7 @@ cd dashboard && API_BASE_URL=https://api.hillsrun.com API_KEY=ADD3F7ELUifY37coN6
 - **Charts**: Plotly.js (dynamic import, SSR disabled)
 
 ### Fichiers cles (web/src/)
-- `lib/auth.ts` — Better-Auth server config (Prisma adapter)
+- `lib/auth.ts` — Better-Auth server config (Prisma adapter, sync-on-login hook)
 - `lib/auth-client.ts` — Better-Auth React client (useSession, signIn, signUp, signOut)
 - `lib/prisma.ts` — Singleton Prisma client with PG adapter
 - `lib/garmin-api.ts` — Client HTTP qui appelle le proxy `/api/garmin/*`
@@ -77,7 +77,7 @@ cd dashboard && API_BASE_URL=https://api.hillsrun.com API_KEY=ADD3F7ELUifY37coN6
 - `hooks/use-activities.ts` — TanStack Query hooks (useActivities, useActivity, useActivitySplits)
 - `hooks/use-metrics.ts` — Hooks metrics (useTrainingReadiness, useHrv, useFitnessMetrics, etc.)
 - `hooks/use-trends.ts` — Aggregation hebdo + filtrage par periode
-- `app/api/garmin/[...path]/route.ts` — Proxy vers FastAPI (ajoute X-API-Key server-side)
+- `app/api/garmin/[...path]/route.ts` — Proxy GET+POST vers FastAPI (ajoute X-API-Key server-side)
 - `app/api/auth/[...all]/route.ts` — Better-Auth catch-all handler
 
 ### Pages
@@ -110,11 +110,11 @@ cd dashboard && API_BASE_URL=https://api.hillsrun.com API_KEY=ADD3F7ELUifY37coN6
 - Settings: profil, unites, danger zone
 - Error boundary, 404 page, loading skeletons
 - Mobile responsive (bottom nav + sidebar desktop)
+- Sync-on-login: Better-Auth after hook triggers Garmin sync on sign-in (fire-and-forget, anti-flood via API 409)
 
 ### Known Issues
 - Splits data vide en API (pas encore synce) — charts activite ne montrent rien
 - `sport_type` = 'uncategorized' pour toutes les activites (utiliser `activity_type` a la place)
-- Sync trigger 404: workaround = lancer sync container directement
 - BETTER_AUTH_SECRET a changer pour la production
 - score_feedback, hrv_status, chronic_load dans training_readiness sont null cote Garmin
 
