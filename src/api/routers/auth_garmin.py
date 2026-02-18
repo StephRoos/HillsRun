@@ -63,27 +63,42 @@ class DisconnectRequest(BaseModel):
     better_auth_user_id: str
 
 
-async def _finalize_connect(garmin_client: Garmin, request_email: str, better_auth_user_id: str, db) -> ConnectResponse:
+async def _finalize_connect(
+    garmin_client: Garmin, request_email: str, better_auth_user_id: str, db,
+    existing_user_id: Optional[int] = None,
+) -> ConnectResponse:
     """Extract tokens from authenticated Garmin client, store in DB, return response."""
     token_key = os.environ.get("GARMIN_TOKEN_KEY", "")
 
     display_name = garmin_client.display_name or garmin_client.full_name
-    garmin_user_id = str(display_name or request_email)
 
     token_data = garmin_client.garth.dumps()
     tm = TokenManager(token_key)
     encrypted = tm.encrypt(token_data)
 
-    try:
-        user_id = await db.get_or_create_user_with_link(
-            garmin_user_id=garmin_user_id,
-            better_auth_user_id=better_auth_user_id,
-            display_name=display_name,
-            email=request_email,
-        )
-    except Exception as e:
-        logger.exception("Failed to link Garmin account in database")
-        raise HTTPException(status_code=500, detail=f"Failed to link Garmin account: {e}")
+    if existing_user_id:
+        # Re-connecting an existing user — update tokens + display_name, skip user creation
+        user_id = existing_user_id
+        async with db.pool.acquire() as conn:
+            await conn.execute(
+                """UPDATE garmin_user
+                   SET display_name = COALESCE($1, display_name),
+                       better_auth_user_id = $2
+                   WHERE user_id = $3""",
+                display_name, better_auth_user_id, user_id,
+            )
+    else:
+        garmin_user_id = str(display_name or request_email)
+        try:
+            user_id = await db.get_or_create_user_with_link(
+                garmin_user_id=garmin_user_id,
+                better_auth_user_id=better_auth_user_id,
+                display_name=display_name,
+                email=request_email,
+            )
+        except Exception as e:
+            logger.exception("Failed to link Garmin account in database")
+            raise HTTPException(status_code=500, detail=f"Failed to link Garmin account: {e}")
 
     await db.store_encrypted_tokens(user_id, encrypted)
     logger.info(f"Garmin account connected for better_auth_user={better_auth_user_id}, garmin_user_id={user_id}")
@@ -103,6 +118,7 @@ async def connect_garmin(request: ConnectRequest, db=Depends(get_db)):
         raise HTTPException(status_code=500, detail="Token encryption not configured")
 
     # Check if this Better-Auth user already has a linked Garmin account
+    existing_user_id = None
     existing = await db.get_user_by_better_auth_id(request.better_auth_user_id)
     if existing:
         existing_info = await db.get_user_info(existing)
@@ -112,8 +128,8 @@ async def connect_garmin(request: ConnectRequest, db=Depends(get_db)):
                 garmin_display_name=existing_info.get("display_name"),
                 user_id=existing,
             )
-        # Link exists but no tokens — clean up before re-connecting
-        await db.unlink_better_auth_user(existing)
+        # Link exists but no tokens — remember user_id so we reuse it after auth
+        existing_user_id = existing
 
     # Authenticate with Garmin (MFA-aware)
     try:
@@ -134,13 +150,14 @@ async def connect_garmin(request: ConnectRequest, db=Depends(get_db)):
             "email": request.email,
             "better_auth_user_id": request.better_auth_user_id,
             "garmin_client": garmin_client,
+            "existing_user_id": existing_user_id,
             "created": time.time(),
         }
         logger.info(f"MFA required for {request.email}, session_id={session_id}")
         return ConnectResponse(connected=False, needs_mfa=True, mfa_session_id=session_id)
 
     # No MFA — finalize
-    return await _finalize_connect(garmin_client, request.email, request.better_auth_user_id, db)
+    return await _finalize_connect(garmin_client, request.email, request.better_auth_user_id, db, existing_user_id=existing_user_id)
 
 
 @router.post("/connect/mfa", response_model=ConnectResponse)
@@ -179,7 +196,7 @@ async def connect_garmin_mfa(request: MfaRequest, db=Depends(get_db)):
     except Exception:
         logger.warning("Could not load Garmin profile after MFA")
 
-    return await _finalize_connect(garmin_client, session["email"], request.better_auth_user_id, db)
+    return await _finalize_connect(garmin_client, session["email"], request.better_auth_user_id, db, existing_user_id=session.get("existing_user_id"))
 
 
 @router.get("/status", response_model=StatusResponse)

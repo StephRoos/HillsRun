@@ -133,7 +133,7 @@ cd dashboard && API_BASE_URL=https://api.hillsrun.com API_KEY=ADD3F7ELUifY37coN6
 - Landing page avec gradient hero, features section, "3 steps" section
 - Auth (login/signup) avec Better-Auth + Prisma
 - **Multi-user Garmin connect**: connect/disconnect via Settings, encrypted tokens in DB (Fernet)
-- **Garmin MFA support**: two-step flow (credentials → MFA code), in-memory session store cote API
+- **Garmin MFA support**: two-step flow (credentials → MFA code), in-memory session store cote API, existing_user_id passthrough to prevent duplicate user creation on reconnect
 - Dashboard: weekly summary, readiness SVG arc gauge, activity list avec filtres, calendar view toggle, "Connect your Garmin" prompt si non connecte
 - Activity detail: metrics, secondary metrics, splits table, charts Plotly, PR/favorite badges, device name, description, similar activities
 - Trends: 8 charts (2 weekly bars + 6 daily scatter with linear regression trend lines), shared WeekTick x-axis with year annotations, filtre 4w/3m/6m/1y
@@ -153,7 +153,7 @@ cd dashboard && API_BASE_URL=https://api.hillsrun.com API_KEY=ADD3F7ELUifY37coN6
 - Vercel auto-deploy Git integration pas encore connectee (deploy manuel via CLI)
 
 ### Prochaines etapes
-- Connecter Vercel Git integration pour auto-deploy
+- Connecter Vercel Git integration pour auto-deploy (Root Directory = `web`)
 - Ajouter comparaison semaine precedente
 - Offline mode PWA (service worker)
 
