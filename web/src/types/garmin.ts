@@ -15,6 +15,7 @@ export interface Page<T> {
 export interface Activity {
   activity_id: number;
   activity_name: string | null;
+  custom_name: string | null;
   activity_type: string | null;
   sport_type: string | null;
   start_timestamp: string | null;

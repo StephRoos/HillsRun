@@ -165,9 +165,14 @@ class TrainingReadiness(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ActivityUpdate(BaseModel):
+    custom_name: Optional[str] = None
+
+
 class Activity(BaseModel):
     activity_id: int
     activity_name: Optional[str] = None
+    custom_name: Optional[str] = None
     activity_type: Optional[str] = None
     sport_type: Optional[str] = None
     start_timestamp: Optional[datetime] = None

@@ -67,6 +67,16 @@ export const garminApi = {
   getBodyComposition: (params?: Record<string, string>) =>
     garminFetch<Page<BodyComposition>>("body/composition", params),
 
+  updateActivity: async (id: string, body: { custom_name: string | null }) => {
+    const res = await fetch(`/api/garmin/activities/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`Garmin API error: ${res.status}`);
+    return res.json() as Promise<ActivityDetail>;
+  },
+
   // Sync
   triggerSync: async () => {
     const res = await fetch("/api/garmin/sync/trigger", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });

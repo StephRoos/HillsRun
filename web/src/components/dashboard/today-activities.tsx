@@ -31,7 +31,7 @@ export function TodayActivities() {
           <div className="space-y-2">
             {todayActivities.map((a) => (
               <div key={a.activity_id} className="flex items-center justify-between text-sm">
-                <span className="font-medium">{a.activity_name ?? a.activity_type}</span>
+                <span className="font-medium">{a.custom_name ?? a.activity_name ?? a.activity_type}</span>
                 <span className="text-muted-foreground">
                   {a.distance_meters ? `${(a.distance_meters / 1000).toFixed(1)} km` : ""}
                 </span>

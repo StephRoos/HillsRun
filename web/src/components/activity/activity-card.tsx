@@ -22,7 +22,7 @@ export function ActivityCard({ activity }: { activity: Activity }) {
           <div className="flex-1 min-w-0 space-y-1">
             <div className="flex items-center gap-2">
               <span className="font-medium truncate">
-                {activity.activity_name ?? "Activity"}
+                {activity.custom_name ?? activity.activity_name ?? "Activity"}
               </span>
               <Badge variant="secondary" className="text-xs shrink-0">
                 {activityTypeLabel(activity.activity_type)}

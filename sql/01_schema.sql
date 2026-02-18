@@ -253,6 +253,7 @@ CREATE TABLE IF NOT EXISTS activities (
     user_id BIGINT REFERENCES garmin_user(user_id) ON DELETE CASCADE,
     activity_id BIGINT UNIQUE NOT NULL,
     activity_name VARCHAR(255),
+    custom_name VARCHAR(255),
     activity_type VARCHAR(100),
     sport_type VARCHAR(100),
     start_timestamp TIMESTAMPTZ,

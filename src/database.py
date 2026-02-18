@@ -883,6 +883,17 @@ class Database:
         )
         return rows, total
 
+    async def update_activity_custom_name(self, activity_id: int, custom_name: Optional[str]) -> bool:
+        """Update the custom_name of an activity.
+
+        Returns True if the activity was found and updated.
+        """
+        result = await self.pool.execute(
+            "UPDATE activities SET custom_name = $1 WHERE activity_id = $2",
+            custom_name, activity_id,
+        )
+        return result == "UPDATE 1"
+
     async def query_sync_status(self):
         return await self.pool.fetch(
             "SELECT * FROM sync_state ORDER BY category"
