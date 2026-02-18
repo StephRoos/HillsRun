@@ -26,3 +26,33 @@ export async function GET(
   const data = await res.json();
   return NextResponse.json(data);
 }
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  const { path } = await params;
+  const apiPath = `/api/v1/${path.join("/")}`;
+  const url = `${API_BASE}${apiPath}`;
+
+  const body = await request.text();
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "X-API-Key": API_KEY ?? "",
+      "Content-Type": "application/json",
+    },
+    body: body || undefined,
+  });
+
+  if (!res.ok) {
+    return NextResponse.json(
+      { error: `Garmin API error: ${res.status}` },
+      { status: res.status }
+    );
+  }
+
+  const data = await res.json();
+  return NextResponse.json(data);
+}

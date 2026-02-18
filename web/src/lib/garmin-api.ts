@@ -66,4 +66,15 @@ export const garminApi = {
   // Body
   getBodyComposition: (params?: Record<string, string>) =>
     garminFetch<Page<BodyComposition>>("body/composition", params),
+
+  // Sync
+  triggerSync: async () => {
+    const res = await fetch("/api/garmin/sync/trigger", { method: "POST" });
+    if (!res.ok && res.status !== 409) {
+      throw new Error(`Sync trigger error: ${res.status}`);
+    }
+    return res.json();
+  },
+
+  getSyncStatus: () => garminFetch<Record<string, unknown>>("sync/status"),
 };
