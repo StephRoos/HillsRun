@@ -56,9 +56,11 @@ class BaseFetcher(ABC):
         if start_date and end_date:
             return start_date, end_date
 
-        # End date is tomorrow to cover timezone differences (server may be in UTC
-        # while Garmin activities use the user's local time)
+        # End date includes tomorrow to cover timezone differences (server may be
+        # in UTC while Garmin activities use the user's local time)
         end = end_date or (date.today() + timedelta(days=1))
+        # Track the actual sync date separately (never store a future date)
+        self._sync_date = min(end, date.today())
 
         # Determine start date based on mode
         if mode == "incremental":
@@ -66,8 +68,9 @@ class BaseFetcher(ABC):
             last_sync = await self.db.get_last_sync_date(self.category, user_id=self.user_id)
 
             if last_sync:
-                # Start from day after last sync
-                start = last_sync + timedelta(days=1)
+                # Re-sync from last sync date (not +1) to catch activities
+                # added on the same day after the previous sync ran
+                start = last_sync
                 logger.info(f"{self.category}: Incremental sync from {start} to {end}")
             else:
                 # No previous sync, do full sync
@@ -120,9 +123,12 @@ class BaseFetcher(ABC):
             error_message: Optional error message
         """
         sync_status = "success" if error_message is None else "partial"
+        # Use _sync_date (capped at today) to prevent storing future dates
+        # that would break incremental sync start calculations
+        actual_date = getattr(self, "_sync_date", last_date)
         await self.db.update_sync_state(
             category=self.category,
-            last_sync_date=last_date,
+            last_sync_date=actual_date,
             records_synced=records_count,
             sync_status=sync_status,
             error_message=error_message,
