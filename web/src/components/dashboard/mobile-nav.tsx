@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, TrendingUp, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { OfflineIndicator } from "@/components/dashboard/offline-indicator";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -16,6 +17,9 @@ export function MobileNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card md:hidden">
+      <div className="absolute -top-8 left-1/2 -translate-x-1/2">
+        <OfflineIndicator />
+      </div>
       <div className="flex items-center justify-around py-2">
         {navItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");

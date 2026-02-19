@@ -7,6 +7,7 @@ import { signOut, useSession } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { OfflineIndicator } from "@/components/dashboard/offline-indicator";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -48,6 +49,10 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      <div className="px-3 pb-1">
+        <OfflineIndicator />
+      </div>
 
       <Separator />
 
