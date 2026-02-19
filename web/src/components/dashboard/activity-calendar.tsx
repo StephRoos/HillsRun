@@ -105,6 +105,7 @@ export function ActivityCalendar() {
   }
 
   const selectedActivities = selectedDay ? activitiesByDay.get(selectedDay) ?? [] : [];
+  const selectedPlanned = selectedDay ? plannedByDay.get(selectedDay) ?? [] : [];
 
   if (isPending) {
     return (
@@ -212,7 +213,7 @@ export function ActivityCalendar() {
             ))}
         </div>
 
-        {/* Selected day activities */}
+        {/* Selected day details */}
         {selectedDay && (
           <div className="border-t border-border pt-3 space-y-2">
             <p className="text-xs font-medium text-muted-foreground">
@@ -222,30 +223,53 @@ export function ActivityCalendar() {
                 month: "long",
               })}
             </p>
-            {selectedActivities.length === 0 ? (
+
+            {/* Planned workouts */}
+            {selectedPlanned.map((w) => (
+              <div
+                key={`pw-${w.id}`}
+                className="flex items-center justify-between p-2 rounded-md bg-accent/30"
+              >
+                <div className="flex items-center gap-2">
+                  <div
+                    className="h-2 w-2 rounded-full shrink-0"
+                    style={{ border: `1.5px dashed ${getColor(w.sport_type)}` }}
+                  />
+                  <span className="text-sm font-medium truncate">{w.title}</span>
+                  <span className="text-[10px] text-muted-foreground capitalize">{w.intensity}</span>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
+                  {w.planned_distance_meters ? <span>{formatDistance(w.planned_distance_meters)}</span> : null}
+                  {w.planned_duration_seconds ? <span>{formatDuration(w.planned_duration_seconds)}</span> : null}
+                </div>
+              </div>
+            ))}
+
+            {/* Completed activities */}
+            {selectedActivities.map((a) => (
+              <Link
+                key={a.activity_id}
+                href={`/activity/${a.activity_id}`}
+                className="flex items-center justify-between p-2 rounded-md hover:bg-accent/50 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <div
+                    className="h-2 w-2 rounded-full shrink-0"
+                    style={{ backgroundColor: getColor(a.activity_type) }}
+                  />
+                  <span className="text-sm font-medium truncate">
+                    {a.custom_name ?? a.activity_name ?? activityTypeLabel(a.activity_type)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
+                  {a.distance_meters ? <span>{formatDistance(a.distance_meters)}</span> : null}
+                  {a.duration_seconds ? <span>{formatDuration(a.duration_seconds)}</span> : null}
+                </div>
+              </Link>
+            ))}
+
+            {selectedActivities.length === 0 && selectedPlanned.length === 0 && (
               <p className="text-xs text-muted-foreground">Rest day</p>
-            ) : (
-              selectedActivities.map((a) => (
-                <Link
-                  key={a.activity_id}
-                  href={`/activity/${a.activity_id}`}
-                  className="flex items-center justify-between p-2 rounded-md hover:bg-accent/50 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="h-2 w-2 rounded-full shrink-0"
-                      style={{ backgroundColor: getColor(a.activity_type) }}
-                    />
-                    <span className="text-sm font-medium truncate">
-                      {a.custom_name ?? a.activity_name ?? activityTypeLabel(a.activity_type)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
-                    {a.distance_meters ? <span>{formatDistance(a.distance_meters)}</span> : null}
-                    {a.duration_seconds ? <span>{formatDuration(a.duration_seconds)}</span> : null}
-                  </div>
-                </Link>
-              ))
             )}
           </div>
         )}
