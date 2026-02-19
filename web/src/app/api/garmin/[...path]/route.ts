@@ -91,3 +91,71 @@ export async function POST(
   const data = await res.json();
   return NextResponse.json(data);
 }
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  const { userId, error } = await resolveGarminUserId(request);
+  if (error) return error;
+
+  const { path } = await params;
+  const apiPath = `/api/v1/${path.join("/")}`;
+  const url = `${API_BASE}${apiPath}`;
+
+  const body = await request.text();
+
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      "X-API-Key": API_KEY ?? "",
+      "X-Garmin-User-Id": String(userId),
+      "Content-Type": "application/json",
+    },
+    body: body || "{}",
+  });
+
+  if (!res.ok) {
+    return NextResponse.json(
+      { error: `Garmin API error: ${res.status}` },
+      { status: res.status }
+    );
+  }
+
+  const data = await res.json();
+  return NextResponse.json(data);
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  const { userId, error } = await resolveGarminUserId(request);
+  if (error) return error;
+
+  const { path } = await params;
+  const apiPath = `/api/v1/${path.join("/")}`;
+  const url = `${API_BASE}${apiPath}`;
+
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      "X-API-Key": API_KEY ?? "",
+      "X-Garmin-User-Id": String(userId),
+    },
+  });
+
+  if (res.status === 204) {
+    return new NextResponse(null, { status: 204 });
+  }
+
+  if (!res.ok) {
+    return NextResponse.json(
+      { error: `Garmin API error: ${res.status}` },
+      { status: res.status }
+    );
+  }
+
+  const data = await res.json();
+  return NextResponse.json(data);
+}

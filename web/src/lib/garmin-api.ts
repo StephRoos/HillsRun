@@ -11,6 +11,10 @@ import type {
   TrainingReadiness,
   FitnessMetrics,
   BodyComposition,
+  PlannedWorkout,
+  PlannedWorkoutCreate,
+  PlannedWorkoutUpdate,
+  BulkImportResult,
 } from "@/types/garmin";
 
 export class GarminNotConnectedError extends Error {
@@ -106,4 +110,49 @@ export const garminApi = {
     garminFetch<{ status: string; error: string | null }>(
       `sync/jobs/${jobId}`
     ),
+
+  // Planned workouts
+  getPlannedWorkouts: (params?: Record<string, string>) =>
+    garminFetch<Page<PlannedWorkout>>("planned-workouts", params),
+
+  getPlannedWorkout: (id: number) =>
+    garminFetch<PlannedWorkout>(`planned-workouts/${id}`),
+
+  createPlannedWorkout: async (body: PlannedWorkoutCreate) => {
+    const res = await fetch("/api/garmin/planned-workouts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`Garmin API error: ${res.status}`);
+    return res.json() as Promise<PlannedWorkout>;
+  },
+
+  updatePlannedWorkout: async (id: number, body: PlannedWorkoutUpdate) => {
+    const res = await fetch(`/api/garmin/planned-workouts/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`Garmin API error: ${res.status}`);
+    return res.json() as Promise<PlannedWorkout>;
+  },
+
+  deletePlannedWorkout: async (id: number) => {
+    const res = await fetch(`/api/garmin/planned-workouts/${id}`, {
+      method: "DELETE",
+    });
+    if (!res.ok && res.status !== 204) throw new Error(`Garmin API error: ${res.status}`);
+  },
+
+  importPlannedWorkouts: async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("/api/garmin/planned-workouts/import", {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) throw new Error(`Garmin API error: ${res.status}`);
+    return res.json() as Promise<BulkImportResult>;
+  },
 };

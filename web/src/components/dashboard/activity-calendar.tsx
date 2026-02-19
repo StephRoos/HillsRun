@@ -7,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActivities } from "@/hooks/use-activities";
+import { usePlannedWorkouts } from "@/hooks/use-planned-workouts";
 import { formatDuration, formatDistance, activityTypeLabel } from "@/lib/utils";
-import type { Activity } from "@/types/garmin";
+import type { Activity, PlannedWorkout } from "@/types/garmin";
 
 const ACTIVITY_COLORS: Record<string, string> = {
   running: "#FF8C00",
@@ -19,6 +20,8 @@ const ACTIVITY_COLORS: Record<string, string> = {
   strength_training: "#8B5CF6",
   yoga: "#EC4899",
   walking: "#6B7280",
+  rest: "#94A3B8",
+  stretching: "#F472B6",
 };
 
 function getColor(type: string | null): string {
@@ -42,7 +45,6 @@ export function ActivityCalendar() {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
-  // Fetch 2 months of activities to cover current month
   const startDate = new Date(year, month, 1).toISOString().slice(0, 10);
   const endDate = new Date(year, month + 1, 0).toISOString().slice(0, 10);
 
@@ -50,6 +52,12 @@ export function ActivityCalendar() {
     limit: 100,
     start_date: startDate,
     end_date: endDate,
+  });
+
+  const { data: plannedData } = usePlannedWorkouts({
+    start_date: startDate,
+    end_date: endDate,
+    limit: 200,
   });
 
   // Group activities by date
@@ -65,6 +73,17 @@ export function ActivityCalendar() {
     }
     return map;
   }, [data]);
+
+  const plannedByDay = useMemo(() => {
+    const map = new Map<string, PlannedWorkout[]>();
+    if (!plannedData?.data) return map;
+    for (const w of plannedData.data) {
+      const existing = map.get(w.planned_date) ?? [];
+      existing.push(w);
+      map.set(w.planned_date, existing);
+    }
+    return map;
+  }, [plannedData]);
 
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfWeek(year, month);
@@ -137,6 +156,7 @@ export function ActivityCalendar() {
             const day = i + 1;
             const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
             const dayActivities = activitiesByDay.get(dateStr) ?? [];
+            const dayPlanned = plannedByDay.get(dateStr) ?? [];
             const isToday = dateStr === today;
             const isSelected = dateStr === selectedDay;
 
@@ -152,13 +172,20 @@ export function ActivityCalendar() {
                 <span className={`${isToday ? "font-bold text-primary" : "text-muted-foreground"}`}>
                   {day}
                 </span>
-                {dayActivities.length > 0 && (
+                {(dayActivities.length > 0 || dayPlanned.length > 0) && (
                   <div className="flex gap-0.5">
                     {dayActivities.slice(0, 3).map((a, j) => (
                       <div
-                        key={j}
+                        key={`a-${j}`}
                         className="h-1.5 w-1.5 rounded-full"
                         style={{ backgroundColor: getColor(a.activity_type) }}
+                      />
+                    ))}
+                    {dayPlanned.slice(0, 3 - Math.min(dayActivities.length, 3)).map((w, j) => (
+                      <div
+                        key={`p-${j}`}
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ border: `1px dashed ${getColor(w.sport_type)}` }}
                       />
                     ))}
                   </div>
@@ -172,7 +199,6 @@ export function ActivityCalendar() {
         <div className="flex flex-wrap gap-3 pt-2">
           {Object.entries(ACTIVITY_COLORS)
             .filter(([type]) => {
-              // Only show types that appear in the current month
               for (const activities of activitiesByDay.values()) {
                 if (activities.some((a) => a.activity_type === type)) return true;
               }

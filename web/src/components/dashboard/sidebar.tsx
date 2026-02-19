@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, TrendingUp, Settings, LogOut, Mountain } from "lucide-react";
+import { LayoutDashboard, Calendar, TrendingUp, Settings, LogOut, Mountain } from "lucide-react";
 import { signOut, useSession } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -11,6 +11,7 @@ import { OfflineIndicator } from "@/components/dashboard/offline-indicator";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Calendar", href: "/calendar", icon: Calendar },
   { label: "Trends", href: "/trends", icon: TrendingUp },
   { label: "Settings", href: "/settings", icon: Settings },
 ];

@@ -247,6 +247,54 @@ class HydrationData(BaseModel):
     model_config = {"from_attributes": True}
 
 
+VALID_SPORT_TYPES = {"running", "trail_running", "cycling", "swimming", "strength_training", "rest", "stretching"}
+VALID_INTENSITIES = {"easy", "moderate", "hard", "race"}
+
+
+class PlannedWorkoutCreate(BaseModel):
+    planned_date: date
+    sport_type: str
+    title: str
+    description: Optional[str] = None
+    planned_duration_seconds: Optional[int] = None
+    planned_distance_meters: Optional[float] = None
+    intensity: str = "moderate"
+
+
+class PlannedWorkoutUpdate(BaseModel):
+    planned_date: Optional[date] = None
+    sport_type: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    planned_duration_seconds: Optional[int] = None
+    planned_distance_meters: Optional[float] = None
+    intensity: Optional[str] = None
+    completed: Optional[bool] = None
+
+
+class PlannedWorkout(BaseModel):
+    id: int
+    user_id: int
+    planned_date: date
+    sport_type: str
+    title: str
+    description: Optional[str] = None
+    planned_duration_seconds: Optional[int] = None
+    planned_distance_meters: Optional[float] = None
+    intensity: str = "moderate"
+    completed: bool = False
+    created_by_user_id: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class BulkImportResult(BaseModel):
+    imported: int
+    errors: List[str] = []
+
+
 class SyncStatus(BaseModel):
     category: str
     last_sync_date: Optional[date] = None

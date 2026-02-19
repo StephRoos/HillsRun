@@ -156,3 +156,46 @@ export interface BodyComposition {
   body_fat_percentage: number | null;
   muscle_mass_kg: number | null;
 }
+
+// Planned workouts
+export interface PlannedWorkout {
+  id: number;
+  user_id: number;
+  planned_date: string;
+  sport_type: string;
+  title: string;
+  description: string | null;
+  planned_duration_seconds: number | null;
+  planned_distance_meters: number | null;
+  intensity: string;
+  completed: boolean;
+  created_by_user_id: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface PlannedWorkoutCreate {
+  planned_date: string;
+  sport_type: string;
+  title: string;
+  description?: string;
+  planned_duration_seconds?: number;
+  planned_distance_meters?: number;
+  intensity?: string;
+}
+
+export interface PlannedWorkoutUpdate {
+  planned_date?: string;
+  sport_type?: string;
+  title?: string;
+  description?: string;
+  planned_duration_seconds?: number;
+  planned_distance_meters?: number;
+  intensity?: string;
+  completed?: boolean;
+}
+
+export interface BulkImportResult {
+  imported: number;
+  errors: string[];
+}

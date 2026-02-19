@@ -1033,6 +1033,115 @@ class Database:
             )
         return result == "UPDATE 1"
 
+    # ============================================
+    # Planned Workout Operations
+    # ============================================
+
+    ALLOWED_SPORT_TYPES = {
+        "running", "trail_running", "cycling", "swimming",
+        "strength_training", "rest", "stretching",
+    }
+
+    ALLOWED_INTENSITIES = {"easy", "moderate", "hard", "race"}
+
+    async def create_planned_workout(self, user_id: int, data: Dict[str, Any]) -> Dict[str, Any]:
+        query = """
+            INSERT INTO planned_workouts (
+                user_id, planned_date, sport_type, title, description,
+                planned_duration_seconds, planned_distance_meters, intensity,
+                created_by_user_id
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING *
+        """
+        row = await self.pool.fetchrow(
+            query, user_id,
+            data["planned_date"], data["sport_type"], data["title"],
+            data.get("description"), data.get("planned_duration_seconds"),
+            data.get("planned_distance_meters"), data.get("intensity", "moderate"),
+            data.get("created_by_user_id"),
+        )
+        return dict(row)
+
+    async def update_planned_workout(
+        self, workout_id: int, user_id: int, data: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        allowed = {
+            "planned_date", "sport_type", "title", "description",
+            "planned_duration_seconds", "planned_distance_meters",
+            "intensity", "completed",
+        }
+        updates = {k: v for k, v in data.items() if k in allowed and v is not None}
+        if not updates:
+            return await self.get_planned_workout(workout_id, user_id)
+
+        set_clauses = []
+        params: list = []
+        for i, (col, val) in enumerate(updates.items(), start=1):
+            set_clauses.append(f"{col} = ${i}")
+            params.append(val)
+
+        idx = len(params) + 1
+        params.extend([workout_id, user_id])
+        query = f"""
+            UPDATE planned_workouts SET {', '.join(set_clauses)}
+            WHERE id = ${idx} AND user_id = ${idx + 1}
+            RETURNING *
+        """
+        row = await self.pool.fetchrow(query, *params)
+        return dict(row) if row else None
+
+    async def delete_planned_workout(self, workout_id: int, user_id: int) -> bool:
+        result = await self.pool.execute(
+            "DELETE FROM planned_workouts WHERE id = $1 AND user_id = $2",
+            workout_id, user_id,
+        )
+        return result == "DELETE 1"
+
+    async def get_planned_workout(self, workout_id: int, user_id: int) -> Optional[Dict[str, Any]]:
+        row = await self.pool.fetchrow(
+            "SELECT * FROM planned_workouts WHERE id = $1 AND user_id = $2",
+            workout_id, user_id,
+        )
+        return dict(row) if row else None
+
+    async def query_planned_workouts(
+        self, user_id: int, start_date: date, end_date: date,
+        limit: int = 200, offset: int = 0,
+    ):
+        total = await self.pool.fetchval(
+            "SELECT COUNT(*) FROM planned_workouts WHERE user_id=$1 AND planned_date BETWEEN $2 AND $3",
+            user_id, start_date, end_date,
+        )
+        rows = await self.pool.fetch(
+            "SELECT * FROM planned_workouts WHERE user_id=$1 AND planned_date BETWEEN $2 AND $3"
+            " ORDER BY planned_date ASC, id ASC LIMIT $4 OFFSET $5",
+            user_id, start_date, end_date, limit, offset,
+        )
+        return rows, total
+
+    async def bulk_create_planned_workouts(self, user_id: int, workouts: List[Dict[str, Any]]) -> int:
+        if not workouts:
+            return 0
+        query = """
+            INSERT INTO planned_workouts (
+                user_id, planned_date, sport_type, title, description,
+                planned_duration_seconds, planned_distance_meters, intensity
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        """
+        records = [
+            (
+                user_id,
+                w["planned_date"], w["sport_type"], w["title"],
+                w.get("description"), w.get("planned_duration_seconds"),
+                w.get("planned_distance_meters"), w.get("intensity", "moderate"),
+            )
+            for w in workouts
+        ]
+        await self.pool.executemany(query, records)
+        return len(records)
+
     async def query_sync_status(self, user_id: Optional[int] = None):
         if user_id is not None:
             return await self.pool.fetch(

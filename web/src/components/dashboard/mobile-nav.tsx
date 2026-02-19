@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, TrendingUp, Settings } from "lucide-react";
+import { LayoutDashboard, Calendar, TrendingUp, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OfflineIndicator } from "@/components/dashboard/offline-indicator";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Calendar", href: "/calendar", icon: Calendar },
   { label: "Trends", href: "/trends", icon: TrendingUp },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
