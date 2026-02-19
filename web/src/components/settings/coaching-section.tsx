@@ -5,7 +5,6 @@ import { Copy, Trash2, UserMinus, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
   useCoachingStatus,
@@ -78,52 +77,35 @@ export function CoachingSection() {
             </div>
           )}
 
-          {/* Invite codes list */}
-          {inviteCodes.data && inviteCodes.data.length > 0 && (
+          {/* Invite codes list (pending only) */}
+          {inviteCodes.data && inviteCodes.data.filter((ic) => ic.status === "pending").length > 0 && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase">
-                Invite codes
+                Pending invite codes
               </p>
-              {inviteCodes.data.map((ic) => (
+              {inviteCodes.data.filter((ic) => ic.status === "pending").map((ic) => (
                 <div
                   key={ic.id}
                   className="flex items-center justify-between rounded-md border p-2 text-sm"
                 >
-                  <div className="flex items-center gap-2">
-                    <code className="font-mono text-sm">{ic.code}</code>
-                    <Badge
-                      variant={
-                        ic.status === "pending"
-                          ? "outline"
-                          : ic.status === "redeemed"
-                            ? "default"
-                            : "secondary"
-                      }
-                    >
-                      {ic.status}
-                    </Badge>
-                  </div>
+                  <code className="font-mono text-sm">{ic.code}</code>
                   <div className="flex gap-1">
-                    {ic.status === "pending" && (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => copyCode(ic.code)}
-                        >
-                          <Copy className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-destructive"
-                          onClick={() => revokeCode.mutate(ic.code)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </>
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => copyCode(ic.code)}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive"
+                      onClick={() => revokeCode.mutate(ic.code)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </div>
               ))}
