@@ -1163,7 +1163,7 @@ class Database:
             SELECT ca.coach_better_auth_id, u.name AS coach_name, u.email AS coach_email,
                    ca.status, ca.linked_at
             FROM coach_athletes ca
-            LEFT JOIN "user" u ON u.id = ca.coach_better_auth_id
+            LEFT JOIN "User" u ON u.id = ca.coach_better_auth_id
             WHERE ca.athlete_user_id = $1 AND ca.status = 'active'
             ORDER BY ca.linked_at DESC
         """, athlete_user_id)
