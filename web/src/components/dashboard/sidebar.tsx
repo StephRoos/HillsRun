@@ -2,12 +2,22 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Calendar, TrendingUp, Settings, LogOut, Mountain } from "lucide-react";
+import { LayoutDashboard, Calendar, TrendingUp, Settings, LogOut, Mountain, Users } from "lucide-react";
 import { signOut, useSession } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { OfflineIndicator } from "@/components/dashboard/offline-indicator";
+import { useCoachingStatus } from "@/hooks/use-coaching";
+import { useCoachContext } from "@/lib/coach-context";
+import { setViewAsAthlete } from "@/lib/garmin-api";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -20,6 +30,23 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session } = useSession();
+  const { data: coachingStatus } = useCoachingStatus();
+  const { athleteUserId, setAthlete } = useCoachContext();
+
+  const athletes = coachingStatus?.athletes ?? [];
+
+  function handleAthleteChange(value: string) {
+    if (value === "self") {
+      setAthlete(null, null);
+      setViewAsAthlete(null);
+    } else {
+      const athlete = athletes.find((a) => String(a.athlete_user_id) === value);
+      if (athlete) {
+        setAthlete(athlete.athlete_user_id, athlete.display_name || athlete.email || `User #${athlete.athlete_user_id}`);
+        setViewAsAthlete(athlete.athlete_user_id);
+      }
+    }
+  }
 
   return (
     <aside className="hidden md:flex md:w-64 md:flex-col md:border-r md:border-border bg-card">
@@ -49,6 +76,37 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        {athletes.length > 0 && (
+          <>
+            <Separator className="my-2" />
+            <div className="px-3 py-1">
+              <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground">
+                <Users className="h-3.5 w-3.5" />
+                Viewing as
+              </div>
+              <Select
+                value={athleteUserId ? String(athleteUserId) : "self"}
+                onValueChange={handleAthleteChange}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="self">My data</SelectItem>
+                  {athletes.map((a) => (
+                    <SelectItem
+                      key={a.athlete_user_id}
+                      value={String(a.athlete_user_id)}
+                    >
+                      {a.display_name || a.email || `User #${a.athlete_user_id}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
       </nav>
 
       <div className="px-3 pb-1">

@@ -34,6 +34,7 @@ import {
 } from "@/hooks/use-garmin-account";
 import { useTriggerSync } from "@/hooks/use-sync";
 import { Loader2 } from "lucide-react";
+import { CoachingSection } from "@/components/settings/coaching-section";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -216,6 +217,9 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Coaching */}
+      {garminAccount?.connected && <CoachingSection />}
 
       {/* Preferences */}
       <Card>

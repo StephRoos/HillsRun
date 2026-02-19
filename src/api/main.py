@@ -8,7 +8,7 @@ from fastapi import FastAPI
 
 from ..config import DatabaseConfig
 from ..database import Database
-from .routers import health, daily, body, metrics, activities, wellness, sync, auth_garmin, planned_workouts
+from .routers import health, daily, body, metrics, activities, wellness, sync, auth_garmin, planned_workouts, coaching
 
 logger = logging.getLogger(__name__)
 
@@ -50,3 +50,4 @@ app.include_router(wellness.router)
 app.include_router(sync.router)
 app.include_router(auth_garmin.router)
 app.include_router(planned_workouts.router)
+app.include_router(coaching.router)

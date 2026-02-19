@@ -199,3 +199,37 @@ export interface BulkImportResult {
   imported: number;
   errors: string[];
 }
+
+// Coaching
+export interface InviteCode {
+  id: number;
+  code: string;
+  coach_better_auth_id: string;
+  status: string;
+  redeemed_by_user_id: number | null;
+  created_at: string | null;
+  expires_at: string | null;
+  redeemed_at: string | null;
+}
+
+export interface CoachAthlete {
+  athlete_user_id: number;
+  display_name: string | null;
+  email: string | null;
+  status: string;
+  linked_at: string | null;
+}
+
+export interface CoachInfo {
+  coach_better_auth_id: string;
+  coach_name: string | null;
+  coach_email: string | null;
+  status: string;
+  linked_at: string | null;
+}
+
+export interface CoachingStatus {
+  coaching_enabled: boolean;
+  athletes: CoachAthlete[];
+  coaches: CoachInfo[];
+}

@@ -3,10 +3,10 @@
 import csv
 import io
 from datetime import date
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, status
 from fastapi.responses import StreamingResponse
 from ..auth import get_api_key
-from ..dependencies import get_db, get_user_id, date_range, pagination
+from ..dependencies import get_db, get_user_id, date_range, pagination, verify_coach_access
 from ..schemas import (
     PlannedWorkout,
     PlannedWorkoutCreate,
@@ -56,12 +56,16 @@ async def list_planned_workouts(
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_planned_workout(
     body: PlannedWorkoutCreate,
+    request: Request,
     db=Depends(get_db),
-    user_id: int = Depends(get_user_id),
 ):
     _validate_sport_type(body.sport_type)
     _validate_intensity(body.intensity)
-    row = await db.create_planned_workout(user_id, body.model_dump())
+    user_id, coach_id = await verify_coach_access(request)
+    data = body.model_dump()
+    if coach_id:
+        data["created_by_user_id"] = coach_id
+    row = await db.create_planned_workout(user_id, data)
     return PlannedWorkout.model_validate(row)
 
 
@@ -82,9 +86,9 @@ async def download_template():
 
 @router.post("/import")
 async def import_planned_workouts(
+    request: Request,
     file: UploadFile = File(...),
     db=Depends(get_db),
-    user_id: int = Depends(get_user_id),
 ):
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="File must be a .csv")
@@ -133,7 +137,8 @@ async def import_planned_workouts(
         except Exception as e:
             errors.append(f"Row {i}: {str(e)}")
 
-    imported = await db.bulk_create_planned_workouts(user_id, workouts)
+    user_id, coach_id = await verify_coach_access(request)
+    imported = await db.bulk_create_planned_workouts(user_id, workouts, created_by_user_id=coach_id)
     return BulkImportResult(imported=imported, errors=errors)
 
 

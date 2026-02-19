@@ -11,11 +11,13 @@ import { SyncButton } from "@/components/dashboard/sync-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useGarminAccount } from "@/hooks/use-garmin-account";
+import { useCoachContext } from "@/lib/coach-context";
 import NextLink from "next/link";
 
 export default function DashboardPage() {
   const [view, setView] = useState<"list" | "calendar">("list");
   const { data: garminAccount, isLoading } = useGarminAccount();
+  const { isViewingAthlete } = useCoachContext();
 
   if (!isLoading && garminAccount && !garminAccount.connected) {
     return (
@@ -60,7 +62,7 @@ export default function DashboardPage() {
               <CalendarDays className="h-4 w-4" />
             </Button>
           </div>
-          <SyncButton />
+          {!isViewingAthlete && <SyncButton />}
         </div>
       </div>
       <WeeklySummary />

@@ -347,6 +347,54 @@ class SyncTriggerResponse(BaseModel):
     message: str
 
 
+# Coaching
+class InviteCodeCreate(BaseModel):
+    pass  # code is auto-generated
+
+
+class InviteCodeResponse(BaseModel):
+    id: int
+    code: str
+    coach_better_auth_id: str
+    status: str
+    redeemed_by_user_id: Optional[int] = None
+    created_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    redeemed_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class RedeemCodeRequest(BaseModel):
+    code: str
+
+
+class CoachAthlete(BaseModel):
+    athlete_user_id: int
+    display_name: Optional[str] = None
+    email: Optional[str] = None
+    status: str
+    linked_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class CoachInfo(BaseModel):
+    coach_better_auth_id: str
+    coach_name: Optional[str] = None
+    coach_email: Optional[str] = None
+    status: str
+    linked_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class CoachingStatus(BaseModel):
+    coaching_enabled: bool
+    athletes: List[CoachAthlete] = []
+    coaches: List[CoachInfo] = []
+
+
 def make_page(rows, total: int, limit: int, offset: int, schema_class) -> dict:
     return {
         "data": [schema_class.model_validate(dict(r)) for r in rows],

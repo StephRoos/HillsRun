@@ -1120,15 +1120,16 @@ class Database:
         )
         return rows, total
 
-    async def bulk_create_planned_workouts(self, user_id: int, workouts: List[Dict[str, Any]]) -> int:
+    async def bulk_create_planned_workouts(self, user_id: int, workouts: List[Dict[str, Any]], created_by_user_id: Optional[str] = None) -> int:
         if not workouts:
             return 0
         query = """
             INSERT INTO planned_workouts (
                 user_id, planned_date, sport_type, title, description,
-                planned_duration_seconds, planned_distance_meters, intensity
+                planned_duration_seconds, planned_distance_meters, intensity,
+                created_by_user_id
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         """
         records = [
             (
@@ -1136,11 +1137,108 @@ class Database:
                 w["planned_date"], w["sport_type"], w["title"],
                 w.get("description"), w.get("planned_duration_seconds"),
                 w.get("planned_distance_meters"), w.get("intensity", "moderate"),
+                created_by_user_id,
             )
             for w in workouts
         ]
         await self.pool.executemany(query, records)
         return len(records)
+
+    # ============================================
+    # Coaching Operations
+    # ============================================
+
+    async def get_athletes_for_coach(self, coach_better_auth_id: str) -> List[Dict[str, Any]]:
+        rows = await self.pool.fetch("""
+            SELECT ca.athlete_user_id, gu.display_name, gu.email, ca.status, ca.linked_at
+            FROM coach_athletes ca
+            JOIN garmin_user gu ON gu.user_id = ca.athlete_user_id
+            WHERE ca.coach_better_auth_id = $1 AND ca.status = 'active'
+            ORDER BY ca.linked_at DESC
+        """, coach_better_auth_id)
+        return [dict(r) for r in rows]
+
+    async def get_coaches_for_athlete(self, athlete_user_id: int) -> List[Dict[str, Any]]:
+        rows = await self.pool.fetch("""
+            SELECT ca.coach_better_auth_id, u.name AS coach_name, u.email AS coach_email,
+                   ca.status, ca.linked_at
+            FROM coach_athletes ca
+            LEFT JOIN "user" u ON u.id = ca.coach_better_auth_id
+            WHERE ca.athlete_user_id = $1 AND ca.status = 'active'
+            ORDER BY ca.linked_at DESC
+        """, athlete_user_id)
+        return [dict(r) for r in rows]
+
+    async def is_coach_of_athlete(self, coach_better_auth_id: str, athlete_user_id: int) -> bool:
+        result = await self.pool.fetchval("""
+            SELECT EXISTS(
+                SELECT 1 FROM coach_athletes
+                WHERE coach_better_auth_id = $1 AND athlete_user_id = $2 AND status = 'active'
+            )
+        """, coach_better_auth_id, athlete_user_id)
+        return result
+
+    async def unlink_coach_athlete(self, coach_better_auth_id: str, athlete_user_id: int) -> bool:
+        result = await self.pool.execute("""
+            UPDATE coach_athletes SET status = 'removed', removed_at = CURRENT_TIMESTAMP
+            WHERE coach_better_auth_id = $1 AND athlete_user_id = $2 AND status = 'active'
+        """, coach_better_auth_id, athlete_user_id)
+        return result == "UPDATE 1"
+
+    async def create_invite_code(self, coach_better_auth_id: str, code: str) -> Dict[str, Any]:
+        row = await self.pool.fetchrow("""
+            INSERT INTO invite_codes (coach_better_auth_id, code)
+            VALUES ($1, $2)
+            RETURNING *
+        """, coach_better_auth_id, code)
+        return dict(row)
+
+    async def get_invite_codes_for_coach(self, coach_better_auth_id: str) -> List[Dict[str, Any]]:
+        rows = await self.pool.fetch("""
+            SELECT * FROM invite_codes
+            WHERE coach_better_auth_id = $1
+            ORDER BY created_at DESC
+        """, coach_better_auth_id)
+        return [dict(r) for r in rows]
+
+    async def redeem_invite_code(self, code: str, athlete_user_id: int) -> Dict[str, Any]:
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                row = await conn.fetchrow("""
+                    UPDATE invite_codes
+                    SET status = 'redeemed', redeemed_by_user_id = $2, redeemed_at = CURRENT_TIMESTAMP
+                    WHERE code = $1 AND status = 'pending' AND expires_at > CURRENT_TIMESTAMP
+                    RETURNING *
+                """, code, athlete_user_id)
+                if not row:
+                    return None
+                await conn.execute("""
+                    INSERT INTO coach_athletes (coach_better_auth_id, athlete_user_id)
+                    VALUES ($1, $2)
+                    ON CONFLICT (coach_better_auth_id, athlete_user_id) DO UPDATE
+                    SET status = 'active', removed_at = NULL, linked_at = CURRENT_TIMESTAMP
+                """, row["coach_better_auth_id"], athlete_user_id)
+                return dict(row)
+
+    async def revoke_invite_code(self, code: str, coach_better_auth_id: str) -> bool:
+        result = await self.pool.execute("""
+            UPDATE invite_codes SET status = 'revoked'
+            WHERE code = $1 AND coach_better_auth_id = $2 AND status = 'pending'
+        """, code, coach_better_auth_id)
+        return result == "UPDATE 1"
+
+    async def enable_coaching(self, better_auth_user_id: str) -> None:
+        await self.pool.execute(
+            "UPDATE garmin_user SET coaching_enabled = TRUE WHERE better_auth_user_id = $1",
+            better_auth_user_id,
+        )
+
+    async def get_coaching_enabled(self, better_auth_user_id: str) -> bool:
+        result = await self.pool.fetchval(
+            "SELECT coaching_enabled FROM garmin_user WHERE better_auth_user_id = $1",
+            better_auth_user_id,
+        )
+        return bool(result)
 
     async def query_sync_status(self, user_id: Optional[int] = None):
         if user_id is not None:

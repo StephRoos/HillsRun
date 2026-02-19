@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { MobileNav } from "@/components/dashboard/mobile-nav";
+import { CoachBanner } from "@/components/dashboard/coach-banner";
 
 export default async function DashboardLayout({
   children,
@@ -21,6 +22,7 @@ export default async function DashboardLayout({
     <div className="flex h-screen">
       <Sidebar />
       <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
+        <CoachBanner />
         {children}
       </main>
       <MobileNav />

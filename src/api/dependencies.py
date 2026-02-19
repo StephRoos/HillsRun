@@ -46,3 +46,30 @@ def pagination(
     offset: int = Query(default=0, ge=0, description="Number of results to skip"),
 ):
     return limit, offset
+
+
+async def get_better_auth_user_id(request: Request) -> Optional[str]:
+    """Extract Better-Auth user ID from X-Better-Auth-User-Id header."""
+    return request.headers.get("X-Better-Auth-User-Id")
+
+
+async def verify_coach_access(request: Request) -> tuple:
+    """Resolve user_id, optionally verifying coach access.
+
+    Returns (target_user_id, coach_better_auth_id or None).
+    If X-Coach-Better-Auth-Id header is present, verifies coach→athlete relationship.
+    """
+    db = request.app.state.db
+    user_id = await get_user_id(request)
+    coach_id = request.headers.get("X-Coach-Better-Auth-Id")
+
+    if coach_id:
+        is_coach = await db.is_coach_of_athlete(coach_id, user_id)
+        if not is_coach:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to manage this athlete's workouts",
+            )
+        return user_id, coach_id
+
+    return user_id, None

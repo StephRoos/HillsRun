@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { LayoutDashboard, Calendar, TrendingUp, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OfflineIndicator } from "@/components/dashboard/offline-indicator";
+import { useCoachContext } from "@/lib/coach-context";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -15,9 +16,15 @@ const navItems = [
 
 export function MobileNav() {
   const pathname = usePathname();
+  const { isViewingAthlete, athleteName } = useCoachContext();
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card md:hidden">
+      {isViewingAthlete && (
+        <div className="bg-primary/10 text-primary text-xs text-center py-1 font-medium">
+          Viewing {athleteName}&apos;s data
+        </div>
+      )}
       <div className="absolute -top-8 left-1/2 -translate-x-1/2">
         <OfflineIndicator />
       </div>

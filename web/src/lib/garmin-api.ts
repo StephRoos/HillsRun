@@ -24,6 +24,20 @@ export class GarminNotConnectedError extends Error {
   }
 }
 
+let _viewAsAthleteId: number | null = null;
+
+export function setViewAsAthlete(id: number | null) {
+  _viewAsAthleteId = id;
+}
+
+function getHeaders(): Record<string, string> {
+  const h: Record<string, string> = {};
+  if (_viewAsAthleteId !== null) {
+    h["X-View-As-Athlete"] = String(_viewAsAthleteId);
+  }
+  return h;
+}
+
 async function garminFetch<T>(
   path: string,
   params?: Record<string, string>
@@ -33,7 +47,7 @@ async function garminFetch<T>(
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
 
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), { headers: getHeaders() });
   if (!res.ok) {
     if (res.status === 403) {
       throw new GarminNotConnectedError();
@@ -84,7 +98,7 @@ export const garminApi = {
   updateActivity: async (id: string, body: { custom_name: string | null }) => {
     const res = await fetch(`/api/garmin/activities/${id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getHeaders() },
       body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`Garmin API error: ${res.status}`);
@@ -95,7 +109,7 @@ export const garminApi = {
   triggerSync: async (options?: { mode?: string; days_back?: number }) => {
     const res = await fetch("/api/garmin/sync/trigger", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getHeaders() },
       body: JSON.stringify(options ?? {}),
     });
     if (!res.ok && res.status !== 409) {
@@ -121,7 +135,7 @@ export const garminApi = {
   createPlannedWorkout: async (body: PlannedWorkoutCreate) => {
     const res = await fetch("/api/garmin/planned-workouts", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getHeaders() },
       body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`Garmin API error: ${res.status}`);
@@ -131,7 +145,7 @@ export const garminApi = {
   updatePlannedWorkout: async (id: number, body: PlannedWorkoutUpdate) => {
     const res = await fetch(`/api/garmin/planned-workouts/${id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getHeaders() },
       body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`Garmin API error: ${res.status}`);
@@ -141,6 +155,7 @@ export const garminApi = {
   deletePlannedWorkout: async (id: number) => {
     const res = await fetch(`/api/garmin/planned-workouts/${id}`, {
       method: "DELETE",
+      headers: getHeaders(),
     });
     if (!res.ok && res.status !== 204) throw new Error(`Garmin API error: ${res.status}`);
   },
@@ -150,6 +165,7 @@ export const garminApi = {
     formData.append("file", file);
     const res = await fetch("/api/garmin/planned-workouts/import", {
       method: "POST",
+      headers: getHeaders(),
       body: formData,
     });
     if (!res.ok) throw new Error(`Garmin API error: ${res.status}`);

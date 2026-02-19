@@ -2,37 +2,68 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { getGarminUserId } from "@/lib/garmin-user";
+import { verifyCoachAccess } from "@/lib/coach-access";
 
 const API_BASE = process.env.NEXT_PUBLIC_GARMIN_API_URL;
 const API_KEY = process.env.GARMIN_API_KEY;
 
-async function resolveGarminUserId(
+async function resolveRequest(
   request: NextRequest
-): Promise<{ userId: number | null; error?: NextResponse }> {
+): Promise<{
+  garminUserId: number | null;
+  betterAuthUserId: string | null;
+  coachBetterAuthId: string | null;
+  error?: NextResponse;
+}> {
   try {
     const session = await auth.api.getSession({
       headers: await headers(),
     });
     if (!session?.user?.id) {
-      return { userId: null, error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+      return { garminUserId: null, betterAuthUserId: null, coachBetterAuthId: null, error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
     }
 
-    const garminUserId = await getGarminUserId(session.user.id);
+    const betterAuthUserId = session.user.id;
+    const viewAsAthlete = request.headers.get("X-View-As-Athlete");
+
+    if (viewAsAthlete) {
+      const athleteId = parseInt(viewAsAthlete, 10);
+      if (isNaN(athleteId)) {
+        return { garminUserId: null, betterAuthUserId, coachBetterAuthId: null, error: NextResponse.json({ error: "Invalid athlete ID" }, { status: 400 }) };
+      }
+      const hasAccess = await verifyCoachAccess(betterAuthUserId, athleteId);
+      if (!hasAccess) {
+        return { garminUserId: null, betterAuthUserId, coachBetterAuthId: null, error: NextResponse.json({ error: "Not authorized to view this athlete" }, { status: 403 }) };
+      }
+      return { garminUserId: athleteId, betterAuthUserId, coachBetterAuthId: betterAuthUserId };
+    }
+
+    const garminUserId = await getGarminUserId(betterAuthUserId);
     if (!garminUserId) {
-      return { userId: null, error: NextResponse.json({ error: "Garmin account not connected" }, { status: 403 }) };
+      return { garminUserId: null, betterAuthUserId, coachBetterAuthId: null, error: NextResponse.json({ error: "Garmin account not connected" }, { status: 403 }) };
     }
 
-    return { userId: garminUserId };
+    return { garminUserId, betterAuthUserId, coachBetterAuthId: null };
   } catch {
-    return { userId: null, error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+    return { garminUserId: null, betterAuthUserId: null, coachBetterAuthId: null, error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
+}
+
+function buildHeaders(garminUserId: number, betterAuthUserId: string | null, coachBetterAuthId: string | null): Record<string, string> {
+  const h: Record<string, string> = {
+    "X-API-Key": API_KEY ?? "",
+    "X-Garmin-User-Id": String(garminUserId),
+  };
+  if (betterAuthUserId) h["X-Better-Auth-User-Id"] = betterAuthUserId;
+  if (coachBetterAuthId) h["X-Coach-Better-Auth-Id"] = coachBetterAuthId;
+  return h;
 }
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
-  const { userId, error } = await resolveGarminUserId(request);
+  const { garminUserId, betterAuthUserId, coachBetterAuthId, error } = await resolveRequest(request);
   if (error) return error;
 
   const { path } = await params;
@@ -41,10 +72,7 @@ export async function GET(
   const url = `${API_BASE}${apiPath}${searchParams ? `?${searchParams}` : ""}`;
 
   const res = await fetch(url, {
-    headers: {
-      "X-API-Key": API_KEY ?? "",
-      "X-Garmin-User-Id": String(userId),
-    },
+    headers: buildHeaders(garminUserId!, betterAuthUserId, coachBetterAuthId),
   });
 
   if (!res.ok) {
@@ -62,7 +90,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
-  const { userId, error } = await resolveGarminUserId(request);
+  const { garminUserId, betterAuthUserId, coachBetterAuthId, error } = await resolveRequest(request);
   if (error) return error;
 
   const { path } = await params;
@@ -74,8 +102,7 @@ export async function POST(
   const res = await fetch(url, {
     method: "POST",
     headers: {
-      "X-API-Key": API_KEY ?? "",
-      "X-Garmin-User-Id": String(userId),
+      ...buildHeaders(garminUserId!, betterAuthUserId, coachBetterAuthId),
       "Content-Type": "application/json",
     },
     body: body || "{}",
@@ -96,7 +123,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
-  const { userId, error } = await resolveGarminUserId(request);
+  const { garminUserId, betterAuthUserId, coachBetterAuthId, error } = await resolveRequest(request);
   if (error) return error;
 
   const { path } = await params;
@@ -108,8 +135,7 @@ export async function PATCH(
   const res = await fetch(url, {
     method: "PATCH",
     headers: {
-      "X-API-Key": API_KEY ?? "",
-      "X-Garmin-User-Id": String(userId),
+      ...buildHeaders(garminUserId!, betterAuthUserId, coachBetterAuthId),
       "Content-Type": "application/json",
     },
     body: body || "{}",
@@ -130,7 +156,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
-  const { userId, error } = await resolveGarminUserId(request);
+  const { garminUserId, betterAuthUserId, coachBetterAuthId, error } = await resolveRequest(request);
   if (error) return error;
 
   const { path } = await params;
@@ -139,10 +165,7 @@ export async function DELETE(
 
   const res = await fetch(url, {
     method: "DELETE",
-    headers: {
-      "X-API-Key": API_KEY ?? "",
-      "X-Garmin-User-Id": String(userId),
-    },
+    headers: buildHeaders(garminUserId!, betterAuthUserId, coachBetterAuthId),
   });
 
   if (res.status === 204) {
