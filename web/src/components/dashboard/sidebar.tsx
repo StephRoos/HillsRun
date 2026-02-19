@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboard, Calendar, TrendingUp, Settings, LogOut, Mountain, Users } from "lucide-react";
 import { signOut, useSession } from "@/lib/auth-client";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -30,6 +31,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session } = useSession();
+  const queryClient = useQueryClient();
   const { data: coachingStatus } = useCoachingStatus();
   const { athleteUserId, setAthlete } = useCoachContext();
 
@@ -126,6 +128,7 @@ export function Sidebar() {
           size="sm"
           className="w-full justify-start gap-3 text-muted-foreground"
           onClick={async () => {
+            queryClient.clear();
             await signOut();
             router.push("/login");
           }}
