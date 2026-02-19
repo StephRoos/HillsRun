@@ -4,30 +4,18 @@ import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActivities } from "@/hooks/use-activities";
 import { usePlannedWorkouts } from "@/hooks/use-planned-workouts";
-import { formatDuration, formatDistance, activityTypeLabel } from "@/lib/utils";
+import {
+  formatDuration,
+  formatDistance,
+  activityTypeLabel,
+  getActivityColor,
+  ACTIVITY_COLORS,
+} from "@/lib/utils";
 import { WorkoutDialog } from "./workout-dialog";
 import type { Activity, PlannedWorkout } from "@/types/garmin";
-
-const ACTIVITY_COLORS: Record<string, string> = {
-  running: "#FF8C00",
-  trail_running: "#FF6B00",
-  hiking: "#10B981",
-  cycling: "#0891B2",
-  swimming: "#0EA5E9",
-  strength_training: "#8B5CF6",
-  yoga: "#EC4899",
-  walking: "#6B7280",
-  rest: "#94A3B8",
-  stretching: "#F472B6",
-};
-
-function getColor(type: string | null): string {
-  return ACTIVITY_COLORS[type ?? ""] ?? "#94A3B8";
-}
 
 function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate();
@@ -38,18 +26,31 @@ function getFirstDayOfWeek(year: number, month: number): number {
   return day === 0 ? 6 : day - 1;
 }
 
-const INTENSITY_COLORS: Record<string, string> = {
-  easy: "bg-green-500/10 text-green-500",
-  moderate: "bg-yellow-500/10 text-yellow-500",
-  hard: "bg-orange-500/10 text-orange-500",
-  race: "bg-red-500/10 text-red-500",
-};
+function activityLabel(a: Activity): string {
+  return a.custom_name ?? a.activity_name ?? activityTypeLabel(a.activity_type);
+}
+
+function activityMeta(a: Activity): string {
+  const parts: string[] = [];
+  if (a.distance_meters) parts.push(formatDistance(a.distance_meters));
+  if (a.duration_seconds) parts.push(formatDuration(a.duration_seconds));
+  return parts.join(" · ");
+}
+
+function plannedMeta(w: PlannedWorkout): string {
+  const parts: string[] = [];
+  if (w.planned_distance_meters) parts.push(formatDistance(w.planned_distance_meters));
+  if (w.planned_duration_seconds) parts.push(formatDuration(w.planned_duration_seconds));
+  return parts.join(" · ");
+}
+
+const MAX_CARDS = 3;
 
 export function TrainingCalendar() {
   const [currentDate, setCurrentDate] = useState(() => new Date());
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editWorkout, setEditWorkout] = useState<PlannedWorkout | undefined>();
+  const [dialogDate, setDialogDate] = useState<string | undefined>();
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -106,36 +107,27 @@ export function TrainingCalendar() {
 
   function prevMonth() {
     setCurrentDate(new Date(year, month - 1, 1));
-    setSelectedDay(null);
   }
 
   function nextMonth() {
     setCurrentDate(new Date(year, month + 1, 1));
-    setSelectedDay(null);
   }
 
   function goToToday() {
     setCurrentDate(new Date());
-    setSelectedDay(new Date().toISOString().slice(0, 10));
   }
 
-  function openCreateDialog(date?: string) {
+  function openCreateDialog(date: string) {
     setEditWorkout(undefined);
+    setDialogDate(date);
     setDialogOpen(true);
-    if (date) setSelectedDay(date);
   }
 
   function openEditDialog(workout: PlannedWorkout) {
     setEditWorkout(workout);
+    setDialogDate(workout.planned_date);
     setDialogOpen(true);
   }
-
-  const selectedActivities = selectedDay
-    ? activitiesByDay.get(selectedDay) ?? []
-    : [];
-  const selectedPlanned = selectedDay
-    ? plannedByDay.get(selectedDay) ?? []
-    : [];
 
   // Collect active sport types for legend
   const activeSportTypes = useMemo(() => {
@@ -177,211 +169,149 @@ export function TrainingCalendar() {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-4">
-        {/* Calendar grid */}
-        <div className="flex-1">
-          {/* Day headers */}
-          <div className="grid grid-cols-7 gap-1 text-center mb-1">
-            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-              <div key={d} className="text-xs text-muted-foreground font-medium py-2">
-                {d}
-              </div>
-            ))}
-          </div>
+      {/* Calendar grid */}
+      <div>
+        {/* Day headers */}
+        <div className="grid grid-cols-7 gap-1 text-center mb-1">
+          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+            <div key={d} className="text-xs text-muted-foreground font-medium py-2">
+              {d}
+            </div>
+          ))}
+        </div>
 
-          {/* Calendar grid */}
-          <div className="grid grid-cols-7 gap-1">
-            {Array.from({ length: firstDay }).map((_, i) => (
-              <div key={`empty-${i}`} className="aspect-square" />
-            ))}
+        {/* Calendar cells */}
+        <div className="grid grid-cols-7 gap-1">
+          {Array.from({ length: firstDay }).map((_, i) => (
+            <div key={`empty-${i}`} className="min-h-[100px]" />
+          ))}
 
-            {Array.from({ length: daysInMonth }).map((_, i) => {
-              const day = i + 1;
-              const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-              const dayActivities = activitiesByDay.get(dateStr) ?? [];
-              const dayPlanned = plannedByDay.get(dateStr) ?? [];
-              const isToday = dateStr === today;
-              const isSelected = dateStr === selectedDay;
+          {Array.from({ length: daysInMonth }).map((_, i) => {
+            const day = i + 1;
+            const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+            const dayActivities = activitiesByDay.get(dateStr) ?? [];
+            const dayPlanned = plannedByDay.get(dateStr) ?? [];
+            const isToday = dateStr === today;
+            const totalItems = dayActivities.length + dayPlanned.length;
+            const overflow = totalItems - MAX_CARDS;
 
-              return (
-                <button
-                  key={day}
-                  onClick={() => setSelectedDay(isSelected ? null : dateStr)}
-                  className={`aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 text-sm transition-colors border
-                    ${isToday ? "ring-2 ring-primary" : ""}
-                    ${isSelected ? "bg-accent border-accent-foreground/20" : "border-transparent hover:bg-accent/50"}
-                  `}
-                >
+            return (
+              <div
+                key={day}
+                className={`min-h-[100px] rounded-lg border p-1 flex flex-col gap-0.5 transition-colors group
+                  ${isToday ? "ring-2 ring-primary border-primary/30" : "border-border hover:border-border/80 hover:bg-accent/30"}
+                `}
+              >
+                {/* Day number + add button */}
+                <div className="flex items-center justify-between px-0.5">
                   <span
-                    className={`${isToday ? "font-bold text-primary" : "text-muted-foreground"}`}
+                    className={`text-xs leading-5 ${isToday ? "font-bold text-primary" : "text-muted-foreground"}`}
                   >
                     {day}
                   </span>
-                  <div className="flex gap-0.5 flex-wrap justify-center">
-                    {/* Completed activity dots (filled) */}
-                    {dayActivities.slice(0, 3).map((a, j) => (
-                      <div
-                        key={`a-${j}`}
-                        className="h-1.5 w-1.5 rounded-full"
-                        style={{ backgroundColor: getColor(a.activity_type) }}
-                      />
-                    ))}
-                    {/* Planned workout dots (dashed outline) */}
-                    {dayPlanned.slice(0, 3).map((w, j) => (
-                      <div
-                        key={`p-${j}`}
-                        className="h-1.5 w-1.5 rounded-full"
-                        style={{
-                          border: `1px dashed ${getColor(w.sport_type)}`,
-                        }}
-                      />
-                    ))}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Legend */}
-          <div className="flex flex-wrap gap-3 mt-4">
-            {Array.from(activeSportTypes)
-              .filter((type) => type in ACTIVITY_COLORS)
-              .map((type) => (
-                <div
-                  key={type}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground"
-                >
-                  <div
-                    className="h-2 w-2 rounded-full"
-                    style={{ backgroundColor: getColor(type) }}
-                  />
-                  {activityTypeLabel(type)}
-                </div>
-              ))}
-            {activeSportTypes.size > 0 && (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <div
-                  className="h-2 w-2 rounded-full"
-                  style={{ border: "1px dashed #94A3B8" }}
-                />
-                Planned
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Side panel */}
-        {selectedDay && (
-          <div className="lg:w-80 border rounded-lg p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium">
-                {new Date(selectedDay + "T12:00:00").toLocaleDateString(
-                  "en-US",
-                  { weekday: "long", day: "numeric", month: "long" }
-                )}
-              </p>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1"
-                onClick={() => openCreateDialog(selectedDay)}
-              >
-                <Plus className="h-3 w-3" />
-                Add
-              </Button>
-            </div>
-
-            {/* Planned workouts */}
-            {selectedPlanned.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Planned
-                </p>
-                {selectedPlanned.map((w) => (
                   <button
-                    key={w.id}
-                    onClick={() => openEditDialog(w)}
-                    className="w-full text-left p-2 rounded-md hover:bg-accent/50 transition-colors"
+                    onClick={() => openCreateDialog(dateStr)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity h-4 w-4 flex items-center justify-center rounded hover:bg-accent"
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="h-2 w-2 rounded-full shrink-0"
-                          style={{
-                            border: `1.5px dashed ${getColor(w.sport_type)}`,
-                          }}
-                        />
-                        <span className="text-sm font-medium">{w.title}</span>
-                      </div>
-                      <Badge
-                        variant="secondary"
-                        className={`text-[10px] ${INTENSITY_COLORS[w.intensity] ?? ""}`}
-                      >
-                        {w.intensity}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground pl-4">
-                      {w.planned_distance_meters && (
-                        <span>{formatDistance(w.planned_distance_meters)}</span>
-                      )}
-                      {w.planned_duration_seconds && (
-                        <span>{formatDuration(w.planned_duration_seconds)}</span>
-                      )}
-                    </div>
+                    <Plus className="h-3 w-3 text-muted-foreground" />
                   </button>
-                ))}
-              </div>
-            )}
+                </div>
 
-            {/* Completed activities */}
-            {selectedActivities.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Completed
-                </p>
-                {selectedActivities.map((a) => (
+                {/* Activity cards (completed first, then planned) */}
+                {dayActivities.slice(0, MAX_CARDS).map((a) => (
                   <Link
-                    key={a.activity_id}
+                    key={`a-${a.activity_id}`}
                     href={`/activity/${a.activity_id}`}
-                    className="flex items-center justify-between p-2 rounded-md hover:bg-accent/50 transition-colors"
+                    className="flex items-stretch rounded text-[10px] leading-tight hover:brightness-125 transition-all overflow-hidden"
+                    style={{ backgroundColor: `${getActivityColor(a.activity_type)}15` }}
                   >
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="h-2 w-2 rounded-full shrink-0"
-                        style={{ backgroundColor: getColor(a.activity_type) }}
-                      />
-                      <span className="text-sm font-medium truncate">
-                        {a.custom_name ??
-                          a.activity_name ??
-                          activityTypeLabel(a.activity_type)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
-                      {a.distance_meters ? (
-                        <span>{formatDistance(a.distance_meters)}</span>
-                      ) : null}
-                      {a.duration_seconds ? (
-                        <span>{formatDuration(a.duration_seconds)}</span>
-                      ) : null}
+                    <div
+                      className="w-[3px] shrink-0 rounded-l"
+                      style={{ backgroundColor: getActivityColor(a.activity_type) }}
+                    />
+                    <div className="px-1 py-0.5 min-w-0">
+                      <div className="font-medium truncate text-foreground">
+                        {activityLabel(a)}
+                      </div>
+                      {activityMeta(a) && (
+                        <div className="text-muted-foreground truncate">
+                          {activityMeta(a)}
+                        </div>
+                      )}
                     </div>
                   </Link>
                 ))}
-              </div>
-            )}
 
-            {selectedPlanned.length === 0 && selectedActivities.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                No activities or planned workouts
-              </p>
-            )}
-          </div>
-        )}
+                {dayPlanned
+                  .slice(0, Math.max(0, MAX_CARDS - dayActivities.length))
+                  .map((w) => (
+                    <button
+                      key={`p-${w.id}`}
+                      onClick={() => openEditDialog(w)}
+                      className="flex items-stretch rounded text-[10px] leading-tight hover:brightness-125 transition-all overflow-hidden text-left"
+                      style={{ backgroundColor: `${getActivityColor(w.sport_type)}10` }}
+                    >
+                      <div
+                        className="w-[3px] shrink-0 rounded-l"
+                        style={{
+                          backgroundImage: `repeating-linear-gradient(to bottom, ${getActivityColor(w.sport_type)} 0px, ${getActivityColor(w.sport_type)} 3px, transparent 3px, transparent 6px)`,
+                        }}
+                      />
+                      <div className="px-1 py-0.5 min-w-0">
+                        <div className="font-medium truncate text-foreground/70">
+                          {w.title}
+                        </div>
+                        {plannedMeta(w) && (
+                          <div className="text-muted-foreground truncate">
+                            {plannedMeta(w)}
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+
+                {overflow > 0 && (
+                  <span className="text-[10px] text-muted-foreground px-1">
+                    +{overflow} more
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Legend */}
+        <div className="flex flex-wrap gap-3 mt-4">
+          {Array.from(activeSportTypes)
+            .filter((type) => type in ACTIVITY_COLORS)
+            .map((type) => (
+              <div
+                key={type}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground"
+              >
+                <div
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: getActivityColor(type) }}
+                />
+                {activityTypeLabel(type)}
+              </div>
+            ))}
+          {activeSportTypes.size > 0 && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <div
+                className="h-2 w-2 rounded-full"
+                style={{ border: "1.5px dashed #94A3B8" }}
+              />
+              Planned
+            </div>
+          )}
+        </div>
       </div>
 
       <WorkoutDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        date={selectedDay ?? undefined}
+        date={dialogDate}
         workout={editWorkout}
       />
     </>

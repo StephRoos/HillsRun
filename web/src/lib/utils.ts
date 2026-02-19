@@ -41,6 +41,23 @@ export function formatDate(isoString: string | null): string {
   });
 }
 
+export const ACTIVITY_COLORS: Record<string, string> = {
+  running: "#3B82F6",
+  trail_running: "#FF6B00",
+  hiking: "#10B981",
+  cycling: "#0891B2",
+  swimming: "#0EA5E9",
+  strength_training: "#8B5CF6",
+  yoga: "#EC4899",
+  walking: "#6B7280",
+  rest: "#94A3B8",
+  stretching: "#F472B6",
+};
+
+export function getActivityColor(type: string | null): string {
+  return ACTIVITY_COLORS[type ?? ""] ?? "#94A3B8";
+}
+
 const ACTIVITY_TYPE_LABELS: Record<string, string> = {
   running: "Running",
   trail_running: "Trail",

@@ -8,35 +8,25 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActivities } from "@/hooks/use-activities";
 import { usePlannedWorkouts } from "@/hooks/use-planned-workouts";
-import { formatDuration, formatDistance, activityTypeLabel } from "@/lib/utils";
+import {
+  formatDuration,
+  formatDistance,
+  activityTypeLabel,
+  getActivityColor,
+  ACTIVITY_COLORS,
+} from "@/lib/utils";
 import type { Activity, PlannedWorkout } from "@/types/garmin";
-
-const ACTIVITY_COLORS: Record<string, string> = {
-  running: "#FF8C00",
-  trail_running: "#FF6B00",
-  hiking: "#10B981",
-  cycling: "#0891B2",
-  swimming: "#0EA5E9",
-  strength_training: "#8B5CF6",
-  yoga: "#EC4899",
-  walking: "#6B7280",
-  rest: "#94A3B8",
-  stretching: "#F472B6",
-};
-
-function getColor(type: string | null): string {
-  return ACTIVITY_COLORS[type ?? ""] ?? "#94A3B8";
-}
 
 function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate();
 }
 
 function getFirstDayOfWeek(year: number, month: number): number {
-  // Monday = 0, Sunday = 6
   const day = new Date(year, month, 1).getDay();
   return day === 0 ? 6 : day - 1;
 }
+
+const MAX_CARDS = 2;
 
 export function ActivityCalendar() {
   const [currentDate, setCurrentDate] = useState(() => new Date());
@@ -60,7 +50,6 @@ export function ActivityCalendar() {
     limit: 200,
   });
 
-  // Group activities by date
   const activitiesByDay = useMemo(() => {
     const map = new Map<string, Activity[]>();
     if (!data?.data) return map;
@@ -147,12 +136,10 @@ export function ActivityCalendar() {
 
         {/* Calendar grid */}
         <div className="grid grid-cols-7 gap-1">
-          {/* Empty cells before first day */}
           {Array.from({ length: firstDay }).map((_, i) => (
-            <div key={`empty-${i}`} className="aspect-square" />
+            <div key={`empty-${i}`} className="min-h-[52px]" />
           ))}
 
-          {/* Day cells */}
           {Array.from({ length: daysInMonth }).map((_, i) => {
             const day = i + 1;
             const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -160,36 +147,65 @@ export function ActivityCalendar() {
             const dayPlanned = plannedByDay.get(dateStr) ?? [];
             const isToday = dateStr === today;
             const isSelected = dateStr === selectedDay;
+            const totalItems = dayActivities.length + dayPlanned.length;
+            const overflow = totalItems - MAX_CARDS;
 
             return (
               <button
                 key={day}
                 onClick={() => setSelectedDay(isSelected ? null : dateStr)}
-                className={`aspect-square rounded-md flex flex-col items-center justify-center gap-0.5 text-xs transition-colors
+                className={`min-h-[52px] rounded-md flex flex-col p-0.5 text-xs transition-colors
                   ${isToday ? "ring-1 ring-primary" : ""}
                   ${isSelected ? "bg-accent" : "hover:bg-accent/50"}
                 `}
               >
-                <span className={`${isToday ? "font-bold text-primary" : "text-muted-foreground"}`}>
+                <span
+                  className={`text-[10px] leading-4 px-0.5 ${isToday ? "font-bold text-primary" : "text-muted-foreground"}`}
+                >
                   {day}
                 </span>
-                {(dayActivities.length > 0 || dayPlanned.length > 0) && (
-                  <div className="flex gap-0.5">
-                    {dayActivities.slice(0, 3).map((a, j) => (
-                      <div
-                        key={`a-${j}`}
-                        className="h-1.5 w-1.5 rounded-full"
-                        style={{ backgroundColor: getColor(a.activity_type) }}
-                      />
-                    ))}
-                    {dayPlanned.slice(0, 3 - Math.min(dayActivities.length, 3)).map((w, j) => (
-                      <div
-                        key={`p-${j}`}
-                        className="h-1.5 w-1.5 rounded-full"
-                        style={{ border: `1px dashed ${getColor(w.sport_type)}` }}
-                      />
-                    ))}
+
+                {/* Compact cards */}
+                {dayActivities.slice(0, MAX_CARDS).map((a, j) => (
+                  <div
+                    key={`a-${j}`}
+                    className="flex items-stretch rounded mt-0.5 overflow-hidden"
+                    style={{ backgroundColor: `${getActivityColor(a.activity_type)}15` }}
+                  >
+                    <div
+                      className="w-[2px] shrink-0"
+                      style={{ backgroundColor: getActivityColor(a.activity_type) }}
+                    />
+                    <span className="text-[9px] leading-3 px-0.5 py-px truncate text-foreground">
+                      {a.custom_name ?? a.activity_name ?? activityTypeLabel(a.activity_type)}
+                    </span>
                   </div>
+                ))}
+
+                {dayPlanned
+                  .slice(0, Math.max(0, MAX_CARDS - dayActivities.length))
+                  .map((w, j) => (
+                    <div
+                      key={`p-${j}`}
+                      className="flex items-stretch rounded mt-0.5 overflow-hidden"
+                      style={{ backgroundColor: `${getActivityColor(w.sport_type)}10` }}
+                    >
+                      <div
+                        className="w-[2px] shrink-0"
+                        style={{
+                          backgroundImage: `repeating-linear-gradient(to bottom, ${getActivityColor(w.sport_type)} 0px, ${getActivityColor(w.sport_type)} 2px, transparent 2px, transparent 4px)`,
+                        }}
+                      />
+                      <span className="text-[9px] leading-3 px-0.5 py-px truncate text-foreground/60">
+                        {w.title}
+                      </span>
+                    </div>
+                  ))}
+
+                {overflow > 0 && (
+                  <span className="text-[8px] text-muted-foreground px-0.5">
+                    +{overflow}
+                  </span>
                 )}
               </button>
             );
@@ -224,7 +240,6 @@ export function ActivityCalendar() {
               })}
             </p>
 
-            {/* Planned workouts */}
             {selectedPlanned.map((w) => (
               <div
                 key={`pw-${w.id}`}
@@ -233,7 +248,7 @@ export function ActivityCalendar() {
                 <div className="flex items-center gap-2">
                   <div
                     className="h-2 w-2 rounded-full shrink-0"
-                    style={{ border: `1.5px dashed ${getColor(w.sport_type)}` }}
+                    style={{ border: `1.5px dashed ${getActivityColor(w.sport_type)}` }}
                   />
                   <span className="text-sm font-medium truncate">{w.title}</span>
                   <span className="text-[10px] text-muted-foreground capitalize">{w.intensity}</span>
@@ -245,7 +260,6 @@ export function ActivityCalendar() {
               </div>
             ))}
 
-            {/* Completed activities */}
             {selectedActivities.map((a) => (
               <Link
                 key={a.activity_id}
@@ -255,7 +269,7 @@ export function ActivityCalendar() {
                 <div className="flex items-center gap-2">
                   <div
                     className="h-2 w-2 rounded-full shrink-0"
-                    style={{ backgroundColor: getColor(a.activity_type) }}
+                    style={{ backgroundColor: getActivityColor(a.activity_type) }}
                   />
                   <span className="text-sm font-medium truncate">
                     {a.custom_name ?? a.activity_name ?? activityTypeLabel(a.activity_type)}
