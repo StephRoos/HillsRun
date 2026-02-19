@@ -17,33 +17,37 @@ Dashboard Streamlit pour visualiser les donnees de sante/sport synchronisees dep
 - `dashboard/home.py` — Page Home: metrics du jour, weekly summary, recent activities, 7-day trends
 - `dashboard/utils.py` — Helpers: TE-to-TSS, format_duration, sport_icon
 - `dashboard/api_client.py` — Client HTTP pour l'API REST
-- `src/api/` — FastAPI app (routers: daily, metrics, body, activities, sync, auth_garmin)
+- `src/api/` — FastAPI app (routers: daily, metrics, body, activities, sync, auth_garmin, planned_workouts)
 - `src/api/routers/auth_garmin.py` — Garmin connect/disconnect/status + MFA two-step flow
-- `src/api/schemas.py` — Schemas Pydantic (Page, DailySummary, Activity, HrvData, TrainingReadiness, etc.)
+- `src/api/schemas.py` — Schemas Pydantic (Page, DailySummary, Activity, HrvData, TrainingReadiness, PlannedWorkout, etc.)
+- `src/api/routers/planned_workouts.py` — CRUD + CSV import/template for planned workouts
 - `src/database.py` — Queries asyncpg (upsert + query pour chaque type de donnee, multi-user with better_auth_user_id)
 - `src/fetchers/` — Fetchers par categorie (daily_health, activities, body_composition, advanced_metrics, wellness)
 - `src/garmin_client.py` — Wrapper Garmin Connect API avec retry + rate limiting
 - `src/token_manager.py` — Fernet encryption/decryption pour Garmin OAuth tokens en DB
 
 ### NAS Deployment (192.168.129.21, user: Steph)
+SSH alias: `ssh nas` (via `cloudflared access ssh --hostname ssh.hillsrun.com`, works remotely)
 ```bash
 # Copy files (pas de git sur le NAS, fichiers owned by root)
 # Methode rapide: docker cp dans le container running + restart
-cat <local_file> | ssh Steph@192.168.129.21 "cat > /tmp/$(basename <local_file>) && docker cp /tmp/$(basename <local_file>) garmin-api:/app/<path>"
-ssh Steph@192.168.129.21 "docker restart garmin-api"
+cat <local_file> | ssh nas "cat > /tmp/$(basename <local_file>) && docker cp /tmp/$(basename <local_file>) garmin-api:/app/<path>"
+ssh nas "docker restart garmin-api"
 
 # Rebuild complet API image (quand deps changent)
-scp -O <local_file> Steph@192.168.129.21:/volume1/docker/garmin-sync/HillsRun/<path>
-ssh Steph@192.168.129.21 "cd /volume1/docker/garmin-sync/HillsRun && docker build -f Dockerfile.api -t garmin-api:arm64 ."
+# Copy files to build dir via alpine (root-owned files)
+cat <local_file> | ssh nas "cat > /tmp/$(basename <local_file>)"
+ssh nas "docker run --rm -v /volume1/docker/garmin-sync/HillsRun:/build -v /tmp:/host-tmp alpine cp /host-tmp/$(basename <local_file>) /build/<path>"
+ssh nas "cd /volume1/docker/garmin-sync/HillsRun && docker build -f Dockerfile.api -t garmin-api:arm64 ."
 
 # Recreate API container
-ssh Steph@192.168.129.21 "docker stop garmin-api && docker rm garmin-api && docker run -d --name garmin-api --network garmin-sync_garmin-network -p 8000:8000 -v /home/Steph/.garminconnect:/tokens:ro -v /volume1/docker/garmin-sync/HillsRun/config:/app/config:ro -e POSTGRES_HOST=garmin-postgres -e POSTGRES_PORT=5432 -e POSTGRES_DB=garmin_connect -e POSTGRES_USER=garmin -e POSTGRES_PASSWORD=\$(docker exec garmin-postgres printenv POSTGRES_PASSWORD) -e API_KEY=ADD3F7ELUifY37coN6ttuRF4SAcgnsHPKGBdWDkHcio -e GARMIN_TOKENS_DIR=/tokens -e CONFIG_PATH=/app/config/config.yaml -e GARMIN_TOKEN_KEY=\$(docker exec garmin-api printenv GARMIN_TOKEN_KEY) --restart unless-stopped garmin-api:arm64"
+ssh nas "docker stop garmin-api && docker rm garmin-api && docker run -d --name garmin-api --network garmin-sync_garmin-network -p 8000:8000 -v /home/Steph/.garminconnect:/tokens:ro -v /volume1/docker/garmin-sync/HillsRun/config:/app/config:ro -e POSTGRES_HOST=garmin-postgres -e POSTGRES_PORT=5432 -e POSTGRES_DB=garmin_connect -e POSTGRES_USER=garmin -e POSTGRES_PASSWORD=\$(docker exec garmin-postgres printenv POSTGRES_PASSWORD) -e API_KEY=ADD3F7ELUifY37coN6ttuRF4SAcgnsHPKGBdWDkHcio -e GARMIN_TOKENS_DIR=/tokens -e CONFIG_PATH=/app/config/config.yaml -e GARMIN_TOKEN_KEY=\$(docker exec garmin-api printenv GARMIN_TOKEN_KEY) --restart unless-stopped garmin-api:arm64"
 
 # Rebuild sync image
-ssh Steph@192.168.129.21 "cd /volume1/docker/garmin-sync/HillsRun && docker build -f Dockerfile -t garmin-sync:arm64 ."
+ssh nas "cd /volume1/docker/garmin-sync/HillsRun && docker build -f Dockerfile -t garmin-sync:arm64 ."
 
 # Run sync manually
-ssh Steph@192.168.129.21 "docker run --rm --network garmin-sync_garmin-network -v /home/Steph/.garminconnect:/tokens:ro -v /volume1/docker/garmin-sync/HillsRun/config:/app/config:ro -e POSTGRES_HOST=garmin-postgres -e POSTGRES_PORT=5432 -e POSTGRES_DB=garmin_connect -e POSTGRES_USER=garmin -e POSTGRES_PASSWORD=\$(docker exec garmin-postgres printenv POSTGRES_PASSWORD) -e GARMIN_TOKENS_DIR=/tokens garmin-sync:arm64 python main.py --full --days-back 90 --categories advanced_metrics"
+ssh nas "docker run --rm --network garmin-sync_garmin-network -v /home/Steph/.garminconnect:/tokens:ro -v /volume1/docker/garmin-sync/HillsRun/config:/app/config:ro -e POSTGRES_HOST=garmin-postgres -e POSTGRES_PORT=5432 -e POSTGRES_DB=garmin_connect -e POSTGRES_USER=garmin -e POSTGRES_PASSWORD=\$(docker exec garmin-postgres printenv POSTGRES_PASSWORD) -e GARMIN_TOKENS_DIR=/tokens garmin-sync:arm64 python main.py --full --days-back 90 --categories advanced_metrics"
 ```
 
 ### Docker containers on NAS
@@ -54,7 +58,7 @@ ssh Steph@192.168.129.21 "docker run --rm --network garmin-sync_garmin-network -
 ### API endpoints
 - `https://api.hillsrun.com` (via Cloudflare Tunnel)
 - API Key header: `X-API-Key`
-- Data endpoints: `/api/v1/daily/{summary,sleep,stress,body-battery,heart-rate}`, `/api/v1/body/composition`, `/api/v1/metrics/{hrv,spo2,fitness,respiration,training-readiness}`, `/api/v1/activities`
+- Data endpoints: `/api/v1/daily/{summary,sleep,stress,body-battery,heart-rate}`, `/api/v1/body/composition`, `/api/v1/metrics/{hrv,spo2,fitness,respiration,training-readiness}`, `/api/v1/activities`, `/api/v1/planned-workouts`
 - Auth: `/api/v1/auth/{connect,connect/mfa,status,disconnect}`
 - Sync: `/api/v1/sync/{status,trigger,jobs}`
 
@@ -85,14 +89,19 @@ cd dashboard && API_BASE_URL=https://api.hillsrun.com API_KEY=ADD3F7ELUifY37coN6
 - `hooks/use-activities.ts` — TanStack Query hooks (useActivities, useActivity, useActivitySplits)
 - `hooks/use-metrics.ts` — Hooks metrics (useTrainingReadiness, useHrv, useFitnessMetrics, useSleep, useBodyComposition, useStress)
 - `hooks/use-trends.ts` — Aggregation hebdo + filtrage par periode + WeekTick[] for shared x-axis
+- `hooks/use-planned-workouts.ts` — TanStack Query hooks (CRUD + import for planned workouts)
 - `components/charts/trend-charts.tsx` — 8 Plotly charts (weekly bars + daily scatter with trend lines + year annotations)
-- `components/dashboard/activity-calendar.tsx` — Monthly calendar grid with colored activity dots
+- `components/dashboard/activity-calendar.tsx` — Monthly calendar grid with colored activity dots + planned workout dashed dots
+- `components/calendar/training-calendar.tsx` — Full-width monthly calendar with merged activities + planned workouts, side panel, create/edit
+- `components/calendar/workout-dialog.tsx` — Create/edit/delete planned workout dialog (sport type, intensity, duration, distance)
+- `components/calendar/import-dialog.tsx` — CSV import dialog with template download and preview
 - `components/activity/similar-activities.tsx` — Similar activities by type and distance (±20%)
 - `components/providers.tsx` — QueryClientProvider + Sonner Toaster
 - `hooks/use-garmin-account.ts` — Hooks: useGarminAccount, useConnectGarmin (MFA-aware), useSubmitMfa, useDisconnectGarmin
 - `lib/garmin-user.ts` — Server-side: resolve garmin user_id from Better-Auth session (cached 5min)
 - `components/settings/garmin-connect-form.tsx` — Two-step form: credentials → MFA code input
-- `app/api/garmin/[...path]/route.ts` — Proxy GET+POST vers FastAPI (ajoute X-API-Key + X-Garmin-User-Id server-side)
+- `app/api/garmin/[...path]/route.ts` — Proxy GET+POST+PATCH+DELETE vers FastAPI (ajoute X-API-Key + X-Garmin-User-Id server-side)
+- `app/api/garmin/planned-workouts/import/route.ts` — Proxy multipart file upload for CSV import
 - `app/api/garmin/auth/connect/route.ts` — Proxy connect (maxDuration=60 pour Garmin SSO)
 - `app/api/garmin/auth/connect/mfa/route.ts` — Proxy MFA completion
 - `app/api/garmin/auth/{disconnect,status}/route.ts` — Proxy disconnect/status
@@ -104,6 +113,7 @@ cd dashboard && API_BASE_URL=https://api.hillsrun.com API_KEY=ADD3F7ELUifY37coN6
 - `/dashboard` — Dashboard principal (weekly summary, readiness gauge, activity list/calendar toggle)
 - `/activity/[id]` — Detail activite (metrics, splits, charts Plotly, PR/fav badges, device, similar activities)
 - `/trends` — Tendances (8 charts: distance, D+, VO2max, HRV, training load, sleep, weight, stress) + trend lines + year axis + filtre 4w/3m/6m/1y
+- `/calendar` — Training calendar: monthly view with planned workouts + completed activities, create/edit/delete, CSV import
 - `/settings` — Profil (connected to Better-Auth updateUser), suppression compte (deleteUser)
 
 ### Prisma
@@ -127,7 +137,7 @@ cd dashboard && API_BASE_URL=https://api.hillsrun.com API_KEY=ADD3F7ELUifY37coN6
 ### Backend: NAS Docker (voir NAS Deployment ci-dessus)
 - Fichiers owned by root → utiliser `docker cp` + `docker restart` pour update rapide
 
-## Current State (2026-02-19)
+## Current State (2026-02-20)
 
 ### Implemented
 - Landing page avec gradient hero, features section, "3 steps" section
@@ -145,16 +155,18 @@ cd dashboard && API_BASE_URL=https://api.hillsrun.com API_KEY=ADD3F7ELUifY37coN6
 - PWA: manifest.json, SVG icon, installable on mobile (standalone mode)
 - sport_type fixed: fetcher falls back to activityType.typeKey when sport_type is uncategorized
 - Per-user sync state and activity queries (user_id filtering)
+- Vercel Git integration auto-deploy (Root Directory = `web`)
+- **Training Calendar** (`/calendar`): full-width monthly calendar with planned workouts (dashed-outline dots) + completed activities (filled dots), side panel with day details, workout CRUD dialog (sport type, intensity, duration, distance), CSV import with template download
+- Planned workouts: DB table `planned_workouts`, FastAPI CRUD + bulk CSV import, sport types (running, trail_running, cycling, swimming, strength_training, rest, stretching), intensities (easy, moderate, hard, race), `created_by_user_id` column for future coach role
+- Dashboard calendar also shows planned workout dots (dashed outline)
+- Navigation: Dashboard → Calendar → Trends → Settings (sidebar + mobile bottom nav)
 
 ### Known Issues
 - Splits data vide en API (pas encore synce) — charts activite ne montrent rien
 - BETTER_AUTH_SECRET a changer pour la production
 - score_feedback, hrv_status, chronic_load dans training_readiness sont null cote Garmin
-- Vercel auto-deploy Git integration pas encore connectee (deploy manuel via CLI)
-
 ### Prochaines etapes
-- Connecter Vercel Git integration pour auto-deploy (Root Directory = `web`)
-- Ajouter comparaison semaine precedente
+- Coach role (Phase 2): use `created_by_user_id` to allow coaches to create workouts for athletes
 - Offline mode PWA (service worker)
 
 ## Conventions
