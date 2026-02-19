@@ -121,14 +121,7 @@ async def connect_garmin(request: ConnectRequest, db=Depends(get_db)):
     existing_user_id = None
     existing = await db.get_user_by_better_auth_id(request.better_auth_user_id)
     if existing:
-        existing_info = await db.get_user_info(existing)
-        if existing_info and existing_info.get("encrypted_tokens"):
-            return ConnectResponse(
-                connected=True,
-                garmin_display_name=existing_info.get("display_name"),
-                user_id=existing,
-            )
-        # Link exists but no tokens — remember user_id so we reuse it after auth
+        # Link exists — remember user_id so we reuse it after auth
         existing_user_id = existing
 
     # Authenticate with Garmin (MFA-aware)
