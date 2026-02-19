@@ -15,11 +15,13 @@ export const auth = betterAuth({
   },
   hooks: {
     after: createAuthMiddleware(async (ctx) => {
-      const isSignUp = ctx.path.startsWith("/sign-up");
-      const isSignIn = ctx.path.startsWith("/sign-in");
+      // Only trigger sync on actual credential sign-in/sign-up, not session checks
+      const isSignUp = ctx.path === "/sign-up/email";
+      const isSignIn = ctx.path === "/sign-in/email";
+      const isSuccess =
+        (ctx.context?.returned as Response | undefined)?.status === 200;
 
-      if (isSignIn || isSignUp) {
-        // Extract user ID from the response body for per-user sync
+      if ((isSignIn || isSignUp) && isSuccess) {
         let betterAuthUserId: string | undefined;
         try {
           const returned = ctx.context?.returned as Response | undefined;
@@ -31,7 +33,6 @@ export const auth = betterAuth({
           // Ignore parse errors
         }
 
-        // Full sync for new users (1 year), incremental for returning users
         const syncBody = isSignUp
           ? { mode: "full", days_back: 365, better_auth_user_id: betterAuthUserId }
           : { better_auth_user_id: betterAuthUserId };
@@ -43,9 +44,7 @@ export const auth = betterAuth({
             "Content-Type": "application/json",
           },
           body: JSON.stringify(syncBody),
-        }).catch(() => {
-          // Silently ignore errors (409 = sync already running, 404 = no garmin linked, etc.)
-        });
+        }).catch(() => {});
       }
     }),
   },
