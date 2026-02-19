@@ -76,8 +76,14 @@ async def _finalize_connect(
     tm = TokenManager(token_key)
     encrypted = tm.encrypt(token_data)
 
+    if not existing_user_id:
+        # Fallback: look up by email to prevent duplicate user creation
+        existing_user_id = await db.get_user_by_email(request_email)
+        if existing_user_id:
+            logger.info(f"Found existing garmin_user by email={request_email}, user_id={existing_user_id}")
+
     if existing_user_id:
-        # Re-connecting an existing user — update tokens + display_name, skip user creation
+        # Re-connecting an existing user — update tokens + display_name + link
         user_id = existing_user_id
         async with db.pool.acquire() as conn:
             await conn.execute(

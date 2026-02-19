@@ -94,6 +94,18 @@ class Database:
             better_auth_user_id,
         )
 
+    async def get_user_by_email(self, email: str) -> Optional[int]:
+        """Get garmin user_id by email (returns the one with most activities as tiebreaker)."""
+        return await self.pool.fetchval(
+            """SELECT g.user_id FROM garmin_user g
+               LEFT JOIN (SELECT user_id, COUNT(*) as cnt FROM activities GROUP BY user_id) a
+               ON g.user_id = a.user_id
+               WHERE g.email = $1
+               ORDER BY COALESCE(a.cnt, 0) DESC
+               LIMIT 1""",
+            email,
+        )
+
     async def get_or_create_user_with_link(
         self,
         garmin_user_id: str,
