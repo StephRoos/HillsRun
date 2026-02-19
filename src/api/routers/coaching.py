@@ -136,14 +136,24 @@ async def check_access(
 async def coaching_status(
     request: Request,
     db=Depends(get_db),
-    user_id: int = Depends(get_user_id),
 ):
     better_auth_id = _get_better_auth_id(request)
     enabled = await db.get_coaching_enabled(better_auth_id)
     athletes = await db.get_athletes_for_coach(better_auth_id)
-    coaches = await db.get_coaches_for_athlete(user_id)
+
+    # Get user_id from header if available (Garmin may not be connected)
+    coaches = []
+    header_value = request.headers.get("X-Garmin-User-Id")
+    if header_value:
+        try:
+            user_id = int(header_value)
+            coaches_raw = await db.get_coaches_for_athlete(user_id)
+            coaches = [CoachInfo.model_validate(c) for c in coaches_raw]
+        except (ValueError, Exception):
+            pass
+
     return CoachingStatus(
         coaching_enabled=enabled,
         athletes=[CoachAthlete.model_validate(a) for a in athletes],
-        coaches=[CoachInfo.model_validate(c) for c in coaches],
+        coaches=coaches,
     )

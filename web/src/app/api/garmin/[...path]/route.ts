@@ -7,8 +7,13 @@ import { verifyCoachAccess } from "@/lib/coach-access";
 const API_BASE = process.env.NEXT_PUBLIC_GARMIN_API_URL;
 const API_KEY = process.env.GARMIN_API_KEY;
 
+function isCoachingPath(path: string[]): boolean {
+  return path[0] === "coaching";
+}
+
 async function resolveRequest(
-  request: NextRequest
+  request: NextRequest,
+  path: string[]
 ): Promise<{
   garminUserId: number | null;
   betterAuthUserId: string | null;
@@ -39,6 +44,12 @@ async function resolveRequest(
     }
 
     const garminUserId = await getGarminUserId(betterAuthUserId);
+
+    // Coaching endpoints work without Garmin connected (only need Better-Auth session)
+    if (!garminUserId && isCoachingPath(path)) {
+      return { garminUserId: null, betterAuthUserId, coachBetterAuthId: null };
+    }
+
     if (!garminUserId) {
       return { garminUserId: null, betterAuthUserId, coachBetterAuthId: null, error: NextResponse.json({ error: "Garmin account not connected" }, { status: 403 }) };
     }
@@ -49,11 +60,11 @@ async function resolveRequest(
   }
 }
 
-function buildHeaders(garminUserId: number, betterAuthUserId: string | null, coachBetterAuthId: string | null): Record<string, string> {
+function buildHeaders(garminUserId: number | null, betterAuthUserId: string | null, coachBetterAuthId: string | null): Record<string, string> {
   const h: Record<string, string> = {
     "X-API-Key": API_KEY ?? "",
-    "X-Garmin-User-Id": String(garminUserId),
   };
+  if (garminUserId != null) h["X-Garmin-User-Id"] = String(garminUserId);
   if (betterAuthUserId) h["X-Better-Auth-User-Id"] = betterAuthUserId;
   if (coachBetterAuthId) h["X-Coach-Better-Auth-Id"] = coachBetterAuthId;
   return h;
@@ -63,16 +74,15 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
-  const { garminUserId, betterAuthUserId, coachBetterAuthId, error } = await resolveRequest(request);
-  if (error) return error;
-
   const { path } = await params;
+  const { garminUserId, betterAuthUserId, coachBetterAuthId, error } = await resolveRequest(request, path);
+  if (error) return error;
   const apiPath = `/api/v1/${path.join("/")}`;
   const searchParams = request.nextUrl.searchParams.toString();
   const url = `${API_BASE}${apiPath}${searchParams ? `?${searchParams}` : ""}`;
 
   const res = await fetch(url, {
-    headers: buildHeaders(garminUserId!, betterAuthUserId, coachBetterAuthId),
+    headers: buildHeaders(garminUserId, betterAuthUserId, coachBetterAuthId),
   });
 
   if (!res.ok) {
@@ -90,10 +100,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
-  const { garminUserId, betterAuthUserId, coachBetterAuthId, error } = await resolveRequest(request);
-  if (error) return error;
-
   const { path } = await params;
+  const { garminUserId, betterAuthUserId, coachBetterAuthId, error } = await resolveRequest(request, path);
+  if (error) return error;
   const apiPath = `/api/v1/${path.join("/")}`;
   const url = `${API_BASE}${apiPath}`;
 
@@ -102,7 +111,7 @@ export async function POST(
   const res = await fetch(url, {
     method: "POST",
     headers: {
-      ...buildHeaders(garminUserId!, betterAuthUserId, coachBetterAuthId),
+      ...buildHeaders(garminUserId, betterAuthUserId, coachBetterAuthId),
       "Content-Type": "application/json",
     },
     body: body || "{}",
@@ -123,10 +132,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
-  const { garminUserId, betterAuthUserId, coachBetterAuthId, error } = await resolveRequest(request);
-  if (error) return error;
-
   const { path } = await params;
+  const { garminUserId, betterAuthUserId, coachBetterAuthId, error } = await resolveRequest(request, path);
+  if (error) return error;
   const apiPath = `/api/v1/${path.join("/")}`;
   const url = `${API_BASE}${apiPath}`;
 
@@ -135,7 +143,7 @@ export async function PATCH(
   const res = await fetch(url, {
     method: "PATCH",
     headers: {
-      ...buildHeaders(garminUserId!, betterAuthUserId, coachBetterAuthId),
+      ...buildHeaders(garminUserId, betterAuthUserId, coachBetterAuthId),
       "Content-Type": "application/json",
     },
     body: body || "{}",
@@ -156,16 +164,15 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
-  const { garminUserId, betterAuthUserId, coachBetterAuthId, error } = await resolveRequest(request);
-  if (error) return error;
-
   const { path } = await params;
+  const { garminUserId, betterAuthUserId, coachBetterAuthId, error } = await resolveRequest(request, path);
+  if (error) return error;
   const apiPath = `/api/v1/${path.join("/")}`;
   const url = `${API_BASE}${apiPath}`;
 
   const res = await fetch(url, {
     method: "DELETE",
-    headers: buildHeaders(garminUserId!, betterAuthUserId, coachBetterAuthId),
+    headers: buildHeaders(garminUserId, betterAuthUserId, coachBetterAuthId),
   });
 
   if (res.status === 204) {

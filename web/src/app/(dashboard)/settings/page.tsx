@@ -219,7 +219,7 @@ export default function SettingsPage() {
       </Card>
 
       {/* Coaching */}
-      {garminAccount?.connected && <CoachingSection />}
+      <CoachingSection />
 
       {/* Preferences */}
       <Card>
