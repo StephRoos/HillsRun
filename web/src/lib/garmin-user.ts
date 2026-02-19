@@ -39,7 +39,12 @@ export async function getGarminUserStatus(
   }
 
   const data: GarminUserStatus = await res.json();
-  cache.set(betterAuthUserId, { data, expires: Date.now() + TTL_MS });
+  // Only cache positive results — don't cache "not connected" because
+  // Vercel serverless instances don't share memory, so invalidation
+  // after connect won't reach other instances.
+  if (data.connected) {
+    cache.set(betterAuthUserId, { data, expires: Date.now() + TTL_MS });
+  }
   return data;
 }
 
