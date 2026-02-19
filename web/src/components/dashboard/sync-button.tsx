@@ -3,27 +3,19 @@
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTriggerSync } from "@/hooks/use-sync";
-import { toast } from "sonner";
 
 export function SyncButton() {
-  const { mutate: triggerSync, isPending } = useTriggerSync();
-
-  function handleSync() {
-    triggerSync(undefined, {
-      onSuccess: () => toast.success("Sync started — data will refresh shortly"),
-      onError: () => toast.error("Failed to trigger sync"),
-    });
-  }
+  const { trigger, isSyncing } = useTriggerSync();
 
   return (
     <Button
       variant="outline"
       size="sm"
-      onClick={handleSync}
-      disabled={isPending}
+      onClick={() => trigger()}
+      disabled={isSyncing}
     >
-      <RefreshCw className={`h-4 w-4 mr-2 ${isPending ? "animate-spin" : ""}`} />
-      {isPending ? "Syncing..." : "Sync"}
+      <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? "animate-spin" : ""}`} />
+      {isSyncing ? "Syncing..." : "Sync"}
     </Button>
   );
 }

@@ -101,4 +101,9 @@ export const garminApi = {
   },
 
   getSyncStatus: () => garminFetch<Record<string, unknown>>("sync/status"),
+
+  getSyncJob: (jobId: string) =>
+    garminFetch<{ status: string; error: string | null }>(
+      `sync/jobs/${jobId}`
+    ),
 };

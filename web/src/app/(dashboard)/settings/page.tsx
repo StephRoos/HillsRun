@@ -32,7 +32,7 @@ import {
   useGarminAccount,
   useDisconnectGarmin,
 } from "@/hooks/use-garmin-account";
-import { garminApi } from "@/lib/garmin-api";
+import { useTriggerSync } from "@/hooks/use-sync";
 import { Loader2 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -40,7 +40,7 @@ export default function SettingsPage() {
   const { data: session } = useSession();
   const [name, setName] = useState(session?.user?.name ?? "");
   const [saving, setSaving] = useState(false);
-  const [syncing, setSyncing] = useState(false);
+  const { trigger: triggerSync, isSyncing: syncing } = useTriggerSync();
   const [units, setUnits] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("hillsrun-units") ?? "km";
@@ -72,18 +72,8 @@ export default function SettingsPage() {
     toast.success(`Units set to ${value === "km" ? "kilometers" : "miles"}`);
   }
 
-  async function handleSyncNow(full = false) {
-    setSyncing(true);
-    try {
-      await garminApi.triggerSync(
-        full ? { mode: "full", days_back: 365 } : undefined
-      );
-      toast.success(full ? "Full sync started" : "Sync started");
-    } catch {
-      toast.error("Failed to trigger sync");
-    } finally {
-      setSyncing(false);
-    }
+  function handleSyncNow(full = false) {
+    triggerSync(full ? { mode: "full", days_back: 365 } : undefined);
   }
 
   async function handleDeleteAccount() {
