@@ -22,6 +22,7 @@ export function useCoachingStatus() {
     queryKey: ["coaching-status"],
     queryFn: () => coachingFetch<CoachingStatus>("status"),
     retry: false,
+    refetchInterval: 30_000,
   });
 }
 
