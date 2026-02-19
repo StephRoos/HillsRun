@@ -56,8 +56,9 @@ class BaseFetcher(ABC):
         if start_date and end_date:
             return start_date, end_date
 
-        # End date is always today (or provided)
-        end = end_date or date.today()
+        # End date is tomorrow to cover timezone differences (server may be in UTC
+        # while Garmin activities use the user's local time)
+        end = end_date or (date.today() + timedelta(days=1))
 
         # Determine start date based on mode
         if mode == "incremental":
