@@ -20,6 +20,7 @@ import {
 export function CoachingSection() {
   const { data: status } = useCoachingStatus();
   const [redeemCode, setRedeemCode] = useState("");
+  const [lastGeneratedCode, setLastGeneratedCode] = useState<string | null>(null);
 
   const generateCode = useGenerateInviteCode();
   const inviteCodes = useInviteCodes();
@@ -48,12 +49,34 @@ export function CoachingSection() {
             </p>
             <Button
               size="sm"
-              onClick={() => generateCode.mutate()}
+              onClick={() =>
+                generateCode.mutate(undefined, {
+                  onSuccess: (data) => setLastGeneratedCode(data.code),
+                })
+              }
               disabled={generateCode.isPending}
             >
               {generateCode.isPending ? "Generating..." : "Generate invite code"}
             </Button>
           </div>
+
+          {/* Newly generated code highlight */}
+          {lastGeneratedCode && (
+            <div className="flex items-center gap-3 rounded-md border border-primary/30 bg-primary/5 p-3">
+              <code className="font-mono text-lg font-bold tracking-wider">
+                {lastGeneratedCode}
+              </code>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => copyCode(lastGeneratedCode)}
+              >
+                <Copy className="h-3.5 w-3.5" />
+                Copy
+              </Button>
+            </div>
+          )}
 
           {/* Invite codes list */}
           {inviteCodes.data && inviteCodes.data.length > 0 && (

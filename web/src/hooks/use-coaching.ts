@@ -36,7 +36,7 @@ export function useGenerateInviteCode() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["coaching-status"] });
-      toast.success("Invite code generated");
+      queryClient.invalidateQueries({ queryKey: ["invite-codes"] });
     },
     onError: (err) => toast.error(err.message),
   });
