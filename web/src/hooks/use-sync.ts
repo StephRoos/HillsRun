@@ -7,7 +7,7 @@ export function useSyncStatus() {
   return useQuery({
     queryKey: ["sync-status"],
     queryFn: () => garminApi.getSyncStatus(),
-    refetchInterval: 30000,
+    staleTime: 60_000,
   });
 }
 
