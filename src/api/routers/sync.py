@@ -78,6 +78,7 @@ async def _run_sync(job: SyncJobResponse, target_user_id: Optional[int] = None) 
     handler = _JobLogHandler(job)
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
     root_logger = logging.getLogger("src")
+    root_logger.setLevel(logging.DEBUG)
     root_logger.addHandler(handler)
 
     try:
