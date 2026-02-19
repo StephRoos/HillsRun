@@ -1,6 +1,7 @@
 /**
  * Resolve garmin user_id from Better-Auth session user ID.
  * Calls FastAPI /api/v1/auth/status and caches the result for 5 minutes.
+ * Uses request deduplication to prevent thundering herd on page load.
  */
 
 const API_BASE = process.env.NEXT_PUBLIC_GARMIN_API_URL;
@@ -20,6 +21,7 @@ interface CacheEntry {
 
 const TTL_MS = 5 * 60 * 1000; // 5 minutes
 const cache = new Map<string, CacheEntry>();
+const pending = new Map<string, Promise<GarminUserStatus>>();
 
 export async function getGarminUserStatus(
   betterAuthUserId: string
@@ -29,6 +31,22 @@ export async function getGarminUserStatus(
     return cached.data;
   }
 
+  // Deduplicate concurrent requests for the same user
+  const inflight = pending.get(betterAuthUserId);
+  if (inflight) return inflight;
+
+  const promise = fetchGarminUserStatus(betterAuthUserId);
+  pending.set(betterAuthUserId, promise);
+  try {
+    return await promise;
+  } finally {
+    pending.delete(betterAuthUserId);
+  }
+}
+
+async function fetchGarminUserStatus(
+  betterAuthUserId: string
+): Promise<GarminUserStatus> {
   const url = `${API_BASE}/api/v1/auth/status?better_auth_user_id=${encodeURIComponent(betterAuthUserId)}`;
   const res = await fetch(url, {
     headers: { "X-API-Key": API_KEY ?? "" },

@@ -32,6 +32,7 @@ export function useGarminAccount() {
       if (!res.ok) throw new Error("Failed to get Garmin account status");
       return res.json();
     },
+    staleTime: 60_000,
   });
 }
 
