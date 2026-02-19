@@ -17,7 +17,10 @@ class TokenManager:
         self.key = key or os.environ.get("GARMIN_TOKEN_KEY")
         if not self.key:
             raise ValueError("GARMIN_TOKEN_KEY is required for token encryption")
-        self._fernet = Fernet(self.key.encode() if isinstance(self.key, str) else self.key)
+        # Ensure proper base64 padding
+        k = self.key if isinstance(self.key, str) else self.key.decode()
+        k += "=" * (4 - len(k) % 4) if len(k) % 4 else ""
+        self._fernet = Fernet(k.encode())
 
     def encrypt(self, token_data: str) -> bytes:
         """Encrypt token JSON string to bytes."""
