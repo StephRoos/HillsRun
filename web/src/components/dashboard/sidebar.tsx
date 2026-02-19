@@ -48,6 +48,7 @@ export function Sidebar() {
         setViewAsAthlete(athlete.athlete_user_id);
       }
     }
+    queryClient.invalidateQueries();
   }
 
   return (
