@@ -204,6 +204,7 @@ export interface BulkImportResult {
 export interface VmaData {
   manual_vma: number | null;
   estimated_vma: number | null;
+  vo2_max: number | null;
 }
 
 // Coaching

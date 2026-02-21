@@ -44,6 +44,14 @@ export function VmaCard() {
 
   const isManual = data?.manual_vma != null;
   const displayValue = data?.manual_vma ?? data?.estimated_vma;
+  const vo2max = data?.vo2_max;
+
+  function vmaToPace(vma: number): string {
+    const minPerKm = 60 / vma;
+    const mins = Math.floor(minPerKm);
+    const secs = Math.round((minPerKm - mins) * 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  }
 
   function startEditing() {
     setInputValue(displayValue?.toString() ?? "");
@@ -115,13 +123,23 @@ export function VmaCard() {
           </div>
         ) : (
           <div className="flex flex-col items-center gap-1">
+            {vo2max != null && (
+              <span className="text-xs text-muted-foreground">
+                VO2max {vo2max}
+              </span>
+            )}
             <span className="text-2xl font-bold">
               {displayValue != null ? `${displayValue} km/h` : "—"}
             </span>
             {displayValue != null && (
-              <Badge variant="secondary" className="text-[10px]">
-                {isManual ? "manual" : "estimated"}
-              </Badge>
+              <>
+                <Badge variant="secondary" className="text-[10px]">
+                  {isManual ? "manual" : "estimated"}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {vmaToPace(displayValue)} min/km
+                </span>
+              </>
             )}
           </div>
         )}
