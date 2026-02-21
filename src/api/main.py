@@ -30,7 +30,10 @@ def _validate_token_key():
     if not key:
         raise RuntimeError("GARMIN_TOKEN_KEY environment variable is not set")
     try:
-        Fernet(key.encode() if isinstance(key, str) else key)
+        # Add base64 padding if needed (matches token_manager.py behavior)
+        k = key if isinstance(key, str) else key.decode()
+        k += "=" * (4 - len(k) % 4) if len(k) % 4 else ""
+        Fernet(k.encode())
     except Exception as exc:
         raise RuntimeError(f"GARMIN_TOKEN_KEY is not a valid Fernet key: {exc}")
 
