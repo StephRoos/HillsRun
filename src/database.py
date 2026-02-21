@@ -193,14 +193,22 @@ class Database:
     async def get_latest_vo2max_running(self, user_id: int) -> Optional[float]:
         """Get the most recent VO2max running value for a user.
 
+        Checks fitness_metrics first, falls back to activities.vo2_max_value.
+
         Args:
             user_id: User ID.
 
         Returns:
-            Latest vo2_max_running value or None.
+            Latest VO2max running value or None.
         """
-        return await self.pool.fetchval(
+        val = await self.pool.fetchval(
             "SELECT vo2_max_running FROM fitness_metrics WHERE user_id = $1 AND vo2_max_running IS NOT NULL ORDER BY calendar_date DESC LIMIT 1",
+            user_id,
+        )
+        if val is not None:
+            return val
+        return await self.pool.fetchval(
+            "SELECT vo2_max_value FROM activities WHERE user_id = $1 AND vo2_max_value IS NOT NULL ORDER BY start_timestamp DESC LIMIT 1",
             user_id,
         )
 

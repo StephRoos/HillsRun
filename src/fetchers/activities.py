@@ -3,7 +3,7 @@
 import logging
 import json
 from datetime import date, datetime, timedelta
-from typing import Optional, Tuple, Dict, Any, Set
+from typing import Optional, Tuple, Dict, Any, List, Set
 
 from .base import BaseFetcher
 
@@ -125,7 +125,14 @@ class ActivitiesFetcher(BaseFetcher):
             logger.warning(f"Failed to sync splits for activity {activity_id}: {e}")
 
     def _transform_activity(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Transform activity data for database."""
+        """Transform raw Garmin activity data into a dict for DB upsert.
+
+        Args:
+            data: Raw activity data from Garmin API (merged summary + detail).
+
+        Returns:
+            Dict with DB column names as keys.
+        """
         # Parse start timestamp
         start_ts = None
         if data.get("startTimeGMT"):
@@ -187,7 +194,14 @@ class ActivitiesFetcher(BaseFetcher):
         }
 
     def _transform_splits(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Transform splits API response into list of split dicts for DB."""
+        """Transform splits API response into a list of split dicts for DB upsert.
+
+        Args:
+            data: Raw splits response from Garmin API (contains lapDTOs or splitDTOs).
+
+        Returns:
+            List of split dicts with DB column names as keys.
+        """
         splits = []
         lap_dtos = data.get("lapDTOs") or data.get("splitDTOs") or []
         for i, lap in enumerate(lap_dtos):
