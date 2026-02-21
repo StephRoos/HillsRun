@@ -39,7 +39,17 @@ export default function TrendsPage() {
     weight,
     stress,
     isPending,
+    isError,
   } = useTrends(period);
+
+  if (isError) {
+    return (
+      <div className="p-6 space-y-6">
+        <h1 className="text-2xl font-bold">Trends</h1>
+        <p className="text-sm text-muted-foreground">Could not load trends data.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">

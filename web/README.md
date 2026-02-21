@@ -22,7 +22,7 @@ Create `.env.local`:
 
 ```env
 DATABASE_URL="postgresql://garmin:xxx@localhost:15432/garmin_connect"
-NEXT_PUBLIC_GARMIN_API_URL="https://api.hillsrun.com"
+GARMIN_API_URL="https://api.hillsrun.com"
 GARMIN_API_KEY="your-api-key"
 BETTER_AUTH_SECRET="generate-a-real-secret"
 BETTER_AUTH_URL="http://localhost:3000"

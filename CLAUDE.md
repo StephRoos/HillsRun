@@ -137,11 +137,27 @@ Shared in `lib/utils.ts` — running is blue (#3B82F6), trail_running is orange 
 - Auto-deploy: Git integration (Settings → Git → Connect `StephRoos/HillsRun`, Root Directory = `web`)
 - Deploy manuel: `npx vercel --prod --cwd web`
 - `maxDuration = 60` sur les routes auth (Garmin SSO login est lent)
+- Vercel CLI: connecte en tant que `stephaneroos-7891`
 
 ### Backend: NAS Docker (voir NAS Deployment ci-dessus)
 - Fichiers owned by root → utiliser `docker cp` + `docker restart` pour update rapide
 
-## Current State (2026-02-19)
+### Remote Access (fonctionne de n'importe ou)
+Tout l'acces remote passe par Cloudflare Tunnel — pas de VPN ni port forwarding necessaire.
+- **SSH NAS**: `ssh nas` (configure dans `~/.ssh/config`, ProxyCommand via `cloudflared access ssh --hostname ssh.hillsrun.com`, user: Steph)
+- **API publique**: `https://api.hillsrun.com` (header `X-API-Key`)
+- **DB distante**: `cloudflared access tcp --hostname db.hillsrun.com --url localhost:15432` puis connexion PostgreSQL sur `localhost:15432`
+- **Frontend deploy**: `git push` → auto-deploy Vercel, ou `npx vercel --prod --cwd web`
+- **Monitoring**: `ssh nas "docker logs garmin-api --tail 50"`, `ssh nas "docker ps"`
+- **cloudflared**: installe dans `~/.local/bin/cloudflared`
+
+### Workflow de dev remote
+1. Code localement → `git push` → Vercel deploy automatique (frontend)
+2. Modifier l'API → `docker cp` via `ssh nas` → `docker restart garmin-api`
+3. Acceder a la DB → tunnel cloudflared vers `db.hillsrun.com`
+4. Monitorer → `ssh nas "docker logs garmin-api --tail 50"`
+
+## Current State (2026-02-21)
 
 ### Implemented
 - Landing page avec gradient hero, features section, "3 steps" section
@@ -153,23 +169,32 @@ Shared in `lib/utils.ts` — running is blue (#3B82F6), trail_running is orange 
 - Trends: 8 charts (2 weekly bars + 6 daily scatter with linear regression trend lines), shared WeekTick x-axis with year annotations, filtre 4w/3m/6m/1y
 - Settings: profil, Garmin connect/disconnect/sync, coaching section, delete account
 - Toast notifications (sonner) for sync, rename, settings, errors
-- Error boundary, 404 page, loading skeletons
-- Mobile responsive (bottom nav + sidebar desktop)
+- Error boundaries per route (dashboard, trends, calendar) + isError handling in components
+- Mobile responsive (bottom nav + sidebar desktop), safe-area-inset-bottom on mobile nav
 - Sync-on-login: Better-Auth after hook triggers Garmin sync on email sign-in only (exact path match, not session revalidation)
-- PWA: manifest.json, SVG icon, installable on mobile (standalone mode)
+- PWA: manifest.json, SVG + PNG icons (192/512), installable on mobile (standalone mode), apple-touch-icon
 - sport_type fixed: fetcher falls back to activityType.typeKey when sport_type is uncategorized
 - Per-user sync state and activity queries (user_id filtering)
 - Vercel Git integration auto-deploy (Root Directory = `web`)
 - **Training Calendar** (`/calendar`): TrainingPeaks-style monthly calendar with activity cards (colored left border, name + metrics), planned workout cards (dashed border), click activity → detail page, click planned → edit dialog, +N overflow, CSV import
 - **Dashboard Calendar**: compact activity cards (colored bar + name), max 2 visible + overflow, selected day detail panel
-- Planned workouts: DB table `planned_workouts`, FastAPI CRUD + bulk CSV import, sport types (running, trail_running, cycling, swimming, strength_training, rest, stretching), intensities (easy, moderate, hard, race), `created_by_user_id` column for coach role
+- Planned workouts: DB table `planned_workouts`, FastAPI CRUD + bulk CSV import (max 1 MB), sport types (running, trail_running, cycling, swimming, strength_training, rest, stretching), intensities (easy, moderate, hard, race), `created_by_user_id` column for coach role
 - Navigation: Dashboard → Calendar → Trends → Settings (sidebar + mobile bottom nav)
-- Coaching: invite codes, athlete list, view athlete data, redeem invite code
+- Coaching: invite codes, athlete list, view athlete data, redeem invite code, mobile athlete switcher (Select in bottom nav), "View" button in settings, "for [athlete]" badge in workout dialog
+- **Activity splits sync**: fetcher calls `get_activity_splits()` per activity and stores via `upsert_activity_splits()` (non-blocking, try/except)
+- **DB migration documented**: `sql/06_sync_state_per_user.sql` (per-user sync_state), `sql/01_schema.sql` updated to reflect live DB
+- **Security**: `hmac.compare_digest` for API key comparison, `GARMIN_TOKEN_KEY` validated at startup (Fernet key check), ReactQueryDevtools excluded from prod bundle
+- **API logging**: `setup_logging()` called in FastAPI lifespan
+- **Thread safety**: `threading.Lock()` on `_jobs` in sync router
+- **Proxy error forwarding**: upstream FastAPI error `detail` forwarded to frontend (instead of generic "Garmin API error: {status}")
+- **Env var rename**: `NEXT_PUBLIC_GARMIN_API_URL` → `GARMIN_API_URL` (server-side only, never exposed to client)
+- **Build optimization**: `optimizePackageImports: ["lucide-react"]` in next.config.ts
+- A11y: skip-to-main-content link, `role="img"` + `aria-label` on SVG gauge, keyboard navigation on calendar cells, aria-labels on icon buttons
+- Utility tests: `pnpm test` runs vitest (formatDuration, formatDistance, formatPace, formatElevation, getActivityColor, activityTypeLabel)
 - Streamlit dashboard removed (replaced by Next.js frontend on Vercel)
 - Scheduler container removed (had ON CONFLICT DB bug, sync via login + manual button only)
 
 ### Known Issues
-- Splits data vide en API (pas encore synce) — charts activite ne montrent rien
 - BETTER_AUTH_SECRET a changer pour la production
 - score_feedback, hrv_status, chronic_load dans training_readiness sont null cote Garmin
 - Scheduler sync broken: `there is no unique or exclusion constraint matching the ON CONFLICT specification` — needs DB migration to fix unique constraints before re-enabling
@@ -177,7 +202,6 @@ Shared in `lib/utils.ts` — running is blue (#3B82F6), trail_running is orange 
 
 ### Prochaines etapes
 - Fix scheduler DB constraints and re-enable periodic sync
-- Coach role (Phase 2): use `created_by_user_id` to allow coaches to create workouts for athletes
 - Offline mode PWA (service worker)
 
 ## Conventions

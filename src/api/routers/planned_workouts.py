@@ -93,7 +93,10 @@ async def import_planned_workouts(
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="File must be a .csv")
 
-    content = await file.read()
+    MAX_SIZE = 1 * 1024 * 1024  # 1 MB
+    content = await file.read(MAX_SIZE + 1)
+    if len(content) > MAX_SIZE:
+        raise HTTPException(status_code=413, detail="File too large (max 1 MB)")
     text = content.decode("utf-8-sig")
     reader = csv.DictReader(io.StringIO(text))
 

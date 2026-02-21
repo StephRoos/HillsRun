@@ -50,6 +50,7 @@ export default function DashboardPage() {
               size="icon"
               className="h-8 w-8 rounded-r-none"
               onClick={() => setView("list")}
+              aria-label="List view"
             >
               <List className="h-4 w-4" />
             </Button>
@@ -58,6 +59,7 @@ export default function DashboardPage() {
               size="icon"
               className="h-8 w-8 rounded-l-none"
               onClick={() => setView("calendar")}
+              aria-label="Calendar view"
             >
               <CalendarDays className="h-4 w-4" />
             </Button>

@@ -34,7 +34,7 @@ function ReadinessGauge({ score }: { score: number | null | undefined }) {
     value >= 70 ? "#10B981" : value >= 40 ? "#EAB308" : "#EF4444";
 
   return (
-    <svg viewBox="0 0 128 128" className="w-32 h-32 mx-auto">
+    <svg viewBox="0 0 128 128" className="w-32 h-32 mx-auto" role="img" aria-label={`Training readiness score: ${score ?? "unavailable"}`}>
       {/* Background arc */}
       <path
         d={`M ${start.x} ${start.y} A ${r} ${r} 0 ${bgLargeArc} 1 ${bgEnd.x} ${bgEnd.y}`}
@@ -82,12 +82,26 @@ export function ReadinessCard() {
   const today = new Date().toISOString().slice(0, 10);
   const params = { start_date: today, limit: 1 };
 
-  const { data: trData, isPending: trLoading } = useTrainingReadiness(params);
-  const { data: sleepData, isPending: sleepLoading } = useSleep(params);
-  const { data: bbData, isPending: bbLoading } = useBodyBattery(params);
-  const { data: hrvData, isPending: hrvLoading } = useHrv(params);
+  const { data: trData, isPending: trLoading, isError: trError } = useTrainingReadiness(params);
+  const { data: sleepData, isPending: sleepLoading, isError: sleepError } = useSleep(params);
+  const { data: bbData, isPending: bbLoading, isError: bbError } = useBodyBattery(params);
+  const { data: hrvData, isPending: hrvLoading, isError: hrvError } = useHrv(params);
 
   const isPending = trLoading || sleepLoading || bbLoading || hrvLoading;
+  const isError = trError && sleepError && bbError && hrvError;
+
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">Today&apos;s readiness</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">Could not load data</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (isPending) {
     return (

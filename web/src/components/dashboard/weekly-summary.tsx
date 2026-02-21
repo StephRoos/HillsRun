@@ -49,7 +49,7 @@ export function WeeklySummary() {
   const prevStart = prevMonday.toISOString().slice(0, 10);
   const prevEndStr = prevEnd.toISOString().slice(0, 10);
 
-  const { data, isPending } = useActivities({
+  const { data, isPending, isError } = useActivities({
     start_date: prevStart,
     limit: 100,
   });
@@ -63,6 +63,15 @@ export function WeeklySummary() {
     if (!data?.data) return null;
     return computeStats(data.data, prevStart, prevEndStr);
   }, [data, prevStart, prevEndStr]);
+
+  if (isError) {
+    return (
+      <div className="space-y-3">
+        <h2 className="text-lg font-semibold">This week runs</h2>
+        <p className="text-sm text-muted-foreground">Could not load data</p>
+      </div>
+    );
+  }
 
   if (isPending) {
     return (

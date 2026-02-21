@@ -29,7 +29,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
         </TooltipProvider>
       </CoachProvider>
       <Toaster theme="dark" position="bottom-right" richColors />
-      <ReactQueryDevtools initialIsOpen={false} />
+      {process.env.NODE_ENV === "development" && (
+        <ReactQueryDevtools initialIsOpen={false} />
+      )}
     </QueryClientProvider>
   );
 }

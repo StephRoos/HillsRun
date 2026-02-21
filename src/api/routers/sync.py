@@ -27,6 +27,7 @@ router = APIRouter(prefix="/api/v1/sync", tags=["sync"], dependencies=[Depends(g
 # In-memory job store (OrderedDict to maintain insertion order, capped at 50)
 MAX_JOBS = 50
 _jobs: OrderedDict[str, SyncJobResponse] = OrderedDict()
+_jobs_lock = threading.Lock()
 
 
 class _JobLogHandler(logging.Handler):
@@ -45,9 +46,10 @@ class _JobLogHandler(logging.Handler):
 
 
 def _store_job(job: SyncJobResponse) -> None:
-    _jobs[job.job_id] = job
-    while len(_jobs) > MAX_JOBS:
-        _jobs.popitem(last=False)
+    with _jobs_lock:
+        _jobs[job.job_id] = job
+        while len(_jobs) > MAX_JOBS:
+            _jobs.popitem(last=False)
 
 
 def _run_sync_in_thread(job: SyncJobResponse, target_user_id: Optional[int] = None) -> None:
@@ -146,21 +148,22 @@ async def trigger_sync(
                 pass
 
     # Anti-flood: check if there's already a running job for this user
-    for j in _jobs.values():
-        if j.status in (SyncJobStatus.pending, SyncJobStatus.running):
-            # Per-user anti-flood: if we know the target, only block same user
-            if target_user_id is not None:
-                if getattr(j, '_target_user_id', None) == target_user_id:
+    with _jobs_lock:
+        for j in _jobs.values():
+            if j.status in (SyncJobStatus.pending, SyncJobStatus.running):
+                # Per-user anti-flood: if we know the target, only block same user
+                if target_user_id is not None:
+                    if getattr(j, '_target_user_id', None) == target_user_id:
+                        raise HTTPException(
+                            status_code=409,
+                            detail=f"A sync job is already running for this user (job_id={j.job_id})",
+                        )
+                else:
+                    # Legacy mode: block any running job
                     raise HTTPException(
                         status_code=409,
-                        detail=f"A sync job is already running for this user (job_id={j.job_id})",
+                        detail=f"A sync job is already running (job_id={j.job_id})",
                     )
-            else:
-                # Legacy mode: block any running job
-                raise HTTPException(
-                    status_code=409,
-                    detail=f"A sync job is already running (job_id={j.job_id})",
-                )
 
     # Validate categories
     valid_categories = {"daily_health", "activities", "body_composition", "advanced_metrics", "wellness"}

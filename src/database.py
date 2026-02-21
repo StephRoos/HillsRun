@@ -756,6 +756,62 @@ class Database:
             "manual_activity", "pr", "favorite", "auto_calc_calories", "num_laps", "activity_data"
         ]])
 
+    async def upsert_activity_splits(self, activity_id: int, splits: List[Dict[str, Any]]) -> int:
+        """Upsert activity splits/laps.
+
+        Args:
+            activity_id: Activity ID
+            splits: List of split data dicts
+
+        Returns:
+            Number of splits upserted
+        """
+        if not splits:
+            return 0
+
+        query = """
+            INSERT INTO activity_splits (
+                activity_id, split_index, split_type, distance_meters, duration_seconds,
+                average_speed, average_hr, max_hr, average_power, max_power,
+                average_cadence, elevation_gain_meters, elevation_loss_meters, start_timestamp
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            ON CONFLICT (activity_id, split_index) DO UPDATE SET
+                split_type = EXCLUDED.split_type,
+                distance_meters = EXCLUDED.distance_meters,
+                duration_seconds = EXCLUDED.duration_seconds,
+                average_speed = EXCLUDED.average_speed,
+                average_hr = EXCLUDED.average_hr,
+                max_hr = EXCLUDED.max_hr,
+                average_power = EXCLUDED.average_power,
+                max_power = EXCLUDED.max_power,
+                average_cadence = EXCLUDED.average_cadence,
+                elevation_gain_meters = EXCLUDED.elevation_gain_meters,
+                elevation_loss_meters = EXCLUDED.elevation_loss_meters,
+                start_timestamp = EXCLUDED.start_timestamp
+        """
+        records = [
+            (
+                activity_id,
+                s.get("split_index"),
+                s.get("split_type"),
+                s.get("distance_meters"),
+                s.get("duration_seconds"),
+                s.get("average_speed"),
+                s.get("average_hr"),
+                s.get("max_hr"),
+                s.get("average_power"),
+                s.get("max_power"),
+                s.get("average_cadence"),
+                s.get("elevation_gain_meters"),
+                s.get("elevation_loss_meters"),
+                s.get("start_timestamp"),
+            )
+            for s in splits
+        ]
+        await self.pool.executemany(query, records)
+        return len(records)
+
     async def get_activity_ids_for_range(self, user_id: int, start_date: date, end_date: date) -> List[int]:
         """Get all activity_ids in DB for a user within a date range."""
         rows = await self.pool.fetch(

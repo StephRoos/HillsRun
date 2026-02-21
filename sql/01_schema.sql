@@ -16,23 +16,25 @@ CREATE TABLE IF NOT EXISTS garmin_user (
     display_name VARCHAR(255),
     email VARCHAR(255),
     profile_image_url TEXT,
+    better_auth_user_id VARCHAR(36) UNIQUE,
+    encrypted_tokens BYTEA,
+    tokens_updated_at TIMESTAMPTZ,
+    coaching_enabled BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
--- Sync state tracking
+-- Sync state tracking (per-user, see 06_sync_state_per_user.sql)
 CREATE TABLE IF NOT EXISTS sync_state (
     id SERIAL PRIMARY KEY,
-    category VARCHAR(50) UNIQUE NOT NULL,
+    user_id BIGINT REFERENCES garmin_user(user_id) ON DELETE CASCADE,
+    category VARCHAR(50) NOT NULL,
     last_sync_date DATE NOT NULL,
     last_sync_timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     records_synced INTEGER DEFAULT 0,
     sync_status VARCHAR(20) DEFAULT 'success', -- success, partial, failed
     error_message TEXT,
-    CONSTRAINT valid_category CHECK (category IN (
-        'daily_health', 'activities', 'body_composition',
-        'advanced_metrics', 'wellness'
-    ))
+    UNIQUE(user_id, category)
 );
 
 -- ============================================
@@ -251,7 +253,7 @@ CREATE TABLE IF NOT EXISTS respiration_data (
 CREATE TABLE IF NOT EXISTS activities (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT REFERENCES garmin_user(user_id) ON DELETE CASCADE,
-    activity_id BIGINT UNIQUE NOT NULL,
+    activity_id BIGINT NOT NULL,
     activity_name VARCHAR(255),
     custom_name VARCHAR(255),
     activity_type VARCHAR(100),
@@ -299,7 +301,8 @@ CREATE TABLE IF NOT EXISTS activities (
     num_laps INTEGER,
     activity_data JSONB, -- Full activity JSON for reference
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, activity_id)
 );
 
 -- Activity splits/laps

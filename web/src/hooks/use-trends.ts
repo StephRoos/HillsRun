@@ -186,5 +186,13 @@ export function useTrends(period: Period) {
       sleep.isPending ||
       weight.isPending ||
       stress.isPending,
+    isError:
+      activities.isError &&
+      readiness.isError &&
+      hrv.isError &&
+      fitness.isError &&
+      sleep.isError &&
+      weight.isError &&
+      stress.isError,
   };
 }

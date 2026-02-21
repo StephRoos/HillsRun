@@ -4,7 +4,7 @@
  * Uses request deduplication to prevent thundering herd on page load.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_GARMIN_API_URL;
+const API_BASE = process.env.GARMIN_API_URL;
 const API_KEY = process.env.GARMIN_API_KEY;
 
 interface GarminUserStatus {

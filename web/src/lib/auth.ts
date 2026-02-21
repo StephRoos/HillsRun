@@ -3,7 +3,7 @@ import { createAuthMiddleware } from "better-auth/api";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "./prisma";
 
-const GARMIN_API_BASE = process.env.NEXT_PUBLIC_GARMIN_API_URL;
+const GARMIN_API_BASE = process.env.GARMIN_API_URL;
 const GARMIN_API_KEY = process.env.GARMIN_API_KEY;
 
 export const auth = betterAuth({

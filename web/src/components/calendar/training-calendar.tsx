@@ -198,6 +198,10 @@ export function TrainingCalendar() {
             return (
               <div
                 key={day}
+                role="button"
+                tabIndex={0}
+                aria-label={`${dateStr}, ${totalItems} ${totalItems === 1 ? "item" : "items"}`}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openCreateDialog(dateStr); } }}
                 className={`min-h-[100px] rounded-lg border p-1 flex flex-col gap-0.5 transition-colors group
                   ${isToday ? "ring-2 ring-primary border-primary/30" : "border-border hover:border-border/80 hover:bg-accent/30"}
                 `}

@@ -19,11 +19,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import {
   useCreatePlannedWorkout,
   useUpdatePlannedWorkout,
   useDeletePlannedWorkout,
 } from "@/hooks/use-planned-workouts";
+import { useCoachContext } from "@/lib/coach-context";
 import type { PlannedWorkout } from "@/types/garmin";
 
 const SPORT_TYPES = [
@@ -55,6 +57,7 @@ function WorkoutForm({
   onClose: () => void;
 }) {
   const isEdit = !!workout;
+  const { isViewingAthlete, athleteName } = useCoachContext();
 
   const [plannedDate, setPlannedDate] = useState(
     workout?.planned_date ?? date ?? ""
@@ -120,7 +123,14 @@ function WorkoutForm({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{isEdit ? "Edit Workout" : "Plan Workout"}</DialogTitle>
+        <DialogTitle className="flex items-center gap-2">
+          {isEdit ? "Edit Workout" : "Plan Workout"}
+          {isViewingAthlete && (
+            <Badge variant="secondary" className="text-xs font-normal">
+              for {athleteName}
+            </Badge>
+          )}
+        </DialogTitle>
       </DialogHeader>
 
       <div className="space-y-4">

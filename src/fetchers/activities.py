@@ -113,6 +113,17 @@ class ActivitiesFetcher(BaseFetcher):
         await self.db.upsert_activity(self.user_id, activity_data)
         logger.debug(f"Stored activity {activity_id}")
 
+        # Fetch and store splits (non-blocking — don't fail the activity sync)
+        try:
+            ok, splits_data, err = self.garmin_client.get_activity_splits(activity_id)
+            if ok and splits_data:
+                splits = self._transform_splits(splits_data)
+                if splits:
+                    count = await self.db.upsert_activity_splits(activity_id, splits)
+                    logger.debug(f"Stored {count} splits for activity {activity_id}")
+        except Exception as e:
+            logger.warning(f"Failed to sync splits for activity {activity_id}: {e}")
+
     def _transform_activity(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Transform activity data for database."""
         # Parse start timestamp
@@ -174,3 +185,32 @@ class ActivitiesFetcher(BaseFetcher):
             "num_laps": data.get("lapCount"),
             "activity_data": json.dumps(data),
         }
+
+    def _transform_splits(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Transform splits API response into list of split dicts for DB."""
+        splits = []
+        lap_dtos = data.get("lapDTOs") or data.get("splitDTOs") or []
+        for i, lap in enumerate(lap_dtos):
+            start_ts = None
+            if lap.get("startTimeGMT"):
+                start_ts = datetime.fromisoformat(lap["startTimeGMT"].replace("Z", "+00:00"))
+
+            splits.append({
+                "split_index": i,
+                "split_type": lap.get("messageType", "lap"),
+                "distance_meters": lap.get("distance"),
+                "duration_seconds": (
+                    lap.get("duration")
+                    or (lap.get("elapsedDuration", 0) / 1000 if lap.get("elapsedDuration") else None)
+                ),
+                "average_speed": lap.get("averageSpeed"),
+                "average_hr": lap.get("averageHR"),
+                "max_hr": lap.get("maxHR"),
+                "average_power": lap.get("avgPower"),
+                "max_power": lap.get("maxPower"),
+                "average_cadence": lap.get("averageRunningCadenceInStepsPerMinute") or lap.get("avgCadence"),
+                "elevation_gain_meters": lap.get("elevationGain"),
+                "elevation_loss_meters": lap.get("elevationLoss"),
+                "start_timestamp": start_ts,
+            })
+        return splits

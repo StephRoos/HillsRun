@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { getGarminUserId } from "@/lib/garmin-user";
 import { verifyCoachAccess } from "@/lib/coach-access";
 
-const API_BASE = process.env.NEXT_PUBLIC_GARMIN_API_URL;
+const API_BASE = process.env.GARMIN_API_URL;
 const API_KEY = process.env.GARMIN_API_KEY;
 
 function isCoachingPath(path: string[]): boolean {
@@ -60,6 +60,16 @@ async function resolveRequest(
   }
 }
 
+async function forwardError(res: Response): Promise<NextResponse> {
+  try {
+    const body = await res.json();
+    const message = body.detail ?? body.error ?? `Garmin API error: ${res.status}`;
+    return NextResponse.json({ error: message }, { status: res.status });
+  } catch {
+    return forwardError(res);
+  }
+}
+
 function buildHeaders(garminUserId: number | null, betterAuthUserId: string | null, coachBetterAuthId: string | null): Record<string, string> {
   const h: Record<string, string> = {
     "X-API-Key": API_KEY ?? "",
@@ -86,10 +96,7 @@ export async function GET(
   });
 
   if (!res.ok) {
-    return NextResponse.json(
-      { error: `Garmin API error: ${res.status}` },
-      { status: res.status }
-    );
+    return forwardError(res);
   }
 
   const data = await res.json();
@@ -118,10 +125,7 @@ export async function POST(
   });
 
   if (!res.ok) {
-    return NextResponse.json(
-      { error: `Garmin API error: ${res.status}` },
-      { status: res.status }
-    );
+    return forwardError(res);
   }
 
   const data = await res.json();
@@ -150,10 +154,7 @@ export async function PATCH(
   });
 
   if (!res.ok) {
-    return NextResponse.json(
-      { error: `Garmin API error: ${res.status}` },
-      { status: res.status }
-    );
+    return forwardError(res);
   }
 
   const data = await res.json();
@@ -180,10 +181,7 @@ export async function DELETE(
   }
 
   if (!res.ok) {
-    return NextResponse.json(
-      { error: `Garmin API error: ${res.status}` },
-      { status: res.status }
-    );
+    return forwardError(res);
   }
 
   const data = await res.json();

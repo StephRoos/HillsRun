@@ -1,6 +1,7 @@
 """Health check endpoint."""
 
 from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 from ..schemas import HealthResponse
 
 router = APIRouter()
@@ -13,4 +14,4 @@ async def health(request: Request):
         await db.pool.fetchval("SELECT 1")
         return {"status": "ok"}
     except Exception:
-        return {"status": "degraded"}
+        return JSONResponse({"status": "degraded"}, status_code=503)

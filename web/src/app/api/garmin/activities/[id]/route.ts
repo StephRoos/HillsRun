@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { getGarminUserId } from "@/lib/garmin-user";
 
-const API_BASE = process.env.NEXT_PUBLIC_GARMIN_API_URL;
+const API_BASE = process.env.GARMIN_API_URL;
 const API_KEY = process.env.GARMIN_API_KEY;
 
 async function resolveGarminUserId(): Promise<{

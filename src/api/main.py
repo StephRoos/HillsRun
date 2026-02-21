@@ -23,8 +23,23 @@ def _db_config_from_env() -> DatabaseConfig:
     )
 
 
+def _validate_token_key():
+    """Validate GARMIN_TOKEN_KEY env var at startup."""
+    from cryptography.fernet import Fernet
+    key = os.environ.get("GARMIN_TOKEN_KEY", "")
+    if not key:
+        raise RuntimeError("GARMIN_TOKEN_KEY environment variable is not set")
+    try:
+        Fernet(key.encode() if isinstance(key, str) else key)
+    except Exception as exc:
+        raise RuntimeError(f"GARMIN_TOKEN_KEY is not a valid Fernet key: {exc}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from ..utils.logging_config import setup_logging
+    setup_logging(log_level=os.environ.get("LOG_LEVEL", "INFO"))
+    _validate_token_key()
     db = Database(_db_config_from_env())
     await db.connect()
     app.state.db = db

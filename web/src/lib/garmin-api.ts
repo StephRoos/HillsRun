@@ -24,6 +24,15 @@ export class GarminNotConnectedError extends Error {
   }
 }
 
+async function parseErrorMessage(res: Response): Promise<string> {
+  try {
+    const body = await res.json();
+    return body.error ?? body.detail ?? `Garmin API error: ${res.status}`;
+  } catch {
+    return `Garmin API error: ${res.status}`;
+  }
+}
+
 let _viewAsAthleteId: number | null = null;
 
 export function setViewAsAthlete(id: number | null) {
@@ -52,7 +61,8 @@ async function garminFetch<T>(
     if (res.status === 403) {
       throw new GarminNotConnectedError();
     }
-    throw new Error(`Garmin API error: ${res.status}`);
+    const message = await parseErrorMessage(res);
+    throw new Error(message);
   }
   return res.json();
 }
@@ -101,7 +111,7 @@ export const garminApi = {
       headers: { "Content-Type": "application/json", ...getHeaders() },
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`Garmin API error: ${res.status}`);
+    if (!res.ok) throw new Error(await parseErrorMessage(res));
     return res.json() as Promise<ActivityDetail>;
   },
 
@@ -113,7 +123,7 @@ export const garminApi = {
       body: JSON.stringify(options ?? {}),
     });
     if (!res.ok && res.status !== 409) {
-      throw new Error(`Sync trigger error: ${res.status}`);
+      throw new Error(await parseErrorMessage(res));
     }
     return res.json();
   },
@@ -138,7 +148,7 @@ export const garminApi = {
       headers: { "Content-Type": "application/json", ...getHeaders() },
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`Garmin API error: ${res.status}`);
+    if (!res.ok) throw new Error(await parseErrorMessage(res));
     return res.json() as Promise<PlannedWorkout>;
   },
 
@@ -148,7 +158,7 @@ export const garminApi = {
       headers: { "Content-Type": "application/json", ...getHeaders() },
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`Garmin API error: ${res.status}`);
+    if (!res.ok) throw new Error(await parseErrorMessage(res));
     return res.json() as Promise<PlannedWorkout>;
   },
 
@@ -157,7 +167,7 @@ export const garminApi = {
       method: "DELETE",
       headers: getHeaders(),
     });
-    if (!res.ok && res.status !== 204) throw new Error(`Garmin API error: ${res.status}`);
+    if (!res.ok && res.status !== 204) throw new Error(await parseErrorMessage(res));
   },
 
   importPlannedWorkouts: async (file: File) => {
@@ -168,7 +178,7 @@ export const garminApi = {
       headers: getHeaders(),
       body: formData,
     });
-    if (!res.ok) throw new Error(`Garmin API error: ${res.status}`);
+    if (!res.ok) throw new Error(await parseErrorMessage(res));
     return res.json() as Promise<BulkImportResult>;
   },
 };

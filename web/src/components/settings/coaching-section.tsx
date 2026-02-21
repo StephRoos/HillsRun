@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Trash2, UserMinus, Link2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Copy, Trash2, UserMinus, Link2, Eye } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,9 +17,14 @@ import {
   useRemoveAthlete,
   useRemoveCoach,
 } from "@/hooks/use-coaching";
+import { useCoachContext } from "@/lib/coach-context";
+import { setViewAsAthlete } from "@/lib/garmin-api";
 
 export function CoachingSection() {
   const { data: status } = useCoachingStatus();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { setAthlete } = useCoachContext();
   const [redeemCode, setRedeemCode] = useState("");
   const [lastGeneratedCode, setLastGeneratedCode] = useState<string | null>(null);
 
@@ -124,14 +131,33 @@ export function CoachingSection() {
                   className="flex items-center justify-between rounded-md border p-2 text-sm"
                 >
                   <span>{a.display_name || a.email || `User #${a.athlete_user_id}`}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-destructive"
-                    onClick={() => removeAthlete.mutate(a.athlete_user_id)}
-                  >
-                    <UserMinus className="h-3.5 w-3.5" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      aria-label={`View ${a.display_name || "athlete"}'s data`}
+                      onClick={() => {
+                        setAthlete(
+                          a.athlete_user_id,
+                          a.display_name || a.email || `User #${a.athlete_user_id}`
+                        );
+                        setViewAsAthlete(a.athlete_user_id);
+                        queryClient.invalidateQueries();
+                        router.push("/dashboard");
+                      }}
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive"
+                      onClick={() => removeAthlete.mutate(a.athlete_user_id)}
+                    >
+                      <UserMinus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
