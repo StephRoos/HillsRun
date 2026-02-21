@@ -15,6 +15,7 @@ import type {
   PlannedWorkoutCreate,
   PlannedWorkoutUpdate,
   BulkImportResult,
+  VmaData,
 } from "@/types/garmin";
 
 export class GarminNotConnectedError extends Error {
@@ -168,6 +169,19 @@ export const garminApi = {
       headers: getHeaders(),
     });
     if (!res.ok && res.status !== 204) throw new Error(await parseErrorMessage(res));
+  },
+
+  // User profile
+  getVma: () => garminFetch<VmaData>("user/vma"),
+
+  updateVma: async (vma: number | null) => {
+    const res = await fetch("/api/garmin/user/vma", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...getHeaders() },
+      body: JSON.stringify({ vma }),
+    });
+    if (!res.ok) throw new Error(await parseErrorMessage(res));
+    return res.json() as Promise<VmaData>;
   },
 
   importPlannedWorkouts: async (file: File) => {

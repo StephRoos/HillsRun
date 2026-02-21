@@ -200,6 +200,12 @@ export interface BulkImportResult {
   errors: string[];
 }
 
+// VMA
+export interface VmaData {
+  manual_vma: number | null;
+  estimated_vma: number | null;
+}
+
 // Coaching
 export interface InviteCode {
   id: number;

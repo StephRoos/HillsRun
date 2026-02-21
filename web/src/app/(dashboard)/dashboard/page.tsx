@@ -4,6 +4,7 @@ import { useState } from "react";
 import { List, CalendarDays, Link } from "lucide-react";
 import { WeeklySummary } from "@/components/dashboard/weekly-summary";
 import { ReadinessCard } from "@/components/dashboard/readiness-card";
+import { VmaCard } from "@/components/dashboard/vma-card";
 import { TodayActivities } from "@/components/dashboard/today-activities";
 import { ActivityList } from "@/components/activity/activity-list";
 import { ActivityCalendar } from "@/components/dashboard/activity-calendar";
@@ -74,6 +75,7 @@ export default function DashboardPage() {
         </div>
         <div className="space-y-6">
           <TodayActivities />
+          <VmaCard />
           <ReadinessCard />
         </div>
       </div>

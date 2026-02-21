@@ -137,13 +137,6 @@ class Database:
                     RETURNING user_id
                 """, garmin_user_id, better_auth_user_id, display_name, email)
 
-    async def link_better_auth_user(self, user_id: int, better_auth_user_id: str) -> None:
-        """Link an existing garmin_user to a Better-Auth account."""
-        await self.pool.execute(
-            "UPDATE garmin_user SET better_auth_user_id = $1 WHERE user_id = $2",
-            better_auth_user_id, user_id,
-        )
-
     async def store_encrypted_tokens(self, user_id: int, encrypted_tokens: bytes) -> None:
         """Store encrypted Garmin tokens for a user."""
         await self.pool.execute(
@@ -171,10 +164,43 @@ class Database:
         info["encrypted_tokens"] = info.pop("has_tokens")
         return info
 
-    async def clear_user_tokens(self, user_id: int) -> None:
-        """Clear encrypted tokens for a user (disconnect)."""
+    async def get_user_vma(self, user_id: int) -> Optional[float]:
+        """Get manual VMA for a user.
+
+        Args:
+            user_id: User ID.
+
+        Returns:
+            Manual VMA value or None if not set.
+        """
+        return await self.pool.fetchval(
+            "SELECT manual_vma FROM garmin_user WHERE user_id = $1",
+            user_id,
+        )
+
+    async def update_user_vma(self, user_id: int, vma: Optional[float]) -> None:
+        """Update manual VMA for a user.
+
+        Args:
+            user_id: User ID.
+            vma: VMA value in km/h, or None to clear.
+        """
         await self.pool.execute(
-            "UPDATE garmin_user SET encrypted_tokens = NULL, tokens_updated_at = NULL WHERE user_id = $1",
+            "UPDATE garmin_user SET manual_vma = $1 WHERE user_id = $2",
+            vma, user_id,
+        )
+
+    async def get_latest_vo2max_running(self, user_id: int) -> Optional[float]:
+        """Get the most recent VO2max running value for a user.
+
+        Args:
+            user_id: User ID.
+
+        Returns:
+            Latest vo2_max_running value or None.
+        """
+        return await self.pool.fetchval(
+            "SELECT vo2_max_running FROM fitness_metrics WHERE user_id = $1 AND vo2_max_running IS NOT NULL ORDER BY calendar_date DESC LIMIT 1",
             user_id,
         )
 
@@ -870,6 +896,18 @@ class Database:
     async def query_daily_summaries(
         self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
     ):
+        """Query daily summaries for a user within a date range.
+
+        Args:
+            user_id: User ID.
+            start_date: Range start (inclusive).
+            end_date: Range end (inclusive).
+            limit: Max results per page.
+            offset: Number of results to skip.
+
+        Returns:
+            Tuple of (rows, total_count).
+        """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM daily_summary WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
             user_id, start_date, end_date,
@@ -884,6 +922,18 @@ class Database:
     async def query_heart_rate_samples(
         self, user_id: int, start_date: date, end_date: date, limit: int = 1000, offset: int = 0
     ):
+        """Query heart rate samples for a user within a date range.
+
+        Args:
+            user_id: User ID.
+            start_date: Range start (inclusive).
+            end_date: Range end (inclusive).
+            limit: Max results per page.
+            offset: Number of results to skip.
+
+        Returns:
+            Tuple of (rows, total_count).
+        """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM heart_rate_samples WHERE user_id=$1 AND timestamp::date BETWEEN $2 AND $3",
             user_id, start_date, end_date,
@@ -898,6 +948,18 @@ class Database:
     async def query_sleep_data(
         self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
     ):
+        """Query sleep data for a user within a date range.
+
+        Args:
+            user_id: User ID.
+            start_date: Range start (inclusive).
+            end_date: Range end (inclusive).
+            limit: Max results per page.
+            offset: Number of results to skip.
+
+        Returns:
+            Tuple of (rows, total_count).
+        """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM sleep_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
             user_id, start_date, end_date,
@@ -912,6 +974,18 @@ class Database:
     async def query_stress_data(
         self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
     ):
+        """Query stress data for a user within a date range.
+
+        Args:
+            user_id: User ID.
+            start_date: Range start (inclusive).
+            end_date: Range end (inclusive).
+            limit: Max results per page.
+            offset: Number of results to skip.
+
+        Returns:
+            Tuple of (rows, total_count).
+        """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM stress_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
             user_id, start_date, end_date,
@@ -926,6 +1000,18 @@ class Database:
     async def query_body_battery(
         self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
     ):
+        """Query body battery data for a user within a date range.
+
+        Args:
+            user_id: User ID.
+            start_date: Range start (inclusive).
+            end_date: Range end (inclusive).
+            limit: Max results per page.
+            offset: Number of results to skip.
+
+        Returns:
+            Tuple of (rows, total_count).
+        """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM body_battery WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
             user_id, start_date, end_date,
@@ -940,6 +1026,18 @@ class Database:
     async def query_body_composition(
         self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
     ):
+        """Query body composition data for a user within a date range.
+
+        Args:
+            user_id: User ID.
+            start_date: Range start (inclusive).
+            end_date: Range end (inclusive).
+            limit: Max results per page.
+            offset: Number of results to skip.
+
+        Returns:
+            Tuple of (rows, total_count).
+        """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM body_composition WHERE user_id=$1 AND timestamp::date BETWEEN $2 AND $3",
             user_id, start_date, end_date,
@@ -954,6 +1052,18 @@ class Database:
     async def query_hrv_data(
         self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
     ):
+        """Query HRV data for a user within a date range.
+
+        Args:
+            user_id: User ID.
+            start_date: Range start (inclusive).
+            end_date: Range end (inclusive).
+            limit: Max results per page.
+            offset: Number of results to skip.
+
+        Returns:
+            Tuple of (rows, total_count).
+        """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM hrv_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
             user_id, start_date, end_date,
@@ -968,6 +1078,18 @@ class Database:
     async def query_spo2_data(
         self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
     ):
+        """Query SpO2 data for a user within a date range.
+
+        Args:
+            user_id: User ID.
+            start_date: Range start (inclusive).
+            end_date: Range end (inclusive).
+            limit: Max results per page.
+            offset: Number of results to skip.
+
+        Returns:
+            Tuple of (rows, total_count).
+        """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM spo2_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
             user_id, start_date, end_date,
@@ -982,6 +1104,18 @@ class Database:
     async def query_fitness_metrics(
         self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
     ):
+        """Query fitness metrics for a user within a date range.
+
+        Args:
+            user_id: User ID.
+            start_date: Range start (inclusive).
+            end_date: Range end (inclusive).
+            limit: Max results per page.
+            offset: Number of results to skip.
+
+        Returns:
+            Tuple of (rows, total_count).
+        """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM fitness_metrics WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
             user_id, start_date, end_date,
@@ -996,6 +1130,18 @@ class Database:
     async def query_respiration_data(
         self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
     ):
+        """Query respiration data for a user within a date range.
+
+        Args:
+            user_id: User ID.
+            start_date: Range start (inclusive).
+            end_date: Range end (inclusive).
+            limit: Max results per page.
+            offset: Number of results to skip.
+
+        Returns:
+            Tuple of (rows, total_count).
+        """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM respiration_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
             user_id, start_date, end_date,
@@ -1010,6 +1156,18 @@ class Database:
     async def query_training_readiness(
         self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
     ):
+        """Query training readiness data for a user within a date range.
+
+        Args:
+            user_id: User ID.
+            start_date: Range start (inclusive).
+            end_date: Range end (inclusive).
+            limit: Max results per page.
+            offset: Number of results to skip.
+
+        Returns:
+            Tuple of (rows, total_count).
+        """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM training_readiness WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
             user_id, start_date, end_date,
@@ -1031,6 +1189,20 @@ class Database:
         sport_type: Optional[str] = None,
         activity_type: Optional[str] = None,
     ):
+        """Query activities for a user within a date range with optional filters.
+
+        Args:
+            user_id: User ID.
+            start_date: Range start (inclusive).
+            end_date: Range end (inclusive).
+            limit: Max results per page.
+            offset: Number of results to skip.
+            sport_type: Optional filter by sport type.
+            activity_type: Optional filter by activity type.
+
+        Returns:
+            Tuple of (rows, total_count).
+        """
         filters = "user_id=$1 AND start_timestamp::date BETWEEN $2 AND $3"
         params: list = [user_id, start_date, end_date]
         if sport_type:
@@ -1049,6 +1221,15 @@ class Database:
         return rows, total
 
     async def query_activity_by_id(self, activity_id: int, user_id: Optional[int] = None):
+        """Query a single activity by ID.
+
+        Args:
+            activity_id: Activity ID.
+            user_id: Optional user ID for ownership verification.
+
+        Returns:
+            Activity row or None if not found.
+        """
         if user_id is not None:
             return await self.pool.fetchrow(
                 "SELECT * FROM activities WHERE activity_id=$1 AND user_id=$2", activity_id, user_id
@@ -1058,6 +1239,15 @@ class Database:
         )
 
     async def query_activity_splits(self, activity_id: int, user_id: Optional[int] = None):
+        """Query activity splits/laps by activity ID.
+
+        Args:
+            activity_id: Activity ID.
+            user_id: Optional user ID for ownership verification.
+
+        Returns:
+            List of split rows.
+        """
         if user_id is not None:
             # Verify the activity belongs to the user before returning splits
             activity = await self.pool.fetchval(
@@ -1073,6 +1263,18 @@ class Database:
     async def query_hydration_data(
         self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
     ):
+        """Query hydration data for a user within a date range.
+
+        Args:
+            user_id: User ID.
+            start_date: Range start (inclusive).
+            end_date: Range end (inclusive).
+            limit: Max results per page.
+            offset: Number of results to skip.
+
+        Returns:
+            Tuple of (rows, total_count).
+        """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM hydration_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
             user_id, start_date, end_date,
@@ -1105,14 +1307,16 @@ class Database:
     # Planned Workout Operations
     # ============================================
 
-    ALLOWED_SPORT_TYPES = {
-        "running", "trail_running", "cycling", "swimming",
-        "strength_training", "rest", "stretching",
-    }
-
-    ALLOWED_INTENSITIES = {"easy", "moderate", "hard", "race"}
-
     async def create_planned_workout(self, user_id: int, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new planned workout.
+
+        Args:
+            user_id: User ID.
+            data: Workout data dict with planned_date, sport_type, title, etc.
+
+        Returns:
+            Created workout row as dict.
+        """
         query = """
             INSERT INTO planned_workouts (
                 user_id, planned_date, sport_type, title, description,
@@ -1134,6 +1338,16 @@ class Database:
     async def update_planned_workout(
         self, workout_id: int, user_id: int, data: Dict[str, Any]
     ) -> Optional[Dict[str, Any]]:
+        """Update a planned workout.
+
+        Args:
+            workout_id: Workout ID.
+            user_id: User ID for ownership verification.
+            data: Fields to update.
+
+        Returns:
+            Updated workout row as dict, or None if not found.
+        """
         allowed = {
             "planned_date", "sport_type", "title", "description",
             "planned_duration_seconds", "planned_distance_meters",
@@ -1160,6 +1374,7 @@ class Database:
         return dict(row) if row else None
 
     async def delete_planned_workout(self, workout_id: int, user_id: int) -> bool:
+        """Delete a planned workout by ID and user_id. Returns True if deleted."""
         result = await self.pool.execute(
             "DELETE FROM planned_workouts WHERE id = $1 AND user_id = $2",
             workout_id, user_id,
@@ -1167,6 +1382,15 @@ class Database:
         return result == "DELETE 1"
 
     async def get_planned_workout(self, workout_id: int, user_id: int) -> Optional[Dict[str, Any]]:
+        """Get a single planned workout by ID.
+
+        Args:
+            workout_id: Workout ID.
+            user_id: User ID for ownership verification.
+
+        Returns:
+            Workout row as dict, or None if not found.
+        """
         row = await self.pool.fetchrow(
             "SELECT * FROM planned_workouts WHERE id = $1 AND user_id = $2",
             workout_id, user_id,
@@ -1177,6 +1401,18 @@ class Database:
         self, user_id: int, start_date: date, end_date: date,
         limit: int = 200, offset: int = 0,
     ):
+        """Query planned workouts for a user within a date range.
+
+        Args:
+            user_id: User ID.
+            start_date: Range start (inclusive).
+            end_date: Range end (inclusive).
+            limit: Max results per page.
+            offset: Number of results to skip.
+
+        Returns:
+            Tuple of (rows, total_count).
+        """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM planned_workouts WHERE user_id=$1 AND planned_date BETWEEN $2 AND $3",
             user_id, start_date, end_date,
@@ -1189,6 +1425,16 @@ class Database:
         return rows, total
 
     async def bulk_create_planned_workouts(self, user_id: int, workouts: List[Dict[str, Any]], created_by_user_id: Optional[str] = None) -> int:
+        """Bulk create planned workouts from a list.
+
+        Args:
+            user_id: User ID.
+            workouts: List of workout dicts.
+            created_by_user_id: Optional coach user ID for bulk imports.
+
+        Returns:
+            Number of workouts created.
+        """
         if not workouts:
             return 0
         query = """
@@ -1217,6 +1463,14 @@ class Database:
     # ============================================
 
     async def get_athletes_for_coach(self, coach_better_auth_id: str) -> List[Dict[str, Any]]:
+        """Get all active athletes linked to a coach.
+
+        Args:
+            coach_better_auth_id: Coach's Better-Auth user ID.
+
+        Returns:
+            List of athlete dicts with athlete_user_id, display_name, email, status, linked_at.
+        """
         rows = await self.pool.fetch("""
             SELECT ca.athlete_user_id, gu.display_name, gu.email, ca.status, ca.linked_at
             FROM coach_athletes ca
@@ -1227,6 +1481,14 @@ class Database:
         return [dict(r) for r in rows]
 
     async def get_coaches_for_athlete(self, athlete_user_id: int) -> List[Dict[str, Any]]:
+        """Get all active coaches linked to an athlete.
+
+        Args:
+            athlete_user_id: Athlete's user ID.
+
+        Returns:
+            List of coach dicts with coach_better_auth_id, coach_name, coach_email, status, linked_at.
+        """
         rows = await self.pool.fetch("""
             SELECT ca.coach_better_auth_id, u.name AS coach_name, u.email AS coach_email,
                    ca.status, ca.linked_at
@@ -1238,6 +1500,15 @@ class Database:
         return [dict(r) for r in rows]
 
     async def is_coach_of_athlete(self, coach_better_auth_id: str, athlete_user_id: int) -> bool:
+        """Check if a coach is actively linked to an athlete.
+
+        Args:
+            coach_better_auth_id: Coach's Better-Auth user ID.
+            athlete_user_id: Athlete's user ID.
+
+        Returns:
+            True if actively linked, False otherwise.
+        """
         result = await self.pool.fetchval("""
             SELECT EXISTS(
                 SELECT 1 FROM coach_athletes
@@ -1247,6 +1518,7 @@ class Database:
         return result
 
     async def unlink_coach_athlete(self, coach_better_auth_id: str, athlete_user_id: int) -> bool:
+        """Unlink a coach-athlete relationship. Returns True if updated."""
         result = await self.pool.execute("""
             UPDATE coach_athletes SET status = 'removed', removed_at = CURRENT_TIMESTAMP
             WHERE coach_better_auth_id = $1 AND athlete_user_id = $2 AND status = 'active'
@@ -1254,6 +1526,15 @@ class Database:
         return result == "UPDATE 1"
 
     async def create_invite_code(self, coach_better_auth_id: str, code: str) -> Dict[str, Any]:
+        """Create a new invite code for a coach.
+
+        Args:
+            coach_better_auth_id: Coach's Better-Auth user ID.
+            code: The invite code string.
+
+        Returns:
+            Created invite code row as dict.
+        """
         row = await self.pool.fetchrow("""
             INSERT INTO invite_codes (coach_better_auth_id, code)
             VALUES ($1, $2)
@@ -1262,6 +1543,14 @@ class Database:
         return dict(row)
 
     async def get_invite_codes_for_coach(self, coach_better_auth_id: str) -> List[Dict[str, Any]]:
+        """Get all invite codes for a coach, ordered by creation date.
+
+        Args:
+            coach_better_auth_id: Coach's Better-Auth user ID.
+
+        Returns:
+            List of invite code rows as dicts.
+        """
         rows = await self.pool.fetch("""
             SELECT * FROM invite_codes
             WHERE coach_better_auth_id = $1
@@ -1270,6 +1559,15 @@ class Database:
         return [dict(r) for r in rows]
 
     async def redeem_invite_code(self, code: str, athlete_user_id: int) -> Dict[str, Any]:
+        """Redeem an invite code and link coach to athlete.
+
+        Args:
+            code: The invite code string.
+            athlete_user_id: Athlete's user ID.
+
+        Returns:
+            Redeemed invite code row as dict, or None if code invalid/expired.
+        """
         async with self.pool.acquire() as conn:
             async with conn.transaction():
                 row = await conn.fetchrow("""
@@ -1289,6 +1587,7 @@ class Database:
                 return dict(row)
 
     async def revoke_invite_code(self, code: str, coach_better_auth_id: str) -> bool:
+        """Revoke a pending invite code. Returns True if revoked."""
         result = await self.pool.execute("""
             UPDATE invite_codes SET status = 'revoked'
             WHERE code = $1 AND coach_better_auth_id = $2 AND status = 'pending'
@@ -1296,12 +1595,14 @@ class Database:
         return result == "UPDATE 1"
 
     async def enable_coaching(self, better_auth_user_id: str) -> None:
+        """Enable coaching mode for a user."""
         await self.pool.execute(
             "UPDATE garmin_user SET coaching_enabled = TRUE WHERE better_auth_user_id = $1",
             better_auth_user_id,
         )
 
     async def get_coaching_enabled(self, better_auth_user_id: str) -> bool:
+        """Check if coaching mode is enabled for a user."""
         result = await self.pool.fetchval(
             "SELECT coaching_enabled FROM garmin_user WHERE better_auth_user_id = $1",
             better_auth_user_id,
@@ -1309,6 +1610,14 @@ class Database:
         return bool(result)
 
     async def query_sync_status(self, user_id: Optional[int] = None):
+        """Query sync status for all categories, optionally filtered by user.
+
+        Args:
+            user_id: Optional user ID for per-user sync state.
+
+        Returns:
+            List of sync_state rows.
+        """
         if user_id is not None:
             return await self.pool.fetch(
                 "SELECT * FROM sync_state WHERE user_id = $1 ORDER BY category", user_id

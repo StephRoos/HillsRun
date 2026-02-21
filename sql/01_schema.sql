@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS garmin_user (
     encrypted_tokens BYTEA,
     tokens_updated_at TIMESTAMPTZ,
     coaching_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    manual_vma NUMERIC(5, 2),
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
