@@ -236,7 +236,7 @@ class Database:
         if user_id is not None:
             query = "SELECT last_sync_date FROM sync_state WHERE category = $1 AND user_id = $2"
             return await self.pool.fetchval(query, category, user_id)
-        query = "SELECT last_sync_date FROM sync_state WHERE category = $1"
+        query = "SELECT last_sync_date FROM sync_state WHERE category = $1 AND user_id IS NULL"
         return await self.pool.fetchval(query, category)
 
     async def update_sync_state(
@@ -274,7 +274,7 @@ class Database:
             query = """
                 INSERT INTO sync_state (category, last_sync_date, last_sync_timestamp, records_synced, sync_status, error_message)
                 VALUES ($1, $2, CURRENT_TIMESTAMP, $3, $4, $5)
-                ON CONFLICT (user_id, category) DO UPDATE
+                ON CONFLICT (category) WHERE user_id IS NULL DO UPDATE
                 SET last_sync_date = EXCLUDED.last_sync_date,
                     last_sync_timestamp = CURRENT_TIMESTAMP,
                     records_synced = EXCLUDED.records_synced,

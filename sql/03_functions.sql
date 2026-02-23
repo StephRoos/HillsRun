@@ -16,8 +16,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Function to upsert sync state
+-- Function to upsert sync state (per-user)
 CREATE OR REPLACE FUNCTION upsert_sync_state(
+    p_user_id BIGINT,
     p_category VARCHAR,
     p_last_sync_date DATE,
     p_records_synced INTEGER,
@@ -27,6 +28,7 @@ CREATE OR REPLACE FUNCTION upsert_sync_state(
 RETURNS VOID AS $$
 BEGIN
     INSERT INTO sync_state (
+        user_id,
         category,
         last_sync_date,
         last_sync_timestamp,
@@ -35,6 +37,7 @@ BEGIN
         error_message
     )
     VALUES (
+        p_user_id,
         p_category,
         p_last_sync_date,
         CURRENT_TIMESTAMP,
@@ -42,7 +45,7 @@ BEGIN
         p_sync_status,
         p_error_message
     )
-    ON CONFLICT (category) DO UPDATE SET
+    ON CONFLICT (user_id, category) DO UPDATE SET
         last_sync_date = EXCLUDED.last_sync_date,
         last_sync_timestamp = CURRENT_TIMESTAMP,
         records_synced = EXCLUDED.records_synced,
