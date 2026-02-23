@@ -1,19 +1,25 @@
 # HillsRun
 
 ## Overview
-Web app to visualize health/sport data synced from Garmin Connect. FastAPI + PostgreSQL backend on a UGREEN NAS, Next.js frontend on Vercel.
+Trail-focused Garmin dashboard for athletes and coaches. Syncs health/sport data from Garmin Connect, visualizes trends, and supports multi-athlete coaching. Part of the HillsRun + RecettesApp ecosystem.
 
-## Architecture
-
-### Stack
+## Stack
 - **Backend**: FastAPI (async) + asyncpg + Pydantic, Docker on NAS (ARM64)
-- **Database**: PostgreSQL (container `garmin-postgres`)
-- **Sync**: Python fetchers calling `garminconnect` lib, triggered on login + manual Sync button
-- **Frontend**: Next.js 16 (App Router) on Vercel
+- **Database**: PostgreSQL (Garmin tables via raw SQL, auth tables via Prisma)
+- **Sync**: Python fetchers calling `garminconnect` lib, triggered on login + manual
+- **Frontend**: Next.js 16 (App Router) + React 19 + TanStack Query + shadcn/ui + Tailwind CSS v4
 - **Auth**: Better-Auth (email/password) + Prisma adapter
+- **Charts**: Plotly.js (dynamic import, no SSR)
+- **PWA**: Serwist service worker
 - **Tunnel**: Cloudflare Tunnel for remote access
+- **Tests**: Vitest (frontend), pytest (backend)
 
-### Project Structure
+## Theme
+- Shared with RecettesApp (dark mode by default via next-themes)
+- Dark: orange primary (#FF8C00), cyan accent (#0891B2), navy background (#0F1419), slate cards (#1A2332)
+- Light: deep blue primary (oklch), white background
+
+## Project Structure
 ```
 src/                          # Python backend
   api/
@@ -21,67 +27,25 @@ src/                          # Python backend
     auth.py                   # API key validation (X-API-Key)
     dependencies.py           # Shared deps (get_db, date_range, pagination, coach access)
     schemas.py                # Pydantic response schemas + make_page()
-    routers/
-      health.py               # GET /health
-      daily.py                # /api/v1/daily/{summary,sleep,stress,body-battery,heart-rate}
-      body.py                 # /api/v1/body/composition
-      metrics.py              # /api/v1/metrics/{hrv,spo2,fitness,respiration,training-readiness}
-      activities.py           # /api/v1/activities (list, detail, update, splits)
-      wellness.py             # /api/v1/wellness/hydration
-      sync.py                 # /api/v1/sync/{status,trigger,jobs} — threaded async jobs
-      auth_garmin.py          # /api/v1/auth/{connect,connect/mfa,status,disconnect}
-      planned_workouts.py     # /api/v1/planned-workouts (CRUD, CSV import, template)
-      coaching.py             # /api/v1/coaching/{status,invite-codes,redeem,athletes,coaches}
-      user.py                 # /api/v1/user/vma (GET/PATCH — VMA estimated + manual)
-  database.py                 # asyncpg queries (upsert + query, multi-user)
+    routers/                  # 10 routers (health, daily, body, metrics, activities, wellness, sync, auth_garmin, planned_workouts, coaching, user)
+  database.py                 # asyncpg queries (upsert + query, multi-user, 1635 lines)
   garmin_client.py            # Garmin Connect API wrapper (retry + rate limiting)
   token_manager.py            # Fernet encryption for OAuth tokens in DB
   config.py                   # Dataclass config (DB, Garmin, Sync, Logging)
   sync_manager.py             # Orchestrates fetchers per category
-  fetchers/
-    base.py                   # BaseFetcher (date range, sync state, shared helpers)
-    daily_health.py           # Steps, HR, sleep, stress, body battery
-    activities.py             # Activities + splits sync + deletion detection
-    body_comp.py              # Weight/body composition
-    advanced_metrics.py       # HRV, SpO2, VO2 Max, respiration, training readiness
-    wellness.py               # Hydration
-  utils/
-    logging_config.py         # setup_logging() with rotation
-    retry.py                  # Tenacity retry + safe_api_call decorator
+  fetchers/                   # BaseFetcher + 5 subclasses (daily_health, activities, body_comp, advanced_metrics, wellness)
 
 web/src/                      # Next.js frontend
-  lib/
-    auth.ts                   # Better-Auth server config (sync-on-login hook)
-    auth-client.ts            # Better-Auth React client
-    prisma.ts                 # Singleton Prisma client with PG adapter
-    garmin-api.ts             # HTTP client for /api/garmin/* proxy
-    garmin-user.ts            # Resolve garmin user_id (cached, deduplicated)
-    utils.ts                  # Helpers + ACTIVITY_COLORS
-    coach-context.tsx         # React context for coach viewing athlete data
-    coach-access.ts           # Server-side coach access verification
-  hooks/
-    use-activities.ts         # useActivities, useActivity, useActivitySplits
-    use-metrics.ts            # useTrainingReadiness, useHrv, useSleep, etc.
-    use-trends.ts             # Weekly aggregation + WeekTick[] for shared x-axis
-    use-planned-workouts.ts   # CRUD + import hooks
-    use-garmin-account.ts     # useGarminAccount, useConnectGarmin (MFA-aware)
-    use-coaching.ts           # useCoachingStatus, invite codes, athlete management
-    use-sync.ts               # useSyncStatus, useTriggerSync (poll job until complete)
-    use-vma.ts                # useVma, useUpdateVma (manual VMA override)
-  components/
-    charts/trend-charts.tsx   # 8 Plotly charts (bars + scatter + trend lines)
-    calendar/                 # TrainingPeaks-style calendar, workout dialog, CSV import
-    dashboard/                # Weekly summary, readiness gauge, VMA card, activity calendar, nav
-    activity/                 # Detail page components (metrics, splits, similar)
-    settings/                 # Garmin connect form, coaching section
-    ui/                       # shadcn/ui components
-  app/
-    api/garmin/[...path]/     # Proxy to FastAPI (adds X-API-Key server-side)
-    api/auth/[...all]/        # Better-Auth catch-all
-    (dashboard)/              # Dashboard, calendar, trends, settings, activity detail
-    (auth)/                   # Login, signup
+  lib/                        # Auth, Prisma, garmin-api, garmin-user, coach-context, utils
+  hooks/                      # 10 TanStack Query hooks (activities, metrics, trends, sync, coaching, vma, planned-workouts)
+  components/                 # dashboard, activity, charts, calendar, settings, ui (shadcn)
+  app/(dashboard)/            # Dashboard, calendar, trends, settings, activity/[id]
+  app/(auth)/                 # Login, signup
+  app/api/garmin/[...path]/   # Proxy to FastAPI (adds X-API-Key server-side)
+  app/api/auth/[...all]/      # Better-Auth catch-all
   types/garmin.ts             # TypeScript types mirroring Pydantic schemas
 
+specs/                        # Improvement task specs
 sql/                          # DB migrations (applied manually)
 config/config.yaml            # Sync config (categories, rate limits)
 ```
@@ -94,7 +58,7 @@ Base URL: `https://api.hillsrun.com` | Header: `X-API-Key`
 | Daily | `/api/v1/daily/{summary,sleep,stress,body-battery,heart-rate}` |
 | Body | `/api/v1/body/composition` |
 | Metrics | `/api/v1/metrics/{hrv,spo2,fitness,respiration,training-readiness}` |
-| Activities | `/api/v1/activities`, `/api/v1/activities/{id}`, `/api/v1/activities/{id}/splits` |
+| Activities | `/api/v1/activities`, `/{id}`, `/{id}/splits` |
 | Wellness | `/api/v1/wellness/hydration` |
 | Planned | `/api/v1/planned-workouts` (CRUD + `/import` + `/template`) |
 | Auth | `/api/v1/auth/{connect,connect/mfa,status,disconnect}` |
@@ -104,23 +68,26 @@ Base URL: `https://api.hillsrun.com` | Header: `X-API-Key`
 
 ## Development
 
-### Local dev
+### Frontend
 ```bash
-# Frontend
-cd web && pnpm dev
+cd web && pnpm dev            # Dev server
+cd web && pnpm build          # Production build
+cd web && pnpm lint           # ESLint
+cd web && pnpm test           # Vitest
+cd web && pnpm test:watch     # Vitest watch mode
+```
 
-# Tests
-cd web && pnpm test        # vitest
-cd web && pnpm lint         # eslint
-cd web && pnpm build        # production build
-
-# Verify backend imports
-python -c "from src.api.main import app"
+### Backend
+```bash
+uv sync                       # Install Python deps
+uv run python -c "from src.api.main import app"  # Verify imports
+uv run pytest tests/          # Run tests
+uv run ruff check src/        # Lint
+uv run ruff format src/       # Format
 ```
 
 ### Deploy frontend (Vercel)
 - Auto-deploy: `git push` (Vercel Git integration, root = `web`)
-- Manual: `npx vercel --prod --cwd web`
 
 ### Deploy backend (NAS Docker)
 ```bash
@@ -139,27 +106,37 @@ All via Cloudflare Tunnel — no VPN needed.
 - **DB**: `cloudflared access tcp --hostname db.hillsrun.com --url localhost:15432`
 - **Logs**: `ssh nas "docker logs garmin-api --tail 50"`
 
-### Docker containers (NAS)
-- `garmin-postgres` — PostgreSQL (DB: garmin_connect, user: garmin)
-- `garmin-api` — FastAPI (port 8000)
-- `cloudflared-tunnel` — Routes to localhost:8000
-
 ## Conventions
+- CRITICAL: `pnpm` for frontend, `uv` for Python (NEVER pip, NEVER npm)
 - Language: French for exchanges, English for code and UI
-- `pnpm` as package manager
+- Google-style docstrings on all Python functions
 - No polling hooks — use staleTime + invalidation after mutations
 - Activity colors centralized in `lib/utils.ts` — never duplicate in components
 - API key (`GARMIN_API_KEY`) is server-side only, never exposed to client
 - Frontend calls `/api/garmin/*` proxy which forwards to FastAPI with auth headers
 - Prisma schema has auth tables only — Garmin tables are NOT in Prisma (to avoid `db push` dropping them)
-- Google-style docstrings on all Python functions
+
+## Key Architecture Decisions
+- ADR-001: Garmin tables NOT in Prisma (avoid db push dropping them)
+- ADR-002: API proxy pattern (Next.js /api/garmin/* → FastAPI, injects X-API-Key server-side)
+- ADR-003: Fernet encryption for OAuth tokens stored in DB
+- ADR-004: TanStack Query with staleTime + invalidation (no polling)
+- ADR-005: Plotly.js dynamic import (no SSR, chart-heavy app)
+- ADR-006: Coach context via React Context + X-View-As-Athlete header
+- ADR-007: Threaded sync jobs (prevent blocking FastAPI event loop)
+- ADR-008: HillsRun theme shared with RecettesApp (dark mode, orange primary)
+
+## Documentation
+- `PRD.md` — Product requirements (what and why)
+- `ARCHITECTURE.md` — Technical architecture (how)
+- `specs/` — Improvement task specs
+- `docs/SCHEMA.md` — Database schema reference
+- `docs/SETUP.md` — NAS deployment guide
+- `docs/PLAN-API.md` — API implementation plan
+- `docs/TROUBLESHOOTING.md` — Common issues
 
 ## Known Issues
-- `BETTER_AUTH_SECRET` should be changed for production
+- `BETTER_AUTH_SECRET` should be rotated for production (see specs/01-improvements/04-security-hardening.md)
 - `score_feedback`, `hrv_status`, `chronic_load` in training_readiness are null from Garmin API
-- Scheduler sync has broken DB constraints (`ON CONFLICT`) — needs migration before re-enabling
+- Scheduler sync has broken DB constraints — needs migration (see specs/01-improvements/03-fix-scheduler.md)
 - Legacy garmin user_id 67 has no better_auth link (old sync system data)
-
-## TODO
-- Fix scheduler DB constraints and re-enable periodic sync
-- Offline mode PWA (service worker)
