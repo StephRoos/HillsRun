@@ -45,3 +45,11 @@ Thumbs.db
 
 # External dependencies (cloned repos)
 python-garminconnect/
+
+# Root-level artifacts (web deps belong in web/)
+node_modules/
+package.json
+pnpm-lock.yaml
+
+# Claude agent artifacts
+.claude/

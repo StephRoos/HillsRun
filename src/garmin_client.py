@@ -374,17 +374,3 @@ class GarminClient:
         self._rate_limit()
         return self.client.get_hydration_data(date_str)
 
-    @safe_api_call
-    @retry_api_call
-    def get_blood_pressure(self, start_date: date, end_date: date) -> List[Dict[str, Any]]:
-        """Get blood pressure data for date range.
-
-        Args:
-            start_date: Start date
-            end_date: End date
-
-        Returns:
-            List of blood pressure readings
-        """
-        self._rate_limit()
-        return self.client.get_blood_pressure(start_date.isoformat(), end_date.isoformat())

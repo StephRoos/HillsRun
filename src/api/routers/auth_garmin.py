@@ -26,6 +26,7 @@ _MFA_TTL = 300
 
 
 def _cleanup_expired_mfa():
+    """Remove MFA sessions older than _MFA_TTL from the in-memory store."""
     now = time.time()
     expired = [k for k, v in _mfa_sessions.items() if now - v["created"] > _MFA_TTL]
     for k in expired:

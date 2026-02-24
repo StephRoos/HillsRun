@@ -15,5 +15,6 @@ async def body_composition(
     dates=Depends(date_range),
     pages=Depends(pagination),
 ):
+    """Return paginated body composition measurements."""
     rows, total = await db.query_body_composition(user_id, dates[0], dates[1], pages[0], pages[1])
     return make_page(rows, total, pages[0], pages[1], BodyComposition)

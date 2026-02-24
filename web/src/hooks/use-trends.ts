@@ -46,6 +46,7 @@ function formatWeekLabel(mondayStr: string): string {
 }
 
 export interface WeekTick {
+  monday: string;    // e.g. "2025-11-03"
   label: string;     // e.g. "Nov 3"
   year: number;      // e.g. 2025
   isYearStart: boolean; // true on first tick and year boundaries
@@ -61,9 +62,10 @@ function generateAllWeekTicks(startDate: string): WeekTick[] {
   const cursor = new Date(start);
   let lastYear = -1;
   while (cursor <= now) {
+    const monday = cursor.toISOString().slice(0, 10);
     const year = cursor.getUTCFullYear();
-    const label = formatWeekLabel(cursor.toISOString().slice(0, 10));
-    ticks.push({ label, year, isYearStart: year !== lastYear });
+    const label = formatWeekLabel(monday);
+    ticks.push({ monday, label, year, isYearStart: year !== lastYear });
     lastYear = year;
     cursor.setUTCDate(cursor.getUTCDate() + 7);
   }
@@ -86,7 +88,7 @@ export interface WeeklyAverages {
   count: number;
 }
 
-function aggregateWeekly(activities: Activity[]): WeeklyData[] {
+function aggregateWeekly(activities: Activity[], weekTicks: WeekTick[]): WeeklyData[] {
   const weeks = new Map<string, WeeklyData>();
 
   for (const a of activities) {
@@ -105,6 +107,20 @@ function aggregateWeekly(activities: Activity[]): WeeklyData[] {
     existing.duration += a.duration_seconds ?? 0;
     existing.count += 1;
     weeks.set(monday, existing);
+  }
+
+  // Fill gaps: ensure all weeks from weekTicks have entries (zero if no activities)
+  for (const tick of weekTicks) {
+    if (!weeks.has(tick.monday)) {
+      weeks.set(tick.monday, {
+        week: tick.monday,
+        weekLabel: tick.label,
+        elevationGain: 0,
+        distance: 0,
+        duration: 0,
+        count: 0,
+      });
+    }
   }
 
   return Array.from(weeks.values()).sort((a, b) => a.week.localeCompare(b.week));
@@ -149,8 +165,8 @@ export function useTrends(period: Period) {
   );
 
   const weeklyData = useMemo(
-    () => aggregateWeekly(filteredActivities),
-    [filteredActivities]
+    () => aggregateWeekly(filteredActivities, weekTicks),
+    [filteredActivities, weekTicks]
   );
 
   const weeklyAverages = useMemo(
@@ -171,6 +187,7 @@ export function useTrends(period: Period) {
     weeklyData,
     weeklyAverages,
     weekTicks,
+    startDate,
     periodSummary,
     readiness: readiness.data?.data ?? [],
     hrv: hrv.data?.data ?? [],

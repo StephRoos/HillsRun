@@ -31,6 +31,7 @@ export default function TrendsPage() {
     weeklyData,
     weeklyAverages,
     weekTicks,
+    startDate,
     periodSummary,
     readiness,
     hrv,
@@ -141,12 +142,12 @@ export default function TrendsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <WeeklyVolumeChart data={weeklyData} average={weeklyAverages.distance} weekTicks={weekTicks} />
           <WeeklyElevationChart data={weeklyData} average={weeklyAverages.elevationGain} weekTicks={weekTicks} />
-          <Vo2MaxChart data={fitness} weekTicks={weekTicks} />
-          <HrvChart data={hrv} weekTicks={weekTicks} />
-          <TrainingLoadChart data={readiness} weekTicks={weekTicks} />
-          <SleepScoreChart data={sleep} weekTicks={weekTicks} />
-          <WeightChart data={weight} weekTicks={weekTicks} />
-          <StressChart data={stress} weekTicks={weekTicks} />
+          <Vo2MaxChart data={fitness} startDate={startDate} />
+          <HrvChart data={hrv} startDate={startDate} />
+          <TrainingLoadChart data={readiness} startDate={startDate} />
+          <SleepScoreChart data={sleep} startDate={startDate} />
+          <WeightChart data={weight} startDate={startDate} />
+          <StressChart data={stress} startDate={startDate} />
         </div>
       )}
     </div>

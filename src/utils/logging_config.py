@@ -67,15 +67,3 @@ def setup_logging(
     logging.getLogger("asyncpg").setLevel(logging.WARNING)
 
     return logger
-
-
-def get_logger(name: str) -> logging.Logger:
-    """Get a logger instance for a module.
-
-    Args:
-        name: Logger name (typically __name__)
-
-    Returns:
-        Logger instance
-    """
-    return logging.getLogger(name)

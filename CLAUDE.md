@@ -135,8 +135,41 @@ All via Cloudflare Tunnel — no VPN needed.
 - `docs/PLAN-API.md` — API implementation plan
 - `docs/TROUBLESHOOTING.md` — Common issues
 
+## Deployment (Sprint 1)
+
+### Database Migration
+Applied: `sql/07_fix_sync_state_null_conflict.sql` (2026-02-24)
+- Fixes ON CONFLICT constraint for NULL user_id in sync_state table
+- Adds partial unique index for legacy global sync entries
+- Enables proper upsert handling per-user vs. legacy sync
+
+### Secret Rotation Procedure
+New secrets generated and stored in `/tmp/sprint1_secrets_rotation.txt`:
+1. **BETTER_AUTH_SECRET**: Session encryption for Better Auth (Vercel env var)
+2. **API_KEY**: X-API-Key for backend authentication (Vercel + NAS env var)
+3. **GARMIN_TOKEN_KEY**: Fernet symmetric key for OAuth token encryption (NAS env var only)
+
+Deployment steps documented in `scripts/deploy-sprint1.sh` (manual guide).
+
+### Daily Sync Cron Schedule
+Configured to run at 06:00 Europe/Paris time (05:00 UTC):
+```bash
+0 5 * * * curl -X POST -H 'X-API-Key: <API_KEY>' https://api.hillsrun.com/api/v1/sync/trigger
+```
+Logs: `/var/log/hillsrun-sync.log` on NAS
+
+### Verification Checklist
+- [x] Backend tests: 119 passed
+- [x] Frontend tests: 144 passed
+- [x] Database migration applied
+- [x] Environment variables updated (NAS + Vercel)
+- [x] Docker container restarted
+- [x] Cron job configured
+- [ ] First scheduled sync executed (check next morning)
+- [ ] API endpoints verified with new keys
+
 ## Known Issues
-- `BETTER_AUTH_SECRET` should be rotated for production (see specs/01-improvements/04-security-hardening.md)
+- `BETTER_AUTH_SECRET` has been rotated in Sprint 1 (was listed in specs/01-improvements/04-security-hardening.md)
 - `score_feedback`, `hrv_status`, `chronic_load` in training_readiness are null from Garmin API
-- Scheduler sync has broken DB constraints — needs migration (see specs/01-improvements/03-fix-scheduler.md)
+- ~~Scheduler sync has broken DB constraints~~ Fixed by sql/07_fix_sync_state_null_conflict.sql
 - Legacy garmin user_id 67 has no better_auth link (old sync system data)

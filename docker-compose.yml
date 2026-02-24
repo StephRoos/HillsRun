@@ -82,22 +82,6 @@ services:
     networks:
       - garmin-network
 
-  garmin-dashboard:
-    build:
-      context: .
-      dockerfile: Dockerfile.dashboard
-    container_name: garmin-dashboard
-    environment:
-      API_BASE_URL: http://garmin-api:8000
-      API_KEY: ${API_KEY}
-    ports:
-      - "${DASHBOARD_PORT:-8501}:8501"
-    depends_on:
-      garmin-api:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - garmin-network
 
 volumes:
   postgres_data:

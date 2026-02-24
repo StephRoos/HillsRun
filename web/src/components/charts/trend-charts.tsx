@@ -24,13 +24,24 @@ const LAYOUT_BASE: Record<string, unknown> = {
   height: 280,
 };
 
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("en-US", { day: "numeric", month: "short" });
-}
+/** Layout base for daily scatter charts using date axis */
+const DAILY_LAYOUT_BASE: Record<string, unknown> = {
+  ...LAYOUT_BASE,
+  xaxis: {
+    showgrid: false,
+    type: "date",
+    tickformat: "%b %-d",
+    tickangle: -45,
+    dtick: 7 * 86400000, // weekly ticks
+  },
+};
 
 function sortByDate<T extends { calendar_date: string }>(data: T[]): T[] {
   return [...data].sort((a, b) => a.calendar_date.localeCompare(b.calendar_date));
+}
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 /** Build xaxis tick config + year annotations from WeekTick[] */
@@ -186,33 +197,32 @@ export function WeeklyVolumeChart({ data, average, weekTicks }: { data: WeeklyDa
 
 // ── Daily charts with trend lines ──
 
-export function Vo2MaxChart({ data, weekTicks }: { data: FitnessMetrics[]; weekTicks?: WeekTick[] }) {
+export function Vo2MaxChart({ data, startDate }: { data: FitnessMetrics[]; startDate?: string }) {
   const filtered = sortByDate(data.filter((d) => d.vo2_max_running != null));
   if (filtered.length === 0) return null;
 
   const avg = filtered.reduce((s, d) => s + (d.vo2_max_running ?? 0), 0) / filtered.length;
-  const xLabels = filtered.map((d) => formatDate(d.calendar_date));
+  const xDates = filtered.map((d) => d.calendar_date);
   const yValues = filtered.map((d) => d.vo2_max_running);
   const trend = trendLine(yValues);
-  const { xaxisOverride, yearAnnotations } = buildTickConfig(weekTicks);
 
   return (
     <ChartCard title="VO2 Max (running)" average={avg.toFixed(1)}>
       <Plot
         data={[
           {
-            x: xLabels,
+            x: xDates,
             y: yValues,
             type: "scatter" as const,
             mode: "lines+markers" as const,
             line: { color: "#0EA5E9", width: 2 },
             marker: { size: 4 },
-            hovertemplate: "%{y:.1f}<extra></extra>",
+            hovertemplate: "%{x|%b %-d}: %{y:.1f}<extra></extra>",
           },
           ...(trend.length > 0
             ? [
                 {
-                  x: xLabels,
+                  x: xDates,
                   y: trend,
                   type: "scatter" as const,
                   mode: "lines" as const,
@@ -224,11 +234,10 @@ export function Vo2MaxChart({ data, weekTicks }: { data: FitnessMetrics[]; weekT
             : []),
         ]}
         layout={{
-          ...LAYOUT_BASE,
-          xaxis: { ...LAYOUT_BASE.xaxis as object, ...xaxisOverride },
-          yaxis: { ...LAYOUT_BASE.yaxis as object, title: { text: "VO2 Max" } },
+          ...DAILY_LAYOUT_BASE,
+          xaxis: { ...DAILY_LAYOUT_BASE.xaxis as object, range: [startDate, todayISO()] },
+          yaxis: { ...DAILY_LAYOUT_BASE.yaxis as object, title: { text: "VO2 Max" } },
           showlegend: false,
-          annotations: yearAnnotations,
         }}
         config={CONFIG}
         style={STYLE}
@@ -237,34 +246,33 @@ export function Vo2MaxChart({ data, weekTicks }: { data: FitnessMetrics[]; weekT
   );
 }
 
-export function HrvChart({ data, weekTicks }: { data: HrvData[]; weekTicks?: WeekTick[] }) {
+export function HrvChart({ data, startDate }: { data: HrvData[]; startDate?: string }) {
   const filtered = sortByDate(data.filter(
     (d) => d.weekly_avg != null || d.last_night_avg != null
   ));
   if (filtered.length === 0) return null;
 
   const avg = filtered.reduce((s, d) => s + (d.weekly_avg ?? d.last_night_avg ?? 0), 0) / filtered.length;
-  const xLabels = filtered.map((d) => formatDate(d.calendar_date));
+  const xDates = filtered.map((d) => d.calendar_date);
   const yValues = filtered.map((d) => d.weekly_avg ?? d.last_night_avg);
   const trend = trendLine(yValues);
-  const { xaxisOverride, yearAnnotations } = buildTickConfig(weekTicks);
 
   return (
     <ChartCard title="HRV" average={`${Math.round(avg)} ms`}>
       <Plot
         data={[
           {
-            x: xLabels,
+            x: xDates,
             y: yValues,
             type: "scatter" as const,
             mode: "lines" as const,
             line: { color: "#10B981", width: 2 },
-            hovertemplate: "%{y:.0f} ms<extra></extra>",
+            hovertemplate: "%{x|%b %-d}: %{y:.0f} ms<extra></extra>",
           },
           ...(trend.length > 0
             ? [
                 {
-                  x: xLabels,
+                  x: xDates,
                   y: trend,
                   type: "scatter" as const,
                   mode: "lines" as const,
@@ -276,11 +284,10 @@ export function HrvChart({ data, weekTicks }: { data: HrvData[]; weekTicks?: Wee
             : []),
         ]}
         layout={{
-          ...LAYOUT_BASE,
-          xaxis: { ...LAYOUT_BASE.xaxis as object, ...xaxisOverride },
-          yaxis: { ...LAYOUT_BASE.yaxis as object, title: { text: "HRV (ms)" } },
+          ...DAILY_LAYOUT_BASE,
+          xaxis: { ...DAILY_LAYOUT_BASE.xaxis as object, range: [startDate, todayISO()] },
+          yaxis: { ...DAILY_LAYOUT_BASE.yaxis as object, title: { text: "HRV (ms)" } },
           showlegend: false,
-          annotations: yearAnnotations,
         }}
         config={CONFIG}
         style={STYLE}
@@ -289,32 +296,31 @@ export function HrvChart({ data, weekTicks }: { data: HrvData[]; weekTicks?: Wee
   );
 }
 
-export function TrainingLoadChart({ data, weekTicks }: { data: TrainingReadiness[]; weekTicks?: WeekTick[] }) {
+export function TrainingLoadChart({ data, startDate }: { data: TrainingReadiness[]; startDate?: string }) {
   const filtered = sortByDate(data.filter((d) => d.acute_load != null));
   if (filtered.length === 0) return null;
 
   const avg = filtered.reduce((s, d) => s + (d.acute_load ?? 0), 0) / filtered.length;
-  const xLabels = filtered.map((d) => formatDate(d.calendar_date));
+  const xDates = filtered.map((d) => d.calendar_date);
   const yValues = filtered.map((d) => d.acute_load);
   const trend = trendLine(yValues);
-  const { xaxisOverride, yearAnnotations } = buildTickConfig(weekTicks);
 
   return (
     <ChartCard title="Training load" average={Math.round(avg).toString()}>
       <Plot
         data={[
           {
-            x: xLabels,
+            x: xDates,
             y: yValues,
             type: "scatter" as const,
             mode: "lines" as const,
             line: { color: "#ef4444", width: 2 },
-            hovertemplate: "%{y:.0f}<extra></extra>",
+            hovertemplate: "%{x|%b %-d}: %{y:.0f}<extra></extra>",
           },
           ...(trend.length > 0
             ? [
                 {
-                  x: xLabels,
+                  x: xDates,
                   y: trend,
                   type: "scatter" as const,
                   mode: "lines" as const,
@@ -326,11 +332,10 @@ export function TrainingLoadChart({ data, weekTicks }: { data: TrainingReadiness
             : []),
         ]}
         layout={{
-          ...LAYOUT_BASE,
-          xaxis: { ...LAYOUT_BASE.xaxis as object, ...xaxisOverride },
-          yaxis: { ...LAYOUT_BASE.yaxis as object, title: { text: "Load" } },
+          ...DAILY_LAYOUT_BASE,
+          xaxis: { ...DAILY_LAYOUT_BASE.xaxis as object, range: [startDate, todayISO()] },
+          yaxis: { ...DAILY_LAYOUT_BASE.yaxis as object, title: { text: "Load" } },
           showlegend: false,
-          annotations: yearAnnotations,
         }}
         config={CONFIG}
         style={STYLE}
@@ -339,33 +344,32 @@ export function TrainingLoadChart({ data, weekTicks }: { data: TrainingReadiness
   );
 }
 
-export function SleepScoreChart({ data, weekTicks }: { data: SleepData[]; weekTicks?: WeekTick[] }) {
+export function SleepScoreChart({ data, startDate }: { data: SleepData[]; startDate?: string }) {
   const filtered = sortByDate(data.filter((d) => d.sleep_score != null));
   if (filtered.length === 0) return null;
 
   const avg = filtered.reduce((s, d) => s + (d.sleep_score ?? 0), 0) / filtered.length;
-  const xLabels = filtered.map((d) => formatDate(d.calendar_date));
+  const xDates = filtered.map((d) => d.calendar_date);
   const yValues = filtered.map((d) => d.sleep_score);
   const trend = trendLine(yValues);
-  const { xaxisOverride, yearAnnotations } = buildTickConfig(weekTicks);
 
   return (
     <ChartCard title="Sleep score" average={Math.round(avg).toString()}>
       <Plot
         data={[
           {
-            x: xLabels,
+            x: xDates,
             y: yValues,
             type: "scatter" as const,
             mode: "lines+markers" as const,
             line: { color: "#8B5CF6", width: 2 },
             marker: { size: 3 },
-            hovertemplate: "%{y:.0f}<extra></extra>",
+            hovertemplate: "%{x|%b %-d}: %{y:.0f}<extra></extra>",
           },
           ...(trend.length > 0
             ? [
                 {
-                  x: xLabels,
+                  x: xDates,
                   y: trend,
                   type: "scatter" as const,
                   mode: "lines" as const,
@@ -377,11 +381,10 @@ export function SleepScoreChart({ data, weekTicks }: { data: SleepData[]; weekTi
             : []),
         ]}
         layout={{
-          ...LAYOUT_BASE,
-          xaxis: { ...LAYOUT_BASE.xaxis as object, ...xaxisOverride },
-          yaxis: { ...LAYOUT_BASE.yaxis as object, title: { text: "Score" } },
+          ...DAILY_LAYOUT_BASE,
+          xaxis: { ...DAILY_LAYOUT_BASE.xaxis as object, range: [startDate, todayISO()] },
+          yaxis: { ...DAILY_LAYOUT_BASE.yaxis as object, title: { text: "Score" } },
           showlegend: false,
-          annotations: yearAnnotations,
         }}
         config={CONFIG}
         style={STYLE}
@@ -390,35 +393,34 @@ export function SleepScoreChart({ data, weekTicks }: { data: SleepData[]; weekTi
   );
 }
 
-export function WeightChart({ data, weekTicks }: { data: BodyComposition[]; weekTicks?: WeekTick[] }) {
+export function WeightChart({ data, startDate }: { data: BodyComposition[]; startDate?: string }) {
   const filtered = [...data]
     .filter((d) => d.weight_kg != null)
     .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
   if (filtered.length === 0) return null;
 
   const avg = filtered.reduce((s, d) => s + (d.weight_kg ?? 0), 0) / filtered.length;
-  const xLabels = filtered.map((d) => formatDate(d.timestamp.slice(0, 10)));
+  const xDates = filtered.map((d) => d.timestamp.slice(0, 10));
   const yValues = filtered.map((d) => d.weight_kg);
   const trend = trendLine(yValues);
-  const { xaxisOverride, yearAnnotations } = buildTickConfig(weekTicks);
 
   return (
     <ChartCard title="Weight" average={`${avg.toFixed(1)} kg`}>
       <Plot
         data={[
           {
-            x: xLabels,
+            x: xDates,
             y: yValues,
             type: "scatter" as const,
             mode: "lines+markers" as const,
             line: { color: "#F59E0B", width: 2 },
             marker: { size: 4 },
-            hovertemplate: "%{y:.1f} kg<extra></extra>",
+            hovertemplate: "%{x|%b %-d}: %{y:.1f} kg<extra></extra>",
           },
           ...(trend.length > 0
             ? [
                 {
-                  x: xLabels,
+                  x: xDates,
                   y: trend,
                   type: "scatter" as const,
                   mode: "lines" as const,
@@ -430,11 +432,10 @@ export function WeightChart({ data, weekTicks }: { data: BodyComposition[]; week
             : []),
         ]}
         layout={{
-          ...LAYOUT_BASE,
-          xaxis: { ...LAYOUT_BASE.xaxis as object, ...xaxisOverride },
-          yaxis: { ...LAYOUT_BASE.yaxis as object, title: { text: "kg" } },
+          ...DAILY_LAYOUT_BASE,
+          xaxis: { ...DAILY_LAYOUT_BASE.xaxis as object, range: [startDate, todayISO()] },
+          yaxis: { ...DAILY_LAYOUT_BASE.yaxis as object, title: { text: "kg" } },
           showlegend: false,
-          annotations: yearAnnotations,
         }}
         config={CONFIG}
         style={STYLE}
@@ -443,32 +444,31 @@ export function WeightChart({ data, weekTicks }: { data: BodyComposition[]; week
   );
 }
 
-export function StressChart({ data, weekTicks }: { data: StressData[]; weekTicks?: WeekTick[] }) {
+export function StressChart({ data, startDate }: { data: StressData[]; startDate?: string }) {
   const filtered = sortByDate(data.filter((d) => d.average_stress_level != null));
   if (filtered.length === 0) return null;
 
   const avg = filtered.reduce((s, d) => s + (d.average_stress_level ?? 0), 0) / filtered.length;
-  const xLabels = filtered.map((d) => formatDate(d.calendar_date));
+  const xDates = filtered.map((d) => d.calendar_date);
   const yValues = filtered.map((d) => d.average_stress_level);
   const trend = trendLine(yValues);
-  const { xaxisOverride, yearAnnotations } = buildTickConfig(weekTicks);
 
   return (
     <ChartCard title="Stress level" average={Math.round(avg).toString()}>
       <Plot
         data={[
           {
-            x: xLabels,
+            x: xDates,
             y: yValues,
             type: "scatter" as const,
             mode: "lines" as const,
             line: { color: "#EC4899", width: 2 },
-            hovertemplate: "%{y:.0f}<extra></extra>",
+            hovertemplate: "%{x|%b %-d}: %{y:.0f}<extra></extra>",
           },
           ...(trend.length > 0
             ? [
                 {
-                  x: xLabels,
+                  x: xDates,
                   y: trend,
                   type: "scatter" as const,
                   mode: "lines" as const,
@@ -480,11 +480,10 @@ export function StressChart({ data, weekTicks }: { data: StressData[]; weekTicks
             : []),
         ]}
         layout={{
-          ...LAYOUT_BASE,
-          xaxis: { ...LAYOUT_BASE.xaxis as object, ...xaxisOverride },
-          yaxis: { ...LAYOUT_BASE.yaxis as object, title: { text: "Stress" } },
+          ...DAILY_LAYOUT_BASE,
+          xaxis: { ...DAILY_LAYOUT_BASE.xaxis as object, range: [startDate, todayISO()] },
+          yaxis: { ...DAILY_LAYOUT_BASE.yaxis as object, title: { text: "Stress" } },
           showlegend: false,
-          annotations: yearAnnotations,
         }}
         config={CONFIG}
         style={STYLE}

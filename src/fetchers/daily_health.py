@@ -72,15 +72,6 @@ class DailyHealthFetcher(BaseFetcher):
 
         return records_count, error_message
 
-    @staticmethod
-    def _ensure_dict(data) -> Optional[Dict[str, Any]]:
-        """Ensure data is a dict. If it's a list, take first element."""
-        if isinstance(data, dict):
-            return data
-        if isinstance(data, list) and data and isinstance(data[0], dict):
-            return data[0]
-        return None
-
     async def _fetch_daily_summary(self, current_date: date, date_str: str) -> None:
         """Fetch and store daily summary."""
         success, data, error = self.garmin_client.get_user_summary(date_str)
@@ -268,21 +259,6 @@ class DailyHealthFetcher(BaseFetcher):
         bb_data = self._transform_body_battery_data(current_date, data)
         await self.db.upsert_body_battery(self.user_id, bb_data)
         logger.debug(f"Stored body battery data for {date_str}")
-
-    @staticmethod
-    def _parse_timestamp(value) -> Optional[datetime]:
-        """Parse a timestamp that may be int (ms) or ISO string."""
-        if not value:
-            return None
-        try:
-            if isinstance(value, (int, float)):
-                return datetime.fromtimestamp(value / 1000.0)
-            if isinstance(value, str):
-                # Try ISO format
-                return datetime.fromisoformat(value.replace("Z", "+00:00"))
-        except (ValueError, OSError):
-            pass
-        return None
 
     def _transform_body_battery_data(self, calendar_date: date, data: Dict[str, Any]) -> Dict[str, Any]:
         """Transform body battery data for database."""

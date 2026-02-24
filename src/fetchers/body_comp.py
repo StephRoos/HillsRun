@@ -1,7 +1,7 @@
 """Body composition data fetcher."""
 
 import logging
-from datetime import date, datetime
+from datetime import date
 from typing import Optional, Tuple, Dict, Any
 
 from .base import BaseFetcher
@@ -23,7 +23,17 @@ class BodyCompositionFetcher(BaseFetcher):
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
     ) -> Tuple[int, Optional[str]]:
-        """Fetch body composition data."""
+        """Fetch body composition data.
+
+        Args:
+            mode: Sync mode ('incremental' or 'full')
+            days_back: Number of days to go back for full sync
+            start_date: Optional override start date
+            end_date: Optional override end date
+
+        Returns:
+            Tuple of (records_count, error_message)
+        """
         start, end = await self.determine_date_range(mode, days_back, start_date, end_date)
         logger.info(f"Fetching body composition from {start} to {end}")
 
@@ -70,28 +80,16 @@ class BodyCompositionFetcher(BaseFetcher):
         await self.update_sync_state(end, records_count, error_message)
         return records_count, error_message
 
-    @staticmethod
-    def _parse_date(value) -> Optional[datetime]:
-        """Parse a date string like '2025-12-01' into datetime."""
-        if not value:
-            return None
-        try:
-            if isinstance(value, str):
-                return datetime.strptime(value, "%Y-%m-%d")
-            if isinstance(value, (int, float)):
-                return datetime.fromtimestamp(value / 1000.0)
-        except (ValueError, OSError):
-            pass
-        return None
-
     def _transform_daily_weight(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Transform daily weight summary for database.
 
-        Structure: { summaryDate, numOfWeightEntries, minWeight, maxWeight,
-                     latestWeight: { weight, bmi, bodyFat, ... },
-                     allWeightMetrics: [...] }
+        Args:
+            data: Daily weight summary dict from Garmin API.
+
+        Returns:
+            Dict with DB column names as keys.
         """
-        timestamp = self._parse_date(data.get("summaryDate"))
+        timestamp = self._parse_timestamp(data.get("summaryDate"))
 
         # Get detailed metrics from latestWeight (may be a dict or absent)
         latest = data.get("latestWeight")

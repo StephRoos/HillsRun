@@ -25,6 +25,7 @@ router = APIRouter(
 
 
 def _validate_sport_type(sport_type: str) -> None:
+    """Raise 422 if sport_type is not in VALID_SPORT_TYPES."""
     if sport_type not in VALID_SPORT_TYPES:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -33,6 +34,7 @@ def _validate_sport_type(sport_type: str) -> None:
 
 
 def _validate_intensity(intensity: str) -> None:
+    """Raise 422 if intensity is not in VALID_INTENSITIES."""
     if intensity not in VALID_INTENSITIES:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -47,6 +49,7 @@ async def list_planned_workouts(
     dates=Depends(date_range),
     pages=Depends(pagination),
 ):
+    """Return paginated planned workouts for a date range."""
     rows, total = await db.query_planned_workouts(
         user_id, dates[0], dates[1], pages[0], pages[1]
     )
@@ -59,6 +62,7 @@ async def create_planned_workout(
     request: Request,
     db=Depends(get_db),
 ):
+    """Create a new planned workout. Coaches can create for their athletes."""
     _validate_sport_type(body.sport_type)
     _validate_intensity(body.intensity)
     user_id, coach_id = await verify_coach_access(request)
@@ -71,6 +75,7 @@ async def create_planned_workout(
 
 @router.get("/template")
 async def download_template():
+    """Download a CSV template for bulk workout import."""
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["date", "sport_type", "title", "description", "duration_minutes", "distance_km", "intensity"])
@@ -90,6 +95,7 @@ async def import_planned_workouts(
     file: UploadFile = File(...),
     db=Depends(get_db),
 ):
+    """Import planned workouts from a CSV file (max 1 MB)."""
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="File must be a .csv")
 
@@ -151,6 +157,11 @@ async def get_planned_workout(
     db=Depends(get_db),
     user_id: int = Depends(get_user_id),
 ):
+    """Return a single planned workout by ID.
+
+    Raises:
+        HTTPException: 404 if not found.
+    """
     row = await db.get_planned_workout(workout_id, user_id)
     if not row:
         raise HTTPException(status_code=404, detail="Planned workout not found")
@@ -164,6 +175,11 @@ async def update_planned_workout(
     db=Depends(get_db),
     user_id: int = Depends(get_user_id),
 ):
+    """Update a planned workout by ID.
+
+    Raises:
+        HTTPException: 404 if not found.
+    """
     if body.sport_type is not None:
         _validate_sport_type(body.sport_type)
     if body.intensity is not None:
@@ -183,6 +199,11 @@ async def delete_planned_workout(
     db=Depends(get_db),
     user_id: int = Depends(get_user_id),
 ):
+    """Delete a planned workout by ID.
+
+    Raises:
+        HTTPException: 404 if not found.
+    """
     deleted = await db.delete_planned_workout(workout_id, user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Planned workout not found")

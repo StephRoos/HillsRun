@@ -76,15 +76,6 @@ class AdvancedMetricsFetcher(BaseFetcher):
 
         return records_count, error_message
 
-    @staticmethod
-    def _ensure_dict(data) -> Optional[Dict[str, Any]]:
-        """Ensure data is a dict. If it's a list, take first element."""
-        if isinstance(data, dict):
-            return data
-        if isinstance(data, list) and data and isinstance(data[0], dict):
-            return data[0]
-        return None
-
     async def _fetch_hrv(self, current_date: date, date_str: str) -> None:
         """Fetch and store HRV data."""
         success, data, error = self.garmin_client.get_hrv_data(date_str)
@@ -109,7 +100,15 @@ class AdvancedMetricsFetcher(BaseFetcher):
         logger.debug(f"Stored HRV data for {date_str}")
 
     def _transform_hrv_data(self, calendar_date: date, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Transform HRV data for database."""
+        """Transform HRV data for database.
+
+        Args:
+            calendar_date: The date for this record.
+            data: Raw data from Garmin API.
+
+        Returns:
+            Dict with DB column names as keys.
+        """
         return {
             "calendar_date": calendar_date,
             "weekly_avg": data.get("weeklyAvg"),
@@ -137,7 +136,15 @@ class AdvancedMetricsFetcher(BaseFetcher):
         logger.debug(f"Stored SpO2 data for {date_str}")
 
     def _transform_spo2_data(self, calendar_date: date, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Transform SpO2 data for database."""
+        """Transform SpO2 data for database.
+
+        Args:
+            calendar_date: The date for this record.
+            data: Raw data from Garmin API.
+
+        Returns:
+            Dict with DB column names as keys.
+        """
         # Parse latest reading timestamp
         latest_ts = None
         if data.get("latestSpO2ReadingTimeGMT"):
@@ -170,7 +177,15 @@ class AdvancedMetricsFetcher(BaseFetcher):
         logger.debug(f"Stored fitness metrics for {date_str}")
 
     def _transform_fitness_metrics(self, calendar_date: date, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Transform fitness metrics for database."""
+        """Transform fitness metrics for database.
+
+        Args:
+            calendar_date: The date for this record.
+            data: Raw data from Garmin API.
+
+        Returns:
+            Dict with DB column names as keys.
+        """
         return {
             "calendar_date": calendar_date,
             "vo2_max": data.get("vo2Max"),
@@ -199,7 +214,15 @@ class AdvancedMetricsFetcher(BaseFetcher):
         logger.debug(f"Stored respiration data for {date_str}")
 
     def _transform_respiration_data(self, calendar_date: date, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Transform respiration data for database."""
+        """Transform respiration data for database.
+
+        Args:
+            calendar_date: The date for this record.
+            data: Raw data from Garmin API.
+
+        Returns:
+            Dict with DB column names as keys.
+        """
         return {
             "calendar_date": calendar_date,
             "avg_waking_respiration_rate": data.get("avgWakingRespirationRate"),

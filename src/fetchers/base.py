@@ -2,8 +2,8 @@
 
 import logging
 from abc import ABC, abstractmethod
-from datetime import date, timedelta
-from typing import Optional, Tuple
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, Optional, Tuple
 
 from ..database import Database
 from ..garmin_client import GarminClient
@@ -33,6 +33,39 @@ class BaseFetcher(ABC):
         self.garmin_client = garmin_client
         self.user_id = user_id
         self.category = category
+
+    @staticmethod
+    def _ensure_dict(data) -> Optional[Dict[str, Any]]:
+        """Ensure data is a dict. If it's a list, take first element."""
+        if isinstance(data, dict):
+            return data
+        if isinstance(data, list) and data and isinstance(data[0], dict):
+            return data[0]
+        return None
+
+    @staticmethod
+    def _parse_timestamp(value) -> Optional[datetime]:
+        """Parse a timestamp value into a datetime.
+
+        Handles millisecond epoch ints, ISO 8601 strings, and date strings
+        like '2025-12-01'.
+        """
+        if not value:
+            return None
+        try:
+            if isinstance(value, (int, float)):
+                return datetime.fromtimestamp(value / 1000.0)
+            if isinstance(value, str):
+                # Try ISO format first (e.g. "2025-12-01T00:00:00Z")
+                try:
+                    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+                except ValueError:
+                    pass
+                # Try plain date format (e.g. "2025-12-01")
+                return datetime.strptime(value, "%Y-%m-%d")
+        except (ValueError, OSError):
+            pass
+        return None
 
     async def determine_date_range(
         self,

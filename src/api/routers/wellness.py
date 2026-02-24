@@ -15,5 +15,6 @@ async def hydration(
     dates=Depends(date_range),
     pages=Depends(pagination),
 ):
+    """Return paginated hydration data."""
     rows, total = await db.query_hydration_data(user_id, dates[0], dates[1], pages[0], pages[1])
     return make_page(rows, total, pages[0], pages[1], HydrationData)

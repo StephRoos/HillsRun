@@ -18,6 +18,7 @@ async def list_activities(
     sport_type: Optional[str] = Query(default=None),
     activity_type: Optional[str] = Query(default=None),
 ):
+    """Return paginated activities, optionally filtered by sport/activity type."""
     rows, total = await db.query_activities(
         user_id, dates[0], dates[1], pages[0], pages[1], sport_type, activity_type
     )
@@ -30,6 +31,11 @@ async def get_activity(
     db=Depends(get_db),
     user_id: int = Depends(get_user_id),
 ):
+    """Return full detail for a single activity.
+
+    Raises:
+        HTTPException: 404 if activity not found.
+    """
     row = await db.query_activity_by_id(activity_id, user_id=user_id)
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Activity not found")
@@ -43,6 +49,11 @@ async def update_activity(
     db=Depends(get_db),
     user_id: int = Depends(get_user_id),
 ):
+    """Update an activity's custom_name.
+
+    Raises:
+        HTTPException: 404 if activity not found.
+    """
     updated = await db.update_activity_custom_name(activity_id, body.custom_name, user_id=user_id)
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Activity not found")
@@ -56,5 +67,6 @@ async def get_activity_splits(
     db=Depends(get_db),
     user_id: int = Depends(get_user_id),
 ):
+    """Return splits/laps for a single activity."""
     rows = await db.query_activity_splits(activity_id, user_id=user_id)
     return {"data": [ActivitySplit.model_validate(dict(r)) for r in rows]}

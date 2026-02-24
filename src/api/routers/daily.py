@@ -15,6 +15,7 @@ async def daily_summary(
     dates=Depends(date_range),
     pages=Depends(pagination),
 ):
+    """Return paginated daily health summaries."""
     rows, total = await db.query_daily_summaries(user_id, dates[0], dates[1], pages[0], pages[1])
     return make_page(rows, total, pages[0], pages[1], DailySummary)
 
@@ -26,6 +27,7 @@ async def heart_rate(
     dates=Depends(date_range),
     pages=Depends(pagination),
 ):
+    """Return paginated heart rate samples (max 5000 per page)."""
     limit = min(pages[0], 5000)
     rows, total = await db.query_heart_rate_samples(user_id, dates[0], dates[1], limit, pages[1])
     return make_page(rows, total, limit, pages[1], HeartRateSample)
@@ -38,6 +40,7 @@ async def sleep(
     dates=Depends(date_range),
     pages=Depends(pagination),
 ):
+    """Return paginated sleep data."""
     rows, total = await db.query_sleep_data(user_id, dates[0], dates[1], pages[0], pages[1])
     return make_page(rows, total, pages[0], pages[1], SleepData)
 
@@ -49,6 +52,7 @@ async def stress(
     dates=Depends(date_range),
     pages=Depends(pagination),
 ):
+    """Return paginated stress data."""
     rows, total = await db.query_stress_data(user_id, dates[0], dates[1], pages[0], pages[1])
     return make_page(rows, total, pages[0], pages[1], StressData)
 
@@ -60,5 +64,6 @@ async def body_battery(
     dates=Depends(date_range),
     pages=Depends(pagination),
 ):
+    """Return paginated body battery data."""
     rows, total = await db.query_body_battery(user_id, dates[0], dates[1], pages[0], pages[1])
     return make_page(rows, total, pages[0], pages[1], BodyBattery)

@@ -15,6 +15,7 @@ async def hrv(
     dates=Depends(date_range),
     pages=Depends(pagination),
 ):
+    """Return paginated HRV data."""
     rows, total = await db.query_hrv_data(user_id, dates[0], dates[1], pages[0], pages[1])
     return make_page(rows, total, pages[0], pages[1], HrvData)
 
@@ -26,6 +27,7 @@ async def spo2(
     dates=Depends(date_range),
     pages=Depends(pagination),
 ):
+    """Return paginated SpO2 data."""
     rows, total = await db.query_spo2_data(user_id, dates[0], dates[1], pages[0], pages[1])
     return make_page(rows, total, pages[0], pages[1], Spo2Data)
 
@@ -37,6 +39,7 @@ async def fitness(
     dates=Depends(date_range),
     pages=Depends(pagination),
 ):
+    """Return paginated fitness metrics (VO2 Max, etc.)."""
     rows, total = await db.query_fitness_metrics(user_id, dates[0], dates[1], pages[0], pages[1])
     return make_page(rows, total, pages[0], pages[1], FitnessMetrics)
 
@@ -48,6 +51,7 @@ async def respiration(
     dates=Depends(date_range),
     pages=Depends(pagination),
 ):
+    """Return paginated respiration data."""
     rows, total = await db.query_respiration_data(user_id, dates[0], dates[1], pages[0], pages[1])
     return make_page(rows, total, pages[0], pages[1], RespirationData)
 
@@ -59,5 +63,6 @@ async def training_readiness(
     dates=Depends(date_range),
     pages=Depends(pagination),
 ):
+    """Return paginated training readiness scores."""
     rows, total = await db.query_training_readiness(user_id, dates[0], dates[1], pages[0], pages[1])
     return make_page(rows, total, pages[0], pages[1], TrainingReadiness)
