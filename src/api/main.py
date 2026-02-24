@@ -3,6 +3,7 @@
 import logging
 import os
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 from fastapi import FastAPI
 
@@ -69,6 +70,7 @@ async def lifespan(app: FastAPI):
     await db.connect()
     app.state.db = db
     app.state.user_id = await db.query_first_user()
+    app.state.start_time = datetime.now(timezone.utc)
     logger.info(f"API started, user_id={app.state.user_id}")
     yield
     await db.disconnect()

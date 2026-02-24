@@ -28,6 +28,9 @@ class HealthResponse(BaseModel):
     """Health check response."""
 
     status: str
+    version: Optional[str] = None
+    uptime_seconds: Optional[float] = None
+    db_connected: bool = False
 
 
 class DailySummary(BaseModel):

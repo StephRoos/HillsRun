@@ -216,6 +216,97 @@ rollback() {
 }
 
 # ============================================================================
+# SMOKE TEST (runs scripts/smoke-test.sh against live API)
+# ============================================================================
+run_smoke_test() {
+  echo "=== SMOKE TEST ==="
+  echo ""
+  echo "Runs post-deploy smoke tests against the live API."
+  echo "Requires API_URL and API_KEY (or env vars GARMIN_API_URL / GARMIN_API_KEY)."
+  echo ""
+  echo "Usage:"
+  echo "  ./scripts/smoke-test.sh [API_URL] [API_KEY]"
+  echo ""
+  echo "Example:"
+  echo "  ./scripts/smoke-test.sh ${API_BASE} '<your-api-key>'"
+  echo ""
+  echo "To run now (if env vars are set):"
+  echo "  GARMIN_API_URL=${API_BASE} GARMIN_API_KEY=<key> ./scripts/smoke-test.sh"
+  echo ""
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if [[ -n "${2:-}" ]]; then
+    "${SCRIPT_DIR}/smoke-test.sh" "${1:-${API_BASE}}" "${2}"
+  elif [[ -n "${GARMIN_API_KEY:-}" ]]; then
+    "${SCRIPT_DIR}/smoke-test.sh" "${GARMIN_API_URL:-${API_BASE}}" "${GARMIN_API_KEY}"
+  else
+    echo "Note: no API key provided — only the public /health endpoint will be tested."
+    "${SCRIPT_DIR}/smoke-test.sh" "${1:-${API_BASE}}"
+  fi
+}
+
+# ============================================================================
+# VERIFY (checks frontend + backend health endpoints)
+# ============================================================================
+verify() {
+  echo "=== DEPLOYMENT VERIFICATION ==="
+  echo ""
+  echo "Checking frontend health..."
+  FRONTEND_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${FRONTEND_BASE}" 2>/dev/null || echo "000")
+  if [[ "${FRONTEND_STATUS}" == "200" ]]; then
+    echo "  PASS  Frontend ${FRONTEND_BASE} → HTTP ${FRONTEND_STATUS}"
+  else
+    echo "  FAIL  Frontend ${FRONTEND_BASE} → HTTP ${FRONTEND_STATUS}"
+  fi
+  echo ""
+  echo "Checking frontend health API..."
+  FRONTEND_HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${FRONTEND_BASE}/api/health" 2>/dev/null || echo "000")
+  if [[ "${FRONTEND_HEALTH_STATUS}" == "200" ]]; then
+    echo "  PASS  ${FRONTEND_BASE}/api/health → HTTP ${FRONTEND_HEALTH_STATUS}"
+  else
+    echo "  FAIL  ${FRONTEND_BASE}/api/health → HTTP ${FRONTEND_HEALTH_STATUS}"
+  fi
+  echo ""
+  echo "Checking backend health..."
+  BACKEND_HEALTH=$(curl -s "${API_BASE}/health" 2>/dev/null || echo '{"status":"unreachable"}')
+  BACKEND_STATUS=$(echo "${BACKEND_HEALTH}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','?'))" 2>/dev/null || echo "?")
+  if [[ "${BACKEND_STATUS}" == "ok" ]]; then
+    echo "  PASS  Backend ${API_BASE}/health → status=${BACKEND_STATUS}"
+    echo "        ${BACKEND_HEALTH}"
+  else
+    echo "  FAIL  Backend ${API_BASE}/health → status=${BACKEND_STATUS}"
+    echo "        ${BACKEND_HEALTH}"
+  fi
+  echo ""
+}
+
+# ============================================================================
+# STATUS (show current deployment state)
+# ============================================================================
+deployment_status() {
+  echo "=== DEPLOYMENT STATUS ==="
+  echo ""
+  echo "--- Backend (${API_BASE}) ---"
+  echo ""
+  echo "  Health endpoint:"
+  curl -s "${API_BASE}/health" 2>/dev/null | python3 -m json.tool 2>/dev/null || echo "  (unreachable)"
+  echo ""
+  echo "  Container status on NAS:"
+  echo "    ssh nas 'docker ps --filter name=${DOCKER_CONTAINER} --format \"table {{.Status}}\\t{{.Ports}}\\t{{.Names}}\"'"
+  echo ""
+  echo "  Container logs (last 20 lines):"
+  echo "    ssh nas 'docker logs ${DOCKER_CONTAINER} --tail 20'"
+  echo ""
+  echo "--- Frontend (${FRONTEND_BASE}) ---"
+  echo ""
+  FRONTEND_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${FRONTEND_BASE}" 2>/dev/null || echo "000")
+  echo "  ${FRONTEND_BASE} → HTTP ${FRONTEND_CODE}"
+  echo ""
+  echo "  For Vercel deployment status:"
+  echo "    https://vercel.com/projects/HillsRun/deployments"
+  echo ""
+}
+
+# ============================================================================
 # MAIN DISPATCH
 # ============================================================================
 case "$COMPONENT" in
@@ -236,6 +327,15 @@ case "$COMPONENT" in
   health)
     health_check
     ;;
+  smoke-test)
+    run_smoke_test "$@"
+    ;;
+  verify)
+    verify
+    ;;
+  status)
+    deployment_status
+    ;;
   rollback)
     rollback
     ;;
@@ -247,7 +347,7 @@ case "$COMPONENT" in
     health_check
     ;;
   *)
-    echo "Usage: $0 [frontend|backend|backend-hotpatch|backend-full|health|rollback|all]"
+    echo "Usage: $0 [frontend|backend|backend-hotpatch|backend-full|health|smoke-test|verify|status|rollback|all]"
     echo ""
     echo "Commands:"
     echo "  frontend          Show frontend deploy steps (Vercel auto-deploy via git push)"
@@ -255,6 +355,9 @@ case "$COMPONENT" in
     echo "  backend-hotpatch  Show hot-patch steps (no Docker rebuild)"
     echo "  backend-full      Show full rebuild steps (new deps or Dockerfile)"
     echo "  health            Show post-deploy health check commands"
+    echo "  smoke-test        Run smoke-test.sh against live API"
+    echo "  verify            Check frontend + backend health endpoints"
+    echo "  status            Show current deployment state"
     echo "  rollback          Show rollback instructions"
     echo "  all               Show all steps in sequence (default)"
     exit 1
