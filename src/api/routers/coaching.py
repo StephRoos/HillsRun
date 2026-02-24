@@ -30,7 +30,10 @@ def _get_better_auth_id(request: Request) -> str:
     """Extract X-Better-Auth-User-Id header, raising 400 if missing."""
     value = request.headers.get("X-Better-Auth-User-Id")
     if not value:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="X-Better-Auth-User-Id header required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="X-Better-Auth-User-Id header required",
+        )
     return value
 
 
@@ -73,7 +76,9 @@ async def revoke_invite_code(
     coach_id = _get_better_auth_id(request)
     revoked = await db.revoke_invite_code(code, coach_id)
     if not revoked:
-        raise HTTPException(status_code=404, detail="Invite code not found or already used")
+        raise HTTPException(
+            status_code=404, detail="Invite code not found or already used"
+        )
 
 
 @router.post("/redeem")
@@ -89,8 +94,13 @@ async def redeem_invite_code(
     """
     result = await db.redeem_invite_code(body.code, user_id)
     if not result:
-        raise HTTPException(status_code=400, detail="Invalid, expired, or already redeemed invite code")
-    return {"message": "Successfully linked to coach", "coach_better_auth_id": result["coach_better_auth_id"]}
+        raise HTTPException(
+            status_code=400, detail="Invalid, expired, or already redeemed invite code"
+        )
+    return {
+        "message": "Successfully linked to coach",
+        "coach_better_auth_id": result["coach_better_auth_id"],
+    }
 
 
 @router.get("/athletes")
@@ -131,7 +141,9 @@ async def list_coaches(
     return [CoachInfo.model_validate(r) for r in rows]
 
 
-@router.delete("/coaches/{coach_better_auth_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/coaches/{coach_better_auth_id}", status_code=status.HTTP_204_NO_CONTENT
+)
 async def remove_coach(
     coach_better_auth_id: str,
     db=Depends(get_db),

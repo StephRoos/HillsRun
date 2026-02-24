@@ -56,7 +56,8 @@ class SyncManager:
                 raise Exception("GARMIN_TOKEN_KEY environment variable is required")
 
             self.garmin_client = GarminClient.from_encrypted_tokens(
-                encrypted_tokens, token_key,
+                encrypted_tokens,
+                token_key,
                 rate_limit_delay=self.config.sync.rate_limit_delay,
             )
             self.user_id = user_id
@@ -76,7 +77,9 @@ class SyncManager:
                 raise Exception(f"Failed to get user profile: {error}")
 
             if isinstance(profile, dict):
-                garmin_user_id = str(profile.get("userId") or profile.get("displayName") or "unknown")
+                garmin_user_id = str(
+                    profile.get("userId") or profile.get("displayName") or "unknown"
+                )
                 display_name = profile.get("displayName")
             else:
                 garmin_user_id = str(profile) if profile else "unknown"
@@ -93,6 +96,7 @@ class SyncManager:
         if self._tokens_from_db and self.garmin_client and self.db and self.user_id:
             try:
                 from .token_manager import TokenManager
+
                 token_key = os.environ.get("GARMIN_TOKEN_KEY", "")
                 refreshed = self.garmin_client.get_refreshed_tokens()
                 tm = TokenManager(token_key)
@@ -139,7 +143,9 @@ class SyncManager:
 
         if dry_run:
             logger.info("DRY RUN MODE - No data will be written")
-            return await self._dry_run_sync(categories, mode, days_back, start_date, end_date)
+            return await self._dry_run_sync(
+                categories, mode, days_back, start_date, end_date
+            )
 
         # Perform actual sync
         report = {

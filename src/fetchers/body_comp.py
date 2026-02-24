@@ -34,7 +34,9 @@ class BodyCompositionFetcher(BaseFetcher):
         Returns:
             Tuple of (records_count, error_message)
         """
-        start, end = await self.determine_date_range(mode, days_back, start_date, end_date)
+        start, end = await self.determine_date_range(
+            mode, days_back, start_date, end_date
+        )
         logger.info(f"Fetching body composition from {start} to {end}")
 
         records_count = 0
@@ -64,10 +66,14 @@ class BodyCompositionFetcher(BaseFetcher):
                     try:
                         body_comp_data = self._transform_daily_weight(summary)
                         if body_comp_data.get("timestamp"):
-                            await self.db.upsert_body_composition(self.user_id, body_comp_data)
+                            await self.db.upsert_body_composition(
+                                self.user_id, body_comp_data
+                            )
                             records_count += 1
                     except Exception as e:
-                        logger.error(f"Error processing weigh-in for {summary.get('summaryDate')}: {e}")
+                        logger.error(
+                            f"Error processing weigh-in for {summary.get('summaryDate')}: {e}"
+                        )
                         errors.append(str(e))
 
                 logger.info(f"Stored {records_count} body composition records")
@@ -103,7 +109,9 @@ class BodyCompositionFetcher(BaseFetcher):
             return val
 
         # Weight: try latestWeight dict, then minWeight/maxWeight from summary
-        weight = grams_to_kg(latest.get("weight") or data.get("minWeight") or data.get("maxWeight"))
+        weight = grams_to_kg(
+            latest.get("weight") or data.get("minWeight") or data.get("maxWeight")
+        )
 
         return {
             "timestamp": timestamp,
@@ -114,7 +122,8 @@ class BodyCompositionFetcher(BaseFetcher):
             "bone_mass_kg": grams_to_kg(latest.get("boneMass"), threshold=100),
             "muscle_mass_kg": grams_to_kg(latest.get("muscleMass"), threshold=200),
             "metabolic_age": latest.get("metabolicAge"),
-            "visceral_fat_rating": latest.get("visceralFatMass") or latest.get("visceralFatRating"),
+            "visceral_fat_rating": latest.get("visceralFatMass")
+            or latest.get("visceralFatRating"),
             "basal_met": latest.get("bmr"),
             "active_met": latest.get("activeMet"),
             "physique_rating": latest.get("physiqueRating"),

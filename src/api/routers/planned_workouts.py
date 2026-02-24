@@ -6,7 +6,13 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, status
 from fastapi.responses import StreamingResponse
 from ..auth import get_api_key
-from ..dependencies import get_db, get_user_id, date_range, pagination, verify_coach_access
+from ..dependencies import (
+    get_db,
+    get_user_id,
+    date_range,
+    pagination,
+    verify_coach_access,
+)
 from ..schemas import (
     PlannedWorkout,
     PlannedWorkoutCreate,
@@ -78,14 +84,36 @@ async def download_template():
     """Download a CSV template for bulk workout import."""
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["date", "sport_type", "title", "description", "duration_minutes", "distance_km", "intensity"])
+    writer.writerow(
+        [
+            "date",
+            "sport_type",
+            "title",
+            "description",
+            "duration_minutes",
+            "distance_km",
+            "intensity",
+        ]
+    )
     writer.writerow(["2026-03-01", "running", "Easy run", "", "45", "10", "easy"])
-    writer.writerow(["2026-03-02", "strength_training", "Upper body", "Gym session", "60", "", "moderate"])
+    writer.writerow(
+        [
+            "2026-03-02",
+            "strength_training",
+            "Upper body",
+            "Gym session",
+            "60",
+            "",
+            "moderate",
+        ]
+    )
     output.seek(0)
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=planned_workouts_template.csv"},
+        headers={
+            "Content-Disposition": "attachment; filename=planned_workouts_template.csv"
+        },
     )
 
 
@@ -134,20 +162,24 @@ async def import_planned_workouts(
             distance_str = row.get("distance_km", "").strip()
             distance_meters = float(distance_str) * 1000 if distance_str else None
 
-            workouts.append({
-                "planned_date": planned_date,
-                "sport_type": sport_type,
-                "title": title,
-                "description": row.get("description", "").strip() or None,
-                "planned_duration_seconds": duration_seconds,
-                "planned_distance_meters": distance_meters,
-                "intensity": intensity,
-            })
+            workouts.append(
+                {
+                    "planned_date": planned_date,
+                    "sport_type": sport_type,
+                    "title": title,
+                    "description": row.get("description", "").strip() or None,
+                    "planned_duration_seconds": duration_seconds,
+                    "planned_distance_meters": distance_meters,
+                    "intensity": intensity,
+                }
+            )
         except Exception as e:
             errors.append(f"Row {i}: {str(e)}")
 
     user_id, coach_id = await verify_coach_access(request)
-    imported = await db.bulk_create_planned_workouts(user_id, workouts, created_by_user_id=coach_id)
+    imported = await db.bulk_create_planned_workouts(
+        user_id, workouts, created_by_user_id=coach_id
+    )
     return BulkImportResult(imported=imported, errors=errors)
 
 

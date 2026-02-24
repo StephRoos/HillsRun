@@ -5,7 +5,9 @@ from ..auth import get_api_key
 from ..dependencies import get_db, get_user_id, date_range, pagination
 from ..schemas import BodyComposition, make_page
 
-router = APIRouter(prefix="/api/v1/body", tags=["body"], dependencies=[Depends(get_api_key)])
+router = APIRouter(
+    prefix="/api/v1/body", tags=["body"], dependencies=[Depends(get_api_key)]
+)
 
 
 @router.get("/composition")
@@ -16,5 +18,7 @@ async def body_composition(
     pages=Depends(pagination),
 ):
     """Return paginated body composition measurements."""
-    rows, total = await db.query_body_composition(user_id, dates[0], dates[1], pages[0], pages[1])
+    rows, total = await db.query_body_composition(
+        user_id, dates[0], dates[1], pages[0], pages[1]
+    )
     return make_page(rows, total, pages[0], pages[1], BodyComposition)

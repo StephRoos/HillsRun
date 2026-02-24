@@ -17,7 +17,10 @@ async def get_user_id(request: Request) -> int:
         try:
             return int(header_value)
         except ValueError:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid X-Garmin-User-Id header")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid X-Garmin-User-Id header",
+            )
 
     # Fallback: singleton user (backward compat for Streamlit dashboard, direct API)
     user_id = request.app.state.user_id
@@ -27,13 +30,20 @@ async def get_user_id(request: Request) -> int:
         if user_id is not None:
             request.app.state.user_id = user_id
         else:
-            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="No user found in database")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="No user found in database",
+            )
     return user_id
 
 
 def date_range(
-    start_date: Optional[date] = Query(default=None, description="Start date (default: 30 days ago)"),
-    end_date: Optional[date] = Query(default=None, description="End date (default: today)"),
+    start_date: Optional[date] = Query(
+        default=None, description="Start date (default: 30 days ago)"
+    ),
+    end_date: Optional[date] = Query(
+        default=None, description="End date (default: today)"
+    ),
 ):
     """Parse optional start/end date query params with defaults (last 30 days).
 

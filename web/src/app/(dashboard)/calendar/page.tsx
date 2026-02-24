@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Upload } from "lucide-react";
+import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TrainingCalendar } from "@/components/calendar/training-calendar";
 import { ImportDialog } from "@/components/calendar/import-dialog";

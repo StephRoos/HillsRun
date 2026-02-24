@@ -1,6 +1,5 @@
 """Garmin token encryption/decryption using Fernet (symmetric AES)."""
 
-import json
 import logging
 import os
 from typing import Optional

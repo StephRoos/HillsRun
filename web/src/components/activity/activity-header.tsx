@@ -15,6 +15,7 @@ export function ActivityHeader({ activity }: { activity: ActivityDetail }) {
   const displayName = activity.custom_name ?? activity.activity_name ?? "Activity";
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(displayName);
+  const [prevDisplayName, setPrevDisplayName] = useState(displayName);
   const inputRef = useRef<HTMLInputElement>(null);
   const savingRef = useRef(false);
   const mutation = useUpdateActivity(String(activity.activity_id));
@@ -26,12 +27,11 @@ export function ActivityHeader({ activity }: { activity: ActivityDetail }) {
     }
   }, [editing]);
 
-  // Sync displayName when activity data changes (after mutation success)
-  useEffect(() => {
-    if (!editing) {
-      setDraft(displayName);
-    }
-  }, [displayName, editing]);
+  // Sync draft when displayName changes externally (e.g. after mutation success)
+  if (!editing && prevDisplayName !== displayName) {
+    setPrevDisplayName(displayName);
+    setDraft(displayName);
+  }
 
   function startEditing() {
     setDraft(displayName);

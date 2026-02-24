@@ -35,7 +35,9 @@ class WellnessFetcher(BaseFetcher):
         Returns:
             Tuple of (records_count, error_message)
         """
-        start, end = await self.determine_date_range(mode, days_back, start_date, end_date)
+        start, end = await self.determine_date_range(
+            mode, days_back, start_date, end_date
+        )
         logger.info(f"Fetching wellness data from {start} to {end}")
 
         records_count = 0
@@ -81,11 +83,15 @@ class WellnessFetcher(BaseFetcher):
         await self.db.upsert_hydration_data(self.user_id, hydration_data)
         logger.debug(f"Stored hydration data for {date_str}")
 
-    def _transform_hydration_data(self, calendar_date: date, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _transform_hydration_data(
+        self, calendar_date: date, data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Transform hydration data for database."""
         return {
             "calendar_date": calendar_date,
             "total_hydration_ml": data.get("valueInML"),
             "hydration_goal_ml": data.get("goalInML"),
-            "hydration_entries": json.dumps(data.get("hydrationLog")) if data.get("hydrationLog") else None,
+            "hydration_entries": json.dumps(data.get("hydrationLog"))
+            if data.get("hydrationLog")
+            else None,
         }

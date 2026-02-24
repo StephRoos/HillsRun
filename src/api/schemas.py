@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 from enum import Enum
-from typing import Any, Generic, List, Optional, TypeVar
+from typing import Generic, List, Optional, TypeVar
 from pydantic import BaseModel, Field
 
 T = TypeVar("T")
@@ -10,6 +10,7 @@ T = TypeVar("T")
 
 class Pagination(BaseModel):
     """Pagination metadata for paginated responses."""
+
     total: int
     limit: int
     offset: int
@@ -18,17 +19,20 @@ class Pagination(BaseModel):
 
 class Page(BaseModel, Generic[T]):
     """Generic paginated response wrapper."""
+
     data: List[T]
     pagination: Pagination
 
 
 class HealthResponse(BaseModel):
     """Health check response."""
+
     status: str
 
 
 class DailySummary(BaseModel):
     """Daily health summary (steps, calories, heart rate, stress)."""
+
     calendar_date: date
     total_steps: Optional[int] = None
     step_goal: Optional[int] = None
@@ -57,6 +61,7 @@ class DailySummary(BaseModel):
 
 class HeartRateSample(BaseModel):
     """Single heart rate measurement."""
+
     timestamp: datetime
     heart_rate: Optional[int] = None
 
@@ -65,6 +70,7 @@ class HeartRateSample(BaseModel):
 
 class SleepData(BaseModel):
     """Daily sleep breakdown (duration, stages, score)."""
+
     calendar_date: date
     sleep_start_timestamp: Optional[datetime] = None
     sleep_end_timestamp: Optional[datetime] = None
@@ -81,6 +87,7 @@ class SleepData(BaseModel):
 
 class StressData(BaseModel):
     """Daily stress level summary."""
+
     calendar_date: date
     average_stress_level: Optional[int] = None
     max_stress_level: Optional[int] = None
@@ -95,6 +102,7 @@ class StressData(BaseModel):
 
 class BodyBattery(BaseModel):
     """Daily body battery summary."""
+
     calendar_date: date
     charged_value: Optional[int] = None
     drained_value: Optional[int] = None
@@ -106,6 +114,7 @@ class BodyBattery(BaseModel):
 
 class BodyComposition(BaseModel):
     """Body composition measurement (weight, body fat, muscle mass)."""
+
     timestamp: datetime
     weight_kg: Optional[float] = None
     bmi: Optional[float] = None
@@ -121,6 +130,7 @@ class BodyComposition(BaseModel):
 
 class HrvData(BaseModel):
     """Heart rate variability data."""
+
     calendar_date: date
     weekly_avg: Optional[int] = None
     last_night_avg: Optional[int] = None
@@ -133,6 +143,7 @@ class HrvData(BaseModel):
 
 class Spo2Data(BaseModel):
     """Blood oxygen saturation data."""
+
     calendar_date: date
     average_spo2_percentage: Optional[float] = None
     lowest_spo2_percentage: Optional[float] = None
@@ -143,6 +154,7 @@ class Spo2Data(BaseModel):
 
 class FitnessMetrics(BaseModel):
     """Fitness metrics (VO2 Max, lactate threshold)."""
+
     calendar_date: date
     vo2_max: Optional[float] = None
     vo2_max_running: Optional[float] = None
@@ -156,6 +168,7 @@ class FitnessMetrics(BaseModel):
 
 class RespirationData(BaseModel):
     """Respiration rate data."""
+
     calendar_date: date
     avg_waking_respiration_rate: Optional[float] = None
     max_waking_respiration_rate: Optional[float] = None
@@ -167,6 +180,7 @@ class RespirationData(BaseModel):
 
 class TrainingReadiness(BaseModel):
     """Training readiness score and contributing factors."""
+
     calendar_date: date
     score: Optional[int] = None
     score_feedback: Optional[str] = None
@@ -181,11 +195,13 @@ class TrainingReadiness(BaseModel):
 
 class ActivityUpdate(BaseModel):
     """Request body for updating activity custom_name."""
+
     custom_name: Optional[str] = None
 
 
 class Activity(BaseModel):
     """Activity summary for list views."""
+
     activity_id: int
     activity_name: Optional[str] = None
     custom_name: Optional[str] = None
@@ -213,6 +229,7 @@ class Activity(BaseModel):
 
 class ActivityDetail(Activity):
     """Full activity detail with all metrics."""
+
     average_pace: Optional[float] = None
     max_pace: Optional[float] = None
     average_running_cadence: Optional[float] = None
@@ -245,6 +262,7 @@ class ActivityDetail(Activity):
 
 class ActivitySplit(BaseModel):
     """Single split/lap within an activity."""
+
     split_index: Optional[int] = None
     split_type: Optional[str] = None
     duration_seconds: Optional[float] = None
@@ -259,6 +277,7 @@ class ActivitySplit(BaseModel):
 
 class HydrationData(BaseModel):
     """Daily hydration data."""
+
     calendar_date: date
     total_hydration_ml: Optional[float] = None
     hydration_goal_ml: Optional[float] = None
@@ -266,12 +285,21 @@ class HydrationData(BaseModel):
     model_config = {"from_attributes": True}
 
 
-VALID_SPORT_TYPES = {"running", "trail_running", "cycling", "swimming", "strength_training", "rest", "stretching"}
+VALID_SPORT_TYPES = {
+    "running",
+    "trail_running",
+    "cycling",
+    "swimming",
+    "strength_training",
+    "rest",
+    "stretching",
+}
 VALID_INTENSITIES = {"easy", "moderate", "hard", "race"}
 
 
 class PlannedWorkoutCreate(BaseModel):
     """Request body for creating a planned workout."""
+
     planned_date: date
     sport_type: str
     title: str
@@ -283,6 +311,7 @@ class PlannedWorkoutCreate(BaseModel):
 
 class PlannedWorkoutUpdate(BaseModel):
     """Request body for updating a planned workout (all fields optional)."""
+
     planned_date: Optional[date] = None
     sport_type: Optional[str] = None
     title: Optional[str] = None
@@ -295,6 +324,7 @@ class PlannedWorkoutUpdate(BaseModel):
 
 class PlannedWorkout(BaseModel):
     """Planned workout with all fields."""
+
     id: int
     user_id: int
     planned_date: date
@@ -314,12 +344,14 @@ class PlannedWorkout(BaseModel):
 
 class BulkImportResult(BaseModel):
     """Result of a bulk CSV import."""
+
     imported: int
     errors: List[str] = []
 
 
 class SyncStatus(BaseModel):
     """Sync state for a single category."""
+
     category: str
     last_sync_date: Optional[date] = None
     last_sync_timestamp: Optional[datetime] = None
@@ -332,6 +364,7 @@ class SyncStatus(BaseModel):
 
 class SyncTriggerRequest(BaseModel):
     """Request body for triggering a sync job."""
+
     categories: Optional[List[str]] = Field(
         None,
         description="Categories to sync. Defaults to all.",
@@ -344,12 +377,17 @@ class SyncTriggerRequest(BaseModel):
     days_back: int = Field(90, description="Days to look back for full sync")
     start_date: Optional[date] = Field(None, description="Override start date")
     end_date: Optional[date] = Field(None, description="Override end date")
-    dry_run: bool = Field(False, description="If true, show what would be synced without writing")
-    better_auth_user_id: Optional[str] = Field(None, description="Better-Auth user ID to sync for")
+    dry_run: bool = Field(
+        False, description="If true, show what would be synced without writing"
+    )
+    better_auth_user_id: Optional[str] = Field(
+        None, description="Better-Auth user ID to sync for"
+    )
 
 
 class SyncJobStatus(str, Enum):
     """Sync job status enum."""
+
     pending = "pending"
     running = "running"
     completed = "completed"
@@ -358,6 +396,7 @@ class SyncJobStatus(str, Enum):
 
 class SyncJobResponse(BaseModel):
     """Full sync job status with logs."""
+
     job_id: str
     status: SyncJobStatus
     created_at: datetime
@@ -371,6 +410,7 @@ class SyncJobResponse(BaseModel):
 
 class SyncTriggerResponse(BaseModel):
     """Response after triggering a sync job."""
+
     job_id: str
     message: str
 
@@ -378,11 +418,13 @@ class SyncTriggerResponse(BaseModel):
 # Coaching
 class InviteCodeCreate(BaseModel):
     """Request body for creating an invite code (empty, code is auto-generated)."""
+
     pass  # code is auto-generated
 
 
 class InviteCodeResponse(BaseModel):
     """Invite code details."""
+
     id: int
     code: str
     coach_better_auth_id: str
@@ -397,11 +439,13 @@ class InviteCodeResponse(BaseModel):
 
 class RedeemCodeRequest(BaseModel):
     """Request body for redeeming an invite code."""
+
     code: str
 
 
 class CoachAthlete(BaseModel):
     """Athlete info as seen by a coach."""
+
     athlete_user_id: int
     display_name: Optional[str] = None
     email: Optional[str] = None
@@ -413,6 +457,7 @@ class CoachAthlete(BaseModel):
 
 class CoachInfo(BaseModel):
     """Coach info as seen by an athlete."""
+
     coach_better_auth_id: str
     coach_name: Optional[str] = None
     coach_email: Optional[str] = None
@@ -424,6 +469,7 @@ class CoachInfo(BaseModel):
 
 class CoachingStatus(BaseModel):
     """Full coaching status (enabled, athletes, coaches)."""
+
     coaching_enabled: bool
     athletes: List[CoachAthlete] = []
     coaches: List[CoachInfo] = []

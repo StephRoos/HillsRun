@@ -35,7 +35,9 @@ class ActivitiesFetcher(BaseFetcher):
         Returns:
             Tuple of (records_count, error_message)
         """
-        start, end = await self.determine_date_range(mode, days_back, start_date, end_date)
+        start, end = await self.determine_date_range(
+            mode, days_back, start_date, end_date
+        )
         logger.info(f"Fetching activities from {start} to {end}")
 
         records_count = 0
@@ -44,7 +46,9 @@ class ActivitiesFetcher(BaseFetcher):
 
         try:
             # Fetch activities for date range
-            success, activities, error = self.garmin_client.get_activities_by_date(start, end)
+            success, activities, error = self.garmin_client.get_activities_by_date(
+                start, end
+            )
 
             if not success:
                 error_msg = f"Failed to get activities: {error}"
@@ -72,17 +76,31 @@ class ActivitiesFetcher(BaseFetcher):
             # for the deletion check (last days_back days) with one extra API call.
             if mode == "incremental" and start > end - timedelta(days=days_back):
                 deletion_start = end - timedelta(days=days_back)
-                logger.info(f"Checking deletions over broader range: {deletion_start} to {end}")
-                success_del, all_activities, err_del = self.garmin_client.get_activities_by_date(deletion_start, end)
+                logger.info(
+                    f"Checking deletions over broader range: {deletion_start} to {end}"
+                )
+                success_del, all_activities, err_del = (
+                    self.garmin_client.get_activities_by_date(deletion_start, end)
+                )
                 if success_del and all_activities is not None:
-                    all_garmin_ids = {a.get("activityId") for a in all_activities if a.get("activityId")}
-                    db_ids = await self.db.get_activity_ids_for_range(self.user_id, deletion_start, end)
+                    all_garmin_ids = {
+                        a.get("activityId")
+                        for a in all_activities
+                        if a.get("activityId")
+                    }
+                    db_ids = await self.db.get_activity_ids_for_range(
+                        self.user_id, deletion_start, end
+                    )
                     to_delete = [aid for aid in db_ids if aid not in all_garmin_ids]
                 else:
                     to_delete = []
             else:
-                db_activity_ids = await self.db.get_activity_ids_for_range(self.user_id, start, end)
-                to_delete = [aid for aid in db_activity_ids if aid not in garmin_activity_ids]
+                db_activity_ids = await self.db.get_activity_ids_for_range(
+                    self.user_id, start, end
+                )
+                to_delete = [
+                    aid for aid in db_activity_ids if aid not in garmin_activity_ids
+                ]
 
             if to_delete:
                 deleted = await self.db.delete_activities(to_delete, self.user_id)
@@ -136,17 +154,29 @@ class ActivitiesFetcher(BaseFetcher):
         # Parse start timestamp
         start_ts = None
         if data.get("startTimeGMT"):
-            start_ts = datetime.fromisoformat(data["startTimeGMT"].replace("Z", "+00:00"))
+            start_ts = datetime.fromisoformat(
+                data["startTimeGMT"].replace("Z", "+00:00")
+            )
         elif data.get("beginTimestamp"):
             start_ts = datetime.fromtimestamp(data["beginTimestamp"] / 1000.0)
 
         return {
             "activity_id": data.get("activityId"),
             "activity_name": data.get("activityName"),
-            "activity_type": data.get("activityType", {}).get("typeKey") if isinstance(data.get("activityType"), dict) else data.get("activityType"),
+            "activity_type": data.get("activityType", {}).get("typeKey")
+            if isinstance(data.get("activityType"), dict)
+            else data.get("activityType"),
             "sport_type": (
-                (data.get("sportTypeKey") if data.get("sportTypeKey") not in (None, "uncategorized") else None)
-                or (data.get("activityType", {}).get("typeKey") if isinstance(data.get("activityType"), dict) else data.get("activityType"))
+                (
+                    data.get("sportTypeKey")
+                    if data.get("sportTypeKey") not in (None, "uncategorized")
+                    else None
+                )
+                or (
+                    data.get("activityType", {}).get("typeKey")
+                    if isinstance(data.get("activityType"), dict)
+                    else data.get("activityType")
+                )
                 or data.get("eventType", {}).get("typeKey")
             ),
             "start_timestamp": start_ts,
@@ -159,7 +189,9 @@ class ActivitiesFetcher(BaseFetcher):
             "calories": data.get("calories"),
             "average_hr": data.get("averageHR"),
             "max_hr": data.get("maxHR"),
-            "average_running_cadence": data.get("averageRunningCadenceInStepsPerMinute"),
+            "average_running_cadence": data.get(
+                "averageRunningCadenceInStepsPerMinute"
+            ),
             "max_running_cadence": data.get("maxRunningCadenceInStepsPerMinute"),
             "average_bike_cadence": data.get("averageBikingCadenceInRevPerMinute"),
             "max_bike_cadence": data.get("maxBikingCadenceInRevPerMinute"),
@@ -183,7 +215,8 @@ class ActivitiesFetcher(BaseFetcher):
             "avg_stride_length": data.get("avgStrideLength"),
             "vo2_max_value": data.get("vO2MaxValue"),
             "lactate_threshold_bpm": data.get("lactateThresholdBpm"),
-            "device_name": data.get("deviceName") or data.get("metadataDTO", {}).get("deviceName"),
+            "device_name": data.get("deviceName")
+            or data.get("metadataDTO", {}).get("deviceName"),
             "description": data.get("description"),
             "manual_activity": data.get("manual", False),
             "pr": data.get("pr", False),
@@ -207,24 +240,33 @@ class ActivitiesFetcher(BaseFetcher):
         for i, lap in enumerate(lap_dtos):
             start_ts = None
             if lap.get("startTimeGMT"):
-                start_ts = datetime.fromisoformat(lap["startTimeGMT"].replace("Z", "+00:00"))
+                start_ts = datetime.fromisoformat(
+                    lap["startTimeGMT"].replace("Z", "+00:00")
+                )
 
-            splits.append({
-                "split_index": i,
-                "split_type": lap.get("messageType", "lap"),
-                "distance_meters": lap.get("distance"),
-                "duration_seconds": (
-                    lap.get("duration")
-                    or (lap.get("elapsedDuration", 0) / 1000 if lap.get("elapsedDuration") else None)
-                ),
-                "average_speed": lap.get("averageSpeed"),
-                "average_hr": lap.get("averageHR"),
-                "max_hr": lap.get("maxHR"),
-                "average_power": lap.get("avgPower"),
-                "max_power": lap.get("maxPower"),
-                "average_cadence": lap.get("averageRunningCadenceInStepsPerMinute") or lap.get("avgCadence"),
-                "elevation_gain_meters": lap.get("elevationGain"),
-                "elevation_loss_meters": lap.get("elevationLoss"),
-                "start_timestamp": start_ts,
-            })
+            splits.append(
+                {
+                    "split_index": i,
+                    "split_type": lap.get("messageType", "lap"),
+                    "distance_meters": lap.get("distance"),
+                    "duration_seconds": (
+                        lap.get("duration")
+                        or (
+                            lap.get("elapsedDuration", 0) / 1000
+                            if lap.get("elapsedDuration")
+                            else None
+                        )
+                    ),
+                    "average_speed": lap.get("averageSpeed"),
+                    "average_hr": lap.get("averageHR"),
+                    "max_hr": lap.get("maxHR"),
+                    "average_power": lap.get("avgPower"),
+                    "max_power": lap.get("maxPower"),
+                    "average_cadence": lap.get("averageRunningCadenceInStepsPerMinute")
+                    or lap.get("avgCadence"),
+                    "elevation_gain_meters": lap.get("elevationGain"),
+                    "elevation_loss_meters": lap.get("elevationLoss"),
+                    "start_timestamp": start_ts,
+                }
+            )
         return splits

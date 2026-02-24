@@ -3,9 +3,18 @@
 from fastapi import APIRouter, Depends
 from ..auth import get_api_key
 from ..dependencies import get_db, get_user_id, date_range, pagination
-from ..schemas import DailySummary, HeartRateSample, SleepData, StressData, BodyBattery, make_page
+from ..schemas import (
+    DailySummary,
+    HeartRateSample,
+    SleepData,
+    StressData,
+    BodyBattery,
+    make_page,
+)
 
-router = APIRouter(prefix="/api/v1/daily", tags=["daily"], dependencies=[Depends(get_api_key)])
+router = APIRouter(
+    prefix="/api/v1/daily", tags=["daily"], dependencies=[Depends(get_api_key)]
+)
 
 
 @router.get("/summary")
@@ -16,7 +25,9 @@ async def daily_summary(
     pages=Depends(pagination),
 ):
     """Return paginated daily health summaries."""
-    rows, total = await db.query_daily_summaries(user_id, dates[0], dates[1], pages[0], pages[1])
+    rows, total = await db.query_daily_summaries(
+        user_id, dates[0], dates[1], pages[0], pages[1]
+    )
     return make_page(rows, total, pages[0], pages[1], DailySummary)
 
 
@@ -29,7 +40,9 @@ async def heart_rate(
 ):
     """Return paginated heart rate samples (max 5000 per page)."""
     limit = min(pages[0], 5000)
-    rows, total = await db.query_heart_rate_samples(user_id, dates[0], dates[1], limit, pages[1])
+    rows, total = await db.query_heart_rate_samples(
+        user_id, dates[0], dates[1], limit, pages[1]
+    )
     return make_page(rows, total, limit, pages[1], HeartRateSample)
 
 
@@ -41,7 +54,9 @@ async def sleep(
     pages=Depends(pagination),
 ):
     """Return paginated sleep data."""
-    rows, total = await db.query_sleep_data(user_id, dates[0], dates[1], pages[0], pages[1])
+    rows, total = await db.query_sleep_data(
+        user_id, dates[0], dates[1], pages[0], pages[1]
+    )
     return make_page(rows, total, pages[0], pages[1], SleepData)
 
 
@@ -53,7 +68,9 @@ async def stress(
     pages=Depends(pagination),
 ):
     """Return paginated stress data."""
-    rows, total = await db.query_stress_data(user_id, dates[0], dates[1], pages[0], pages[1])
+    rows, total = await db.query_stress_data(
+        user_id, dates[0], dates[1], pages[0], pages[1]
+    )
     return make_page(rows, total, pages[0], pages[1], StressData)
 
 
@@ -65,5 +82,7 @@ async def body_battery(
     pages=Depends(pagination),
 ):
     """Return paginated body battery data."""
-    rows, total = await db.query_body_battery(user_id, dates[0], dates[1], pages[0], pages[1])
+    rows, total = await db.query_body_battery(
+        user_id, dates[0], dates[1], pages[0], pages[1]
+    )
     return make_page(rows, total, pages[0], pages[1], BodyBattery)

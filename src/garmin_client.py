@@ -2,8 +2,7 @@
 
 import logging
 import time
-from datetime import date, datetime
-from pathlib import Path
+from datetime import date
 from typing import Optional, Dict, Any, List
 
 from garminconnect import Garmin, GarminConnectAuthenticationError
@@ -31,7 +30,9 @@ class GarminClient:
         self._last_request_time = 0.0
 
     @classmethod
-    def from_encrypted_tokens(cls, encrypted_tokens: bytes, token_key: str, rate_limit_delay: float = 0.5) -> "GarminClient":
+    def from_encrypted_tokens(
+        cls, encrypted_tokens: bytes, token_key: str, rate_limit_delay: float = 0.5
+    ) -> "GarminClient":
         """Create a GarminClient from encrypted tokens stored in DB.
 
         Args:
@@ -61,7 +62,9 @@ class GarminClient:
         prof = garth_client.profile
         instance.client.display_name = prof.get("displayName")
         instance.client.full_name = prof.get("fullName")
-        logger.info(f"Connected to Garmin from DB tokens as {instance.client.display_name}")
+        logger.info(
+            f"Connected to Garmin from DB tokens as {instance.client.display_name}"
+        )
 
         return instance
 
@@ -87,7 +90,9 @@ class GarminClient:
             prof = garth_client.profile
             self.client.display_name = prof.get("displayName")
             self.client.full_name = prof.get("fullName")
-            logger.info(f"Successfully connected to Garmin Connect as {self.client.display_name}")
+            logger.info(
+                f"Successfully connected to Garmin Connect as {self.client.display_name}"
+            )
 
         except FileNotFoundError:
             logger.error(
@@ -228,7 +233,9 @@ class GarminClient:
             Body composition data
         """
         self._rate_limit()
-        return self.client.get_body_composition(start_date.isoformat(), end_date.isoformat())
+        return self.client.get_body_composition(
+            start_date.isoformat(), end_date.isoformat()
+        )
 
     # ============================================
     # Advanced Metrics
@@ -373,4 +380,3 @@ class GarminClient:
         """
         self._rate_limit()
         return self.client.get_hydration_data(date_str)
-

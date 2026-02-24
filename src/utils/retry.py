@@ -75,6 +75,7 @@ def safe_api_call(func: Callable) -> Callable:
     Returns:
         Wrapped function that returns (bool, Any, Optional[str])
     """
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         try:

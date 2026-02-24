@@ -5,7 +5,9 @@ from ..auth import get_api_key
 from ..dependencies import get_db, get_user_id, date_range, pagination
 from ..schemas import HydrationData, make_page
 
-router = APIRouter(prefix="/api/v1/wellness", tags=["wellness"], dependencies=[Depends(get_api_key)])
+router = APIRouter(
+    prefix="/api/v1/wellness", tags=["wellness"], dependencies=[Depends(get_api_key)]
+)
 
 
 @router.get("/hydration")
@@ -16,5 +18,7 @@ async def hydration(
     pages=Depends(pagination),
 ):
     """Return paginated hydration data."""
-    rows, total = await db.query_hydration_data(user_id, dates[0], dates[1], pages[0], pages[1])
+    rows, total = await db.query_hydration_data(
+        user_id, dates[0], dates[1], pages[0], pages[1]
+    )
     return make_page(rows, total, pages[0], pages[1], HydrationData)

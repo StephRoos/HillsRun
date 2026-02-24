@@ -22,7 +22,9 @@ from ..schemas import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/sync", tags=["sync"], dependencies=[Depends(get_api_key)])
+router = APIRouter(
+    prefix="/api/v1/sync", tags=["sync"], dependencies=[Depends(get_api_key)]
+)
 
 # In-memory job store (OrderedDict to maintain insertion order, capped at 50)
 MAX_JOBS = 50
@@ -52,7 +54,9 @@ def _store_job(job: SyncJobResponse) -> None:
             _jobs.popitem(last=False)
 
 
-def _run_sync_in_thread(job: SyncJobResponse, target_user_id: Optional[int] = None) -> None:
+def _run_sync_in_thread(
+    job: SyncJobResponse, target_user_id: Optional[int] = None
+) -> None:
     """Run sync in a separate thread with its own event loop.
 
     garminconnect/garth use synchronous HTTP calls that block the event loop.
@@ -78,7 +82,9 @@ async def _run_sync(job: SyncJobResponse, target_user_id: Optional[int] = None) 
 
     # Attach a log handler to capture sync logs for this job
     handler = _JobLogHandler(job)
-    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    )
     root_logger = logging.getLogger("src")
     root_logger.setLevel(logging.DEBUG)
     root_logger.addHandler(handler)
@@ -135,9 +141,13 @@ async def trigger_sync(
     target_user_id: Optional[int] = None
 
     if request.better_auth_user_id:
-        target_user_id = await db.get_user_by_better_auth_id(request.better_auth_user_id)
+        target_user_id = await db.get_user_by_better_auth_id(
+            request.better_auth_user_id
+        )
         if target_user_id is None:
-            raise HTTPException(status_code=404, detail="No Garmin account linked to this user")
+            raise HTTPException(
+                status_code=404, detail="No Garmin account linked to this user"
+            )
     else:
         # Fallback: read X-Garmin-User-Id header (set by Next.js proxy)
         header_value = raw_request.headers.get("X-Garmin-User-Id")
@@ -153,7 +163,7 @@ async def trigger_sync(
             if j.status in (SyncJobStatus.pending, SyncJobStatus.running):
                 # Per-user anti-flood: if we know the target, only block same user
                 if target_user_id is not None:
-                    if getattr(j, '_target_user_id', None) == target_user_id:
+                    if getattr(j, "_target_user_id", None) == target_user_id:
                         raise HTTPException(
                             status_code=409,
                             detail=f"A sync job is already running for this user (job_id={j.job_id})",
@@ -166,11 +176,19 @@ async def trigger_sync(
                     )
 
     # Validate categories
-    valid_categories = {"daily_health", "activities", "body_composition", "advanced_metrics", "wellness"}
+    valid_categories = {
+        "daily_health",
+        "activities",
+        "body_composition",
+        "advanced_metrics",
+        "wellness",
+    }
     if request.categories:
         invalid = set(request.categories) - valid_categories
         if invalid:
-            raise HTTPException(status_code=400, detail=f"Invalid categories: {invalid}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid categories: {invalid}"
+            )
 
     job = SyncJobResponse(
         job_id=str(uuid.uuid4()),
@@ -181,7 +199,9 @@ async def trigger_sync(
     job._target_user_id = target_user_id  # type: ignore[attr-defined]
     _store_job(job)
 
-    thread = threading.Thread(target=_run_sync_in_thread, args=(job, target_user_id), daemon=True)
+    thread = threading.Thread(
+        target=_run_sync_in_thread, args=(job, target_user_id), daemon=True
+    )
     thread.start()
 
     return SyncTriggerResponse(job_id=job.job_id, message="Sync job started")

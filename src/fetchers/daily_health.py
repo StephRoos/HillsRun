@@ -35,7 +35,9 @@ class DailyHealthFetcher(BaseFetcher):
         Returns:
             Tuple of (records_count, error_message)
         """
-        start, end = await self.determine_date_range(mode, days_back, start_date, end_date)
+        start, end = await self.determine_date_range(
+            mode, days_back, start_date, end_date
+        )
         logger.info(f"Fetching daily health data from {start} to {end}")
 
         records_count = 0
@@ -90,7 +92,9 @@ class DailyHealthFetcher(BaseFetcher):
         await self.db.upsert_daily_summary(self.user_id, summary_data)
         logger.debug(f"Stored daily summary for {date_str}")
 
-    def _transform_daily_summary(self, calendar_date: date, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _transform_daily_summary(
+        self, calendar_date: date, data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Transform daily summary data for database."""
         return {
             "calendar_date": calendar_date,
@@ -138,7 +142,9 @@ class DailyHealthFetcher(BaseFetcher):
             count = await self.db.upsert_heart_rate_samples(self.user_id, samples)
             logger.debug(f"Stored {count} heart rate samples for {date_str}")
 
-    def _transform_heart_rate_samples(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _transform_heart_rate_samples(
+        self, data: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         """Transform heart rate samples for database."""
         samples = []
 
@@ -160,10 +166,12 @@ class DailyHealthFetcher(BaseFetcher):
 
                 if timestamp_ms and hr_value and hr_value > 0:
                     timestamp = datetime.fromtimestamp(timestamp_ms / 1000.0)
-                    samples.append({
-                        "timestamp": timestamp,
-                        "heart_rate": hr_value,
-                    })
+                    samples.append(
+                        {
+                            "timestamp": timestamp,
+                            "heart_rate": hr_value,
+                        }
+                    )
             except (TypeError, ValueError, IndexError):
                 continue
 
@@ -187,12 +195,16 @@ class DailyHealthFetcher(BaseFetcher):
         await self.db.upsert_sleep_data(self.user_id, sleep_data)
         logger.debug(f"Stored sleep data for {date_str}")
 
-    def _transform_sleep_data(self, calendar_date: date, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _transform_sleep_data(
+        self, calendar_date: date, data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Transform sleep data for database."""
         daily_sleep_dto = data.get("dailySleepDTO", {})
         sleep_movement = data.get("sleepMovement", [])
 
-        sleep_start = self._parse_timestamp(daily_sleep_dto.get("sleepStartTimestampGMT"))
+        sleep_start = self._parse_timestamp(
+            daily_sleep_dto.get("sleepStartTimestampGMT")
+        )
         sleep_end = self._parse_timestamp(daily_sleep_dto.get("sleepEndTimestampGMT"))
 
         return {
@@ -204,8 +216,12 @@ class DailyHealthFetcher(BaseFetcher):
             "light_sleep_seconds": daily_sleep_dto.get("lightSleepSeconds"),
             "rem_sleep_seconds": daily_sleep_dto.get("remSleepSeconds"),
             "awake_seconds": daily_sleep_dto.get("awakeSleepSeconds"),
-            "sleep_score": daily_sleep_dto.get("sleepScores", {}).get("overall", {}).get("value"),
-            "sleep_quality": daily_sleep_dto.get("sleepScores", {}).get("overall", {}).get("qualifierKey"),
+            "sleep_score": daily_sleep_dto.get("sleepScores", {})
+            .get("overall", {})
+            .get("value"),
+            "sleep_quality": daily_sleep_dto.get("sleepScores", {})
+            .get("overall", {})
+            .get("qualifierKey"),
             "sleep_levels": json.dumps(sleep_movement) if sleep_movement else None,
         }
 
@@ -227,7 +243,9 @@ class DailyHealthFetcher(BaseFetcher):
         await self.db.upsert_stress_data(self.user_id, stress_data)
         logger.debug(f"Stored stress data for {date_str}")
 
-    def _transform_stress_data(self, calendar_date: date, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _transform_stress_data(
+        self, calendar_date: date, data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Transform stress data for database."""
         return {
             "calendar_date": calendar_date,
@@ -235,11 +253,15 @@ class DailyHealthFetcher(BaseFetcher):
             "max_stress_level": data.get("maxStressLevel"),
             "rest_stress_duration_seconds": data.get("restStressDuration"),
             "activity_stress_duration_seconds": data.get("activityStressDuration"),
-            "uncategorized_stress_duration_seconds": data.get("uncategorizedStressDuration"),
+            "uncategorized_stress_duration_seconds": data.get(
+                "uncategorizedStressDuration"
+            ),
             "low_stress_duration_seconds": data.get("lowStressDuration"),
             "medium_stress_duration_seconds": data.get("mediumStressDuration"),
             "high_stress_duration_seconds": data.get("highStressDuration"),
-            "stress_chart_values": json.dumps(data.get("stressValuesArray")) if data.get("stressValuesArray") else None,
+            "stress_chart_values": json.dumps(data.get("stressValuesArray"))
+            if data.get("stressValuesArray")
+            else None,
         }
 
     async def _fetch_body_battery(self, current_date: date, date_str: str) -> None:
@@ -260,7 +282,9 @@ class DailyHealthFetcher(BaseFetcher):
         await self.db.upsert_body_battery(self.user_id, bb_data)
         logger.debug(f"Stored body battery data for {date_str}")
 
-    def _transform_body_battery_data(self, calendar_date: date, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _transform_body_battery_data(
+        self, calendar_date: date, data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Transform body battery data for database."""
         start_ts = self._parse_timestamp(data.get("startTimestampGMT"))
         end_ts = self._parse_timestamp(data.get("endTimestampGMT"))
@@ -273,5 +297,7 @@ class DailyHealthFetcher(BaseFetcher):
             "lowest_value": data.get("lowestValue"),
             "start_timestamp": start_ts,
             "end_timestamp": end_ts,
-            "body_battery_values": json.dumps(data.get("bodyBatteryValuesArray")) if data.get("bodyBatteryValuesArray") else None,
+            "body_battery_values": json.dumps(data.get("bodyBatteryValuesArray"))
+            if data.get("bodyBatteryValuesArray")
+            else None,
         }

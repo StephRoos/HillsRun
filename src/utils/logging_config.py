@@ -35,7 +35,7 @@ def setup_logging(
     # Create formatter
     formatter = logging.Formatter(
         fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     # Console handler
@@ -54,7 +54,7 @@ def setup_logging(
             log_file,
             maxBytes=10 * 1024 * 1024,  # 10 MB
             backupCount=5,
-            encoding='utf-8'
+            encoding="utf-8",
         )
         file_handler.setLevel(numeric_level)
         file_handler.setFormatter(formatter)

@@ -8,11 +8,14 @@ from pydantic import BaseModel, Field
 from ..auth import get_api_key
 from ..dependencies import get_db, get_user_id
 
-router = APIRouter(prefix="/api/v1/user", tags=["user"], dependencies=[Depends(get_api_key)])
+router = APIRouter(
+    prefix="/api/v1/user", tags=["user"], dependencies=[Depends(get_api_key)]
+)
 
 
 class VmaResponse(BaseModel):
     """VMA data response."""
+
     manual_vma: Optional[float] = None
     estimated_vma: Optional[float] = None
     vo2_max: Optional[float] = None
@@ -20,7 +23,10 @@ class VmaResponse(BaseModel):
 
 class VmaUpdate(BaseModel):
     """Request body for updating manual VMA."""
-    vma: Optional[float] = Field(None, ge=5, le=30, description="VMA in km/h, or null to clear")
+
+    vma: Optional[float] = Field(
+        None, ge=5, le=30, description="VMA in km/h, or null to clear"
+    )
 
 
 @router.get("/vma")
@@ -33,7 +39,11 @@ async def get_vma(
     vo2max = await db.get_latest_vo2max_running(user_id)
     estimated_vma = round(float(vo2max) / 3.5, 2) if vo2max else None
     vo2_float = float(vo2max) if vo2max else None
-    return VmaResponse(manual_vma=float(manual_vma) if manual_vma else None, estimated_vma=estimated_vma, vo2_max=vo2_float)
+    return VmaResponse(
+        manual_vma=float(manual_vma) if manual_vma else None,
+        estimated_vma=estimated_vma,
+        vo2_max=vo2_float,
+    )
 
 
 @router.patch("/vma")
@@ -47,4 +57,6 @@ async def update_vma(
     vo2max = await db.get_latest_vo2max_running(user_id)
     estimated_vma = round(float(vo2max) / 3.5, 2) if vo2max else None
     vo2_float = float(vo2max) if vo2max else None
-    return VmaResponse(manual_vma=body.vma, estimated_vma=estimated_vma, vo2_max=vo2_float)
+    return VmaResponse(
+        manual_vma=body.vma, estimated_vma=estimated_vma, vo2_max=vo2_float
+    )

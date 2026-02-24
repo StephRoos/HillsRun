@@ -8,7 +8,19 @@ from fastapi import FastAPI
 
 from ..config import DatabaseConfig
 from ..database import Database
-from .routers import health, daily, body, metrics, activities, wellness, sync, auth_garmin, planned_workouts, coaching, user
+from .routers import (
+    health,
+    daily,
+    body,
+    metrics,
+    activities,
+    wellness,
+    sync,
+    auth_garmin,
+    planned_workouts,
+    coaching,
+    user,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +43,7 @@ def _validate_token_key():
         RuntimeError: If key is not set or not a valid Fernet key.
     """
     from cryptography.fernet import Fernet
+
     key = os.environ.get("GARMIN_TOKEN_KEY", "")
     if not key:
         raise RuntimeError("GARMIN_TOKEN_KEY environment variable is not set")
@@ -47,6 +60,7 @@ def _validate_token_key():
 async def lifespan(app: FastAPI):
     """Application lifespan: configure logging, validate keys, connect DB."""
     from ..utils.logging_config import setup_logging
+
     setup_logging(log_level=os.environ.get("LOG_LEVEL", "INFO"))
     _validate_token_key()
     db = Database(_db_config_from_env())

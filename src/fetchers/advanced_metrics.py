@@ -3,7 +3,7 @@
 import logging
 import json
 from datetime import date, timedelta, datetime
-from typing import Optional, Tuple, Dict, Any, List
+from typing import Optional, Tuple, Dict, Any
 
 from .base import BaseFetcher
 
@@ -35,7 +35,9 @@ class AdvancedMetricsFetcher(BaseFetcher):
         Returns:
             Tuple of (records_count, error_message)
         """
-        start, end = await self.determine_date_range(mode, days_back, start_date, end_date)
+        start, end = await self.determine_date_range(
+            mode, days_back, start_date, end_date
+        )
         logger.info(f"Fetching advanced metrics from {start} to {end}")
 
         records_count = 0
@@ -99,7 +101,9 @@ class AdvancedMetricsFetcher(BaseFetcher):
         await self.db.upsert_hrv_data(self.user_id, hrv_data)
         logger.debug(f"Stored HRV data for {date_str}")
 
-    def _transform_hrv_data(self, calendar_date: date, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _transform_hrv_data(
+        self, calendar_date: date, data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Transform HRV data for database.
 
         Args:
@@ -135,7 +139,9 @@ class AdvancedMetricsFetcher(BaseFetcher):
         await self.db.upsert_spo2_data(self.user_id, spo2_data)
         logger.debug(f"Stored SpO2 data for {date_str}")
 
-    def _transform_spo2_data(self, calendar_date: date, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _transform_spo2_data(
+        self, calendar_date: date, data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Transform SpO2 data for database.
 
         Args:
@@ -148,7 +154,9 @@ class AdvancedMetricsFetcher(BaseFetcher):
         # Parse latest reading timestamp
         latest_ts = None
         if data.get("latestSpO2ReadingTimeGMT"):
-            latest_ts = datetime.fromtimestamp(data["latestSpO2ReadingTimeGMT"] / 1000.0)
+            latest_ts = datetime.fromtimestamp(
+                data["latestSpO2ReadingTimeGMT"] / 1000.0
+            )
 
         return {
             "calendar_date": calendar_date,
@@ -156,7 +164,9 @@ class AdvancedMetricsFetcher(BaseFetcher):
             "lowest_spo2_percentage": data.get("lowestSPO2"),
             "latest_spo2_reading": data.get("latestSpO2"),
             "latest_spo2_reading_timestamp": latest_ts,
-            "spo2_values": json.dumps(data.get("spO2ValuesArray")) if data.get("spO2ValuesArray") else None,
+            "spo2_values": json.dumps(data.get("spO2ValuesArray"))
+            if data.get("spO2ValuesArray")
+            else None,
         }
 
     async def _fetch_fitness_metrics(self, current_date: date, date_str: str) -> None:
@@ -176,7 +186,9 @@ class AdvancedMetricsFetcher(BaseFetcher):
         await self.db.upsert_fitness_metrics(self.user_id, fitness_data)
         logger.debug(f"Stored fitness metrics for {date_str}")
 
-    def _transform_fitness_metrics(self, calendar_date: date, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _transform_fitness_metrics(
+        self, calendar_date: date, data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Transform fitness metrics for database.
 
         Args:
@@ -213,7 +225,9 @@ class AdvancedMetricsFetcher(BaseFetcher):
         await self.db.upsert_respiration_data(self.user_id, resp_data)
         logger.debug(f"Stored respiration data for {date_str}")
 
-    def _transform_respiration_data(self, calendar_date: date, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _transform_respiration_data(
+        self, calendar_date: date, data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Transform respiration data for database.
 
         Args:
@@ -231,7 +245,9 @@ class AdvancedMetricsFetcher(BaseFetcher):
             "avg_sleep_respiration_rate": data.get("avgSleepRespirationRate"),
         }
 
-    async def _fetch_training_readiness(self, current_date: date, date_str: str) -> None:
+    async def _fetch_training_readiness(
+        self, current_date: date, date_str: str
+    ) -> None:
         """Fetch and store training readiness data."""
         success, data, error = self.garmin_client.get_training_readiness(date_str)
 
@@ -246,10 +262,12 @@ class AdvancedMetricsFetcher(BaseFetcher):
         tr_data = {
             "calendar_date": current_date,
             "score": data.get("score") or data.get("readinessScore"),
-            "score_feedback": data.get("scoreFeedback") or data.get("readinessFeedback"),
+            "score_feedback": data.get("scoreFeedback")
+            or data.get("readinessFeedback"),
             "hrv_status": data.get("hrvStatus"),
             "sleep_score": data.get("sleepScore") or data.get("sleepScoreValue"),
-            "recent_training_load": data.get("recentTrainingLoad") or data.get("acuteTrainingLoad"),
+            "recent_training_load": data.get("recentTrainingLoad")
+            or data.get("acuteTrainingLoad"),
             "acute_load": data.get("acuteLoad") or data.get("acuteTrainingLoadScore"),
             "chronic_load": data.get("chronicLoad") or data.get("chronicTrainingLoad"),
         }

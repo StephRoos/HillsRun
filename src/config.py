@@ -11,6 +11,7 @@ import yaml
 @dataclass
 class DatabaseConfig:
     """Database configuration."""
+
     host: str = "localhost"
     port: int = 5432
     database: str = "garmin_connect"
@@ -23,6 +24,7 @@ class DatabaseConfig:
 @dataclass
 class GarminConfig:
     """Garmin Connect configuration."""
+
     tokens_dir: Path = field(default_factory=lambda: Path.home() / ".garminconnect")
     email: Optional[str] = None
     password: Optional[str] = None
@@ -32,13 +34,16 @@ class GarminConfig:
 @dataclass
 class SyncConfig:
     """Synchronization configuration."""
-    categories: List[str] = field(default_factory=lambda: [
-        "daily_health",
-        "activities",
-        "body_composition",
-        "advanced_metrics",
-        "wellness",
-    ])
+
+    categories: List[str] = field(
+        default_factory=lambda: [
+            "daily_health",
+            "activities",
+            "body_composition",
+            "advanced_metrics",
+            "wellness",
+        ]
+    )
     mode: str = "incremental"  # incremental or full
     days_back: int = 90  # For full sync
     rate_limit_delay: float = 0.5  # Seconds between API calls
@@ -47,6 +52,7 @@ class SyncConfig:
 @dataclass
 class LoggingConfig:
     """Logging configuration."""
+
     level: str = "INFO"
     log_dir: Path = field(default_factory=lambda: Path("logs"))
     log_to_console: bool = True
@@ -56,6 +62,7 @@ class LoggingConfig:
 @dataclass
 class Config:
     """Main application configuration."""
+
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
     garmin: GarminConfig = field(default_factory=GarminConfig)
     sync: SyncConfig = field(default_factory=SyncConfig)
@@ -94,7 +101,9 @@ class Config:
         database = DatabaseConfig(
             host=cls._get_env_or_key(db_data, "host", "POSTGRES_HOST", "localhost"),
             port=int(cls._get_env_or_key(db_data, "port", "POSTGRES_PORT", 5432)),
-            database=cls._get_env_or_key(db_data, "database", "POSTGRES_DB", "garmin_connect"),
+            database=cls._get_env_or_key(
+                db_data, "database", "POSTGRES_DB", "garmin_connect"
+            ),
             user=cls._get_env_or_key(db_data, "user", "POSTGRES_USER", "garmin"),
             password=cls._get_env_or_key(db_data, "password", "POSTGRES_PASSWORD", ""),
             pool_min_size=db_data.get("pool_min_size", 1),
@@ -107,13 +116,17 @@ class Config:
             garmin_data,
             "tokens_dir",
             "GARMIN_TOKENS_DIR",
-            str(Path.home() / ".garminconnect")
+            str(Path.home() / ".garminconnect"),
         )
         garmin = GarminConfig(
             tokens_dir=Path(tokens_dir_str).expanduser(),
             email=cls._get_env_or_key(garmin_data, "email", "GARMIN_EMAIL", None),
-            password=cls._get_env_or_key(garmin_data, "password", "GARMIN_PASSWORD", None),
-            token_key=cls._get_env_or_key(garmin_data, "token_key", "GARMIN_TOKEN_KEY", None),
+            password=cls._get_env_or_key(
+                garmin_data, "password", "GARMIN_PASSWORD", None
+            ),
+            token_key=cls._get_env_or_key(
+                garmin_data, "token_key", "GARMIN_TOKEN_KEY", None
+            ),
         )
 
         # Sync config
@@ -143,10 +156,7 @@ class Config:
 
     @staticmethod
     def _get_env_or_key(
-        data: Dict[str, Any],
-        key: str,
-        env_var: str,
-        default: Any = None
+        data: Dict[str, Any], key: str, env_var: str, default: Any = None
     ) -> Any:
         """Get value from environment variable or dict key.
 

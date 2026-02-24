@@ -1,7 +1,7 @@
 """Database operations with asyncpg."""
 
 import logging
-from datetime import date, datetime
+from datetime import date
 from typing import Optional, Dict, Any, List
 from contextlib import asynccontextmanager
 
@@ -37,7 +37,9 @@ class Database:
                 max_size=self.config.pool_max_size,
                 command_timeout=60,
             )
-            logger.info(f"Connected to database: {self.config.host}:{self.config.port}/{self.config.database}")
+            logger.info(
+                f"Connected to database: {self.config.host}:{self.config.port}/{self.config.database}"
+            )
         except Exception as e:
             logger.error(f"Failed to connect to database: {e}")
             raise
@@ -87,7 +89,9 @@ class Database:
         user_id = await self.pool.fetchval(query, garmin_user_id, display_name, email)
         return user_id
 
-    async def get_user_by_better_auth_id(self, better_auth_user_id: str) -> Optional[int]:
+    async def get_user_by_better_auth_id(
+        self, better_auth_user_id: str
+    ) -> Optional[int]:
         """Get garmin user_id by Better-Auth user ID."""
         return await self.pool.fetchval(
             "SELECT user_id FROM garmin_user WHERE better_auth_user_id = $1",
@@ -124,9 +128,11 @@ class Database:
                 # Clear stale link on OTHER garmin_user rows to avoid UNIQUE violation
                 await conn.execute(
                     "UPDATE garmin_user SET better_auth_user_id = NULL WHERE better_auth_user_id = $1 AND garmin_user_id != $2",
-                    better_auth_user_id, garmin_user_id,
+                    better_auth_user_id,
+                    garmin_user_id,
                 )
-                return await conn.fetchval("""
+                return await conn.fetchval(
+                    """
                     INSERT INTO garmin_user (garmin_user_id, better_auth_user_id, display_name, email)
                     VALUES ($1, $2, $3, $4)
                     ON CONFLICT (garmin_user_id) DO UPDATE
@@ -135,13 +141,21 @@ class Database:
                         email = COALESCE(EXCLUDED.email, garmin_user.email),
                         updated_at = CURRENT_TIMESTAMP
                     RETURNING user_id
-                """, garmin_user_id, better_auth_user_id, display_name, email)
+                """,
+                    garmin_user_id,
+                    better_auth_user_id,
+                    display_name,
+                    email,
+                )
 
-    async def store_encrypted_tokens(self, user_id: int, encrypted_tokens: bytes) -> None:
+    async def store_encrypted_tokens(
+        self, user_id: int, encrypted_tokens: bytes
+    ) -> None:
         """Store encrypted Garmin tokens for a user."""
         await self.pool.execute(
             "UPDATE garmin_user SET encrypted_tokens = $1, tokens_updated_at = CURRENT_TIMESTAMP WHERE user_id = $2",
-            encrypted_tokens, user_id,
+            encrypted_tokens,
+            user_id,
         )
 
     async def get_encrypted_tokens(self, user_id: int) -> Optional[bytes]:
@@ -187,7 +201,8 @@ class Database:
         """
         await self.pool.execute(
             "UPDATE garmin_user SET manual_vma = $1 WHERE user_id = $2",
-            vma, user_id,
+            vma,
+            user_id,
         )
 
     async def get_latest_vo2max_running(self, user_id: int) -> Optional[float]:
@@ -223,7 +238,9 @@ class Database:
     # Sync State Operations
     # ============================================
 
-    async def get_last_sync_date(self, category: str, user_id: Optional[int] = None) -> Optional[date]:
+    async def get_last_sync_date(
+        self, category: str, user_id: Optional[int] = None
+    ) -> Optional[date]:
         """Get last sync date for a category.
 
         Args:
@@ -269,7 +286,15 @@ class Database:
                     sync_status = EXCLUDED.sync_status,
                     error_message = EXCLUDED.error_message
             """
-            await self.pool.execute(query, user_id, category, last_sync_date, records_synced, sync_status, error_message)
+            await self.pool.execute(
+                query,
+                user_id,
+                category,
+                last_sync_date,
+                records_synced,
+                sync_status,
+                error_message,
+            )
         else:
             query = """
                 INSERT INTO sync_state (category, last_sync_date, last_sync_timestamp, records_synced, sync_status, error_message)
@@ -281,8 +306,17 @@ class Database:
                     sync_status = EXCLUDED.sync_status,
                     error_message = EXCLUDED.error_message
             """
-            await self.pool.execute(query, category, last_sync_date, records_synced, sync_status, error_message)
-        logger.info(f"Updated sync state for {category}: {last_sync_date}, {records_synced} records")
+            await self.pool.execute(
+                query,
+                category,
+                last_sync_date,
+                records_synced,
+                sync_status,
+                error_message,
+            )
+        logger.info(
+            f"Updated sync state for {category}: {last_sync_date}, {records_synced} records"
+        )
 
     # ============================================
     # Daily Health Data Operations
@@ -364,7 +398,9 @@ class Database:
             data.get("stress_qualifier"),
         )
 
-    async def upsert_heart_rate_samples(self, user_id: int, samples: List[Dict[str, Any]]) -> int:
+    async def upsert_heart_rate_samples(
+        self, user_id: int, samples: List[Dict[str, Any]]
+    ) -> int:
         """Batch upsert heart rate samples.
 
         Args:
@@ -674,7 +710,9 @@ class Database:
             data.get("avg_sleep_respiration_rate"),
         )
 
-    async def upsert_training_readiness(self, user_id: int, data: Dict[str, Any]) -> None:
+    async def upsert_training_readiness(
+        self, user_id: int, data: Dict[str, Any]
+    ) -> None:
         """Upsert training readiness data."""
         query = """
             INSERT INTO training_readiness (
@@ -777,20 +815,65 @@ class Database:
                 activity_data = EXCLUDED.activity_data,
                 updated_at = CURRENT_TIMESTAMP
         """
-        await self.pool.execute(query, user_id, *[data.get(k) for k in [
-            "activity_id", "activity_name", "activity_type", "sport_type", "start_timestamp",
-            "duration_seconds", "distance_meters", "average_speed", "max_speed", "average_pace", "max_pace",
-            "calories", "average_hr", "max_hr", "average_running_cadence", "max_running_cadence",
-            "average_bike_cadence", "max_bike_cadence", "average_power", "max_power", "normalized_power",
-            "training_stress_score", "intensity_factor", "elevation_gain_meters", "elevation_loss_meters",
-            "min_elevation_meters", "max_elevation_meters", "average_temperature", "max_temperature", "min_temperature",
-            "training_effect", "aerobic_training_effect", "anaerobic_training_effect",
-            "avg_vertical_oscillation", "avg_ground_contact_time", "avg_stride_length",
-            "vo2_max_value", "lactate_threshold_bpm", "device_name", "description",
-            "manual_activity", "pr", "favorite", "auto_calc_calories", "num_laps", "activity_data"
-        ]])
+        await self.pool.execute(
+            query,
+            user_id,
+            *[
+                data.get(k)
+                for k in [
+                    "activity_id",
+                    "activity_name",
+                    "activity_type",
+                    "sport_type",
+                    "start_timestamp",
+                    "duration_seconds",
+                    "distance_meters",
+                    "average_speed",
+                    "max_speed",
+                    "average_pace",
+                    "max_pace",
+                    "calories",
+                    "average_hr",
+                    "max_hr",
+                    "average_running_cadence",
+                    "max_running_cadence",
+                    "average_bike_cadence",
+                    "max_bike_cadence",
+                    "average_power",
+                    "max_power",
+                    "normalized_power",
+                    "training_stress_score",
+                    "intensity_factor",
+                    "elevation_gain_meters",
+                    "elevation_loss_meters",
+                    "min_elevation_meters",
+                    "max_elevation_meters",
+                    "average_temperature",
+                    "max_temperature",
+                    "min_temperature",
+                    "training_effect",
+                    "aerobic_training_effect",
+                    "anaerobic_training_effect",
+                    "avg_vertical_oscillation",
+                    "avg_ground_contact_time",
+                    "avg_stride_length",
+                    "vo2_max_value",
+                    "lactate_threshold_bpm",
+                    "device_name",
+                    "description",
+                    "manual_activity",
+                    "pr",
+                    "favorite",
+                    "auto_calc_calories",
+                    "num_laps",
+                    "activity_data",
+                ]
+            ],
+        )
 
-    async def upsert_activity_splits(self, activity_id: int, splits: List[Dict[str, Any]]) -> int:
+    async def upsert_activity_splits(
+        self, activity_id: int, splits: List[Dict[str, Any]]
+    ) -> int:
         """Upsert activity splits/laps.
 
         Args:
@@ -846,11 +929,15 @@ class Database:
         await self.pool.executemany(query, records)
         return len(records)
 
-    async def get_activity_ids_for_range(self, user_id: int, start_date: date, end_date: date) -> List[int]:
+    async def get_activity_ids_for_range(
+        self, user_id: int, start_date: date, end_date: date
+    ) -> List[int]:
         """Get all activity_ids in DB for a user within a date range."""
         rows = await self.pool.fetch(
             "SELECT activity_id FROM activities WHERE user_id=$1 AND start_timestamp::date BETWEEN $2 AND $3",
-            user_id, start_date, end_date,
+            user_id,
+            start_date,
+            end_date,
         )
         return [r["activity_id"] for r in rows]
 
@@ -861,11 +948,13 @@ class Database:
         await self.pool.execute(
             "DELETE FROM activity_splits WHERE activity_id = ANY($1::bigint[]) "
             "AND activity_id IN (SELECT activity_id FROM activities WHERE user_id = $2)",
-            activity_ids, user_id,
+            activity_ids,
+            user_id,
         )
         result = await self.pool.execute(
             "DELETE FROM activities WHERE activity_id = ANY($1::bigint[]) AND user_id = $2",
-            activity_ids, user_id,
+            activity_ids,
+            user_id,
         )
         # result is like "DELETE 3"
         count = int(result.split()[-1]) if result else 0
@@ -899,10 +988,17 @@ class Database:
 
     async def query_first_user(self) -> Optional[int]:
         """Return the user_id of the first user (single-user setup)."""
-        return await self.pool.fetchval("SELECT user_id FROM garmin_user ORDER BY user_id LIMIT 1")
+        return await self.pool.fetchval(
+            "SELECT user_id FROM garmin_user ORDER BY user_id LIMIT 1"
+        )
 
     async def query_daily_summaries(
-        self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
+        self,
+        user_id: int,
+        start_date: date,
+        end_date: date,
+        limit: int = 50,
+        offset: int = 0,
     ):
         """Query daily summaries for a user within a date range.
 
@@ -918,17 +1014,28 @@ class Database:
         """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM daily_summary WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
-            user_id, start_date, end_date,
+            user_id,
+            start_date,
+            end_date,
         )
         rows = await self.pool.fetch(
             "SELECT * FROM daily_summary WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3"
             " ORDER BY calendar_date DESC LIMIT $4 OFFSET $5",
-            user_id, start_date, end_date, limit, offset,
+            user_id,
+            start_date,
+            end_date,
+            limit,
+            offset,
         )
         return rows, total
 
     async def query_heart_rate_samples(
-        self, user_id: int, start_date: date, end_date: date, limit: int = 1000, offset: int = 0
+        self,
+        user_id: int,
+        start_date: date,
+        end_date: date,
+        limit: int = 1000,
+        offset: int = 0,
     ):
         """Query heart rate samples for a user within a date range.
 
@@ -944,17 +1051,28 @@ class Database:
         """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM heart_rate_samples WHERE user_id=$1 AND timestamp::date BETWEEN $2 AND $3",
-            user_id, start_date, end_date,
+            user_id,
+            start_date,
+            end_date,
         )
         rows = await self.pool.fetch(
             "SELECT * FROM heart_rate_samples WHERE user_id=$1 AND timestamp::date BETWEEN $2 AND $3"
             " ORDER BY timestamp DESC LIMIT $4 OFFSET $5",
-            user_id, start_date, end_date, limit, offset,
+            user_id,
+            start_date,
+            end_date,
+            limit,
+            offset,
         )
         return rows, total
 
     async def query_sleep_data(
-        self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
+        self,
+        user_id: int,
+        start_date: date,
+        end_date: date,
+        limit: int = 50,
+        offset: int = 0,
     ):
         """Query sleep data for a user within a date range.
 
@@ -970,17 +1088,28 @@ class Database:
         """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM sleep_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
-            user_id, start_date, end_date,
+            user_id,
+            start_date,
+            end_date,
         )
         rows = await self.pool.fetch(
             "SELECT * FROM sleep_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3"
             " ORDER BY calendar_date DESC LIMIT $4 OFFSET $5",
-            user_id, start_date, end_date, limit, offset,
+            user_id,
+            start_date,
+            end_date,
+            limit,
+            offset,
         )
         return rows, total
 
     async def query_stress_data(
-        self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
+        self,
+        user_id: int,
+        start_date: date,
+        end_date: date,
+        limit: int = 50,
+        offset: int = 0,
     ):
         """Query stress data for a user within a date range.
 
@@ -996,17 +1125,28 @@ class Database:
         """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM stress_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
-            user_id, start_date, end_date,
+            user_id,
+            start_date,
+            end_date,
         )
         rows = await self.pool.fetch(
             "SELECT * FROM stress_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3"
             " ORDER BY calendar_date DESC LIMIT $4 OFFSET $5",
-            user_id, start_date, end_date, limit, offset,
+            user_id,
+            start_date,
+            end_date,
+            limit,
+            offset,
         )
         return rows, total
 
     async def query_body_battery(
-        self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
+        self,
+        user_id: int,
+        start_date: date,
+        end_date: date,
+        limit: int = 50,
+        offset: int = 0,
     ):
         """Query body battery data for a user within a date range.
 
@@ -1022,17 +1162,28 @@ class Database:
         """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM body_battery WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
-            user_id, start_date, end_date,
+            user_id,
+            start_date,
+            end_date,
         )
         rows = await self.pool.fetch(
             "SELECT * FROM body_battery WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3"
             " ORDER BY calendar_date DESC LIMIT $4 OFFSET $5",
-            user_id, start_date, end_date, limit, offset,
+            user_id,
+            start_date,
+            end_date,
+            limit,
+            offset,
         )
         return rows, total
 
     async def query_body_composition(
-        self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
+        self,
+        user_id: int,
+        start_date: date,
+        end_date: date,
+        limit: int = 50,
+        offset: int = 0,
     ):
         """Query body composition data for a user within a date range.
 
@@ -1048,17 +1199,28 @@ class Database:
         """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM body_composition WHERE user_id=$1 AND timestamp::date BETWEEN $2 AND $3",
-            user_id, start_date, end_date,
+            user_id,
+            start_date,
+            end_date,
         )
         rows = await self.pool.fetch(
             "SELECT * FROM body_composition WHERE user_id=$1 AND timestamp::date BETWEEN $2 AND $3"
             " ORDER BY timestamp DESC LIMIT $4 OFFSET $5",
-            user_id, start_date, end_date, limit, offset,
+            user_id,
+            start_date,
+            end_date,
+            limit,
+            offset,
         )
         return rows, total
 
     async def query_hrv_data(
-        self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
+        self,
+        user_id: int,
+        start_date: date,
+        end_date: date,
+        limit: int = 50,
+        offset: int = 0,
     ):
         """Query HRV data for a user within a date range.
 
@@ -1074,17 +1236,28 @@ class Database:
         """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM hrv_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
-            user_id, start_date, end_date,
+            user_id,
+            start_date,
+            end_date,
         )
         rows = await self.pool.fetch(
             "SELECT * FROM hrv_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3"
             " ORDER BY calendar_date DESC LIMIT $4 OFFSET $5",
-            user_id, start_date, end_date, limit, offset,
+            user_id,
+            start_date,
+            end_date,
+            limit,
+            offset,
         )
         return rows, total
 
     async def query_spo2_data(
-        self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
+        self,
+        user_id: int,
+        start_date: date,
+        end_date: date,
+        limit: int = 50,
+        offset: int = 0,
     ):
         """Query SpO2 data for a user within a date range.
 
@@ -1100,17 +1273,28 @@ class Database:
         """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM spo2_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
-            user_id, start_date, end_date,
+            user_id,
+            start_date,
+            end_date,
         )
         rows = await self.pool.fetch(
             "SELECT * FROM spo2_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3"
             " ORDER BY calendar_date DESC LIMIT $4 OFFSET $5",
-            user_id, start_date, end_date, limit, offset,
+            user_id,
+            start_date,
+            end_date,
+            limit,
+            offset,
         )
         return rows, total
 
     async def query_fitness_metrics(
-        self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
+        self,
+        user_id: int,
+        start_date: date,
+        end_date: date,
+        limit: int = 50,
+        offset: int = 0,
     ):
         """Query fitness metrics for a user within a date range.
 
@@ -1126,17 +1310,28 @@ class Database:
         """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM fitness_metrics WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
-            user_id, start_date, end_date,
+            user_id,
+            start_date,
+            end_date,
         )
         rows = await self.pool.fetch(
             "SELECT * FROM fitness_metrics WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3"
             " ORDER BY calendar_date DESC LIMIT $4 OFFSET $5",
-            user_id, start_date, end_date, limit, offset,
+            user_id,
+            start_date,
+            end_date,
+            limit,
+            offset,
         )
         return rows, total
 
     async def query_respiration_data(
-        self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
+        self,
+        user_id: int,
+        start_date: date,
+        end_date: date,
+        limit: int = 50,
+        offset: int = 0,
     ):
         """Query respiration data for a user within a date range.
 
@@ -1152,17 +1347,28 @@ class Database:
         """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM respiration_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
-            user_id, start_date, end_date,
+            user_id,
+            start_date,
+            end_date,
         )
         rows = await self.pool.fetch(
             "SELECT * FROM respiration_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3"
             " ORDER BY calendar_date DESC LIMIT $4 OFFSET $5",
-            user_id, start_date, end_date, limit, offset,
+            user_id,
+            start_date,
+            end_date,
+            limit,
+            offset,
         )
         return rows, total
 
     async def query_training_readiness(
-        self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
+        self,
+        user_id: int,
+        start_date: date,
+        end_date: date,
+        limit: int = 50,
+        offset: int = 0,
     ):
         """Query training readiness data for a user within a date range.
 
@@ -1178,12 +1384,18 @@ class Database:
         """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM training_readiness WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
-            user_id, start_date, end_date,
+            user_id,
+            start_date,
+            end_date,
         )
         rows = await self.pool.fetch(
             "SELECT * FROM training_readiness WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3"
             " ORDER BY calendar_date DESC LIMIT $4 OFFSET $5",
-            user_id, start_date, end_date, limit, offset,
+            user_id,
+            start_date,
+            end_date,
+            limit,
+            offset,
         )
         return rows, total
 
@@ -1219,16 +1431,20 @@ class Database:
         if activity_type:
             params.append(activity_type)
             filters += f" AND activity_type=${len(params)}"
-        total = await self.pool.fetchval(f"SELECT COUNT(*) FROM activities WHERE {filters}", *params)
+        total = await self.pool.fetchval(
+            f"SELECT COUNT(*) FROM activities WHERE {filters}", *params
+        )
         params += [limit, offset]
         rows = await self.pool.fetch(
             f"SELECT * FROM activities WHERE {filters}"
-            f" ORDER BY start_timestamp DESC LIMIT ${len(params)-1} OFFSET ${len(params)}",
+            f" ORDER BY start_timestamp DESC LIMIT ${len(params) - 1} OFFSET ${len(params)}",
             *params,
         )
         return rows, total
 
-    async def query_activity_by_id(self, activity_id: int, user_id: Optional[int] = None):
+    async def query_activity_by_id(
+        self, activity_id: int, user_id: Optional[int] = None
+    ):
         """Query a single activity by ID.
 
         Args:
@@ -1240,13 +1456,17 @@ class Database:
         """
         if user_id is not None:
             return await self.pool.fetchrow(
-                "SELECT * FROM activities WHERE activity_id=$1 AND user_id=$2", activity_id, user_id
+                "SELECT * FROM activities WHERE activity_id=$1 AND user_id=$2",
+                activity_id,
+                user_id,
             )
         return await self.pool.fetchrow(
             "SELECT * FROM activities WHERE activity_id=$1", activity_id
         )
 
-    async def query_activity_splits(self, activity_id: int, user_id: Optional[int] = None):
+    async def query_activity_splits(
+        self, activity_id: int, user_id: Optional[int] = None
+    ):
         """Query activity splits/laps by activity ID.
 
         Args:
@@ -1259,7 +1479,9 @@ class Database:
         if user_id is not None:
             # Verify the activity belongs to the user before returning splits
             activity = await self.pool.fetchval(
-                "SELECT activity_id FROM activities WHERE activity_id=$1 AND user_id=$2", activity_id, user_id
+                "SELECT activity_id FROM activities WHERE activity_id=$1 AND user_id=$2",
+                activity_id,
+                user_id,
             )
             if activity is None:
                 return []
@@ -1269,7 +1491,12 @@ class Database:
         )
 
     async def query_hydration_data(
-        self, user_id: int, start_date: date, end_date: date, limit: int = 50, offset: int = 0
+        self,
+        user_id: int,
+        start_date: date,
+        end_date: date,
+        limit: int = 50,
+        offset: int = 0,
     ):
         """Query hydration data for a user within a date range.
 
@@ -1285,16 +1512,27 @@ class Database:
         """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM hydration_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3",
-            user_id, start_date, end_date,
+            user_id,
+            start_date,
+            end_date,
         )
         rows = await self.pool.fetch(
             "SELECT * FROM hydration_data WHERE user_id=$1 AND calendar_date BETWEEN $2 AND $3"
             " ORDER BY calendar_date DESC LIMIT $4 OFFSET $5",
-            user_id, start_date, end_date, limit, offset,
+            user_id,
+            start_date,
+            end_date,
+            limit,
+            offset,
         )
         return rows, total
 
-    async def update_activity_custom_name(self, activity_id: int, custom_name: Optional[str], user_id: Optional[int] = None) -> bool:
+    async def update_activity_custom_name(
+        self,
+        activity_id: int,
+        custom_name: Optional[str],
+        user_id: Optional[int] = None,
+    ) -> bool:
         """Update the custom_name of an activity.
 
         Returns True if the activity was found and updated.
@@ -1302,12 +1540,15 @@ class Database:
         if user_id is not None:
             result = await self.pool.execute(
                 "UPDATE activities SET custom_name = $1 WHERE activity_id = $2 AND user_id = $3",
-                custom_name, activity_id, user_id,
+                custom_name,
+                activity_id,
+                user_id,
             )
         else:
             result = await self.pool.execute(
                 "UPDATE activities SET custom_name = $1 WHERE activity_id = $2",
-                custom_name, activity_id,
+                custom_name,
+                activity_id,
             )
         return result == "UPDATE 1"
 
@@ -1315,7 +1556,9 @@ class Database:
     # Planned Workout Operations
     # ============================================
 
-    async def create_planned_workout(self, user_id: int, data: Dict[str, Any]) -> Dict[str, Any]:
+    async def create_planned_workout(
+        self, user_id: int, data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Create a new planned workout.
 
         Args:
@@ -1335,10 +1578,15 @@ class Database:
             RETURNING *
         """
         row = await self.pool.fetchrow(
-            query, user_id,
-            data["planned_date"], data["sport_type"], data["title"],
-            data.get("description"), data.get("planned_duration_seconds"),
-            data.get("planned_distance_meters"), data.get("intensity", "moderate"),
+            query,
+            user_id,
+            data["planned_date"],
+            data["sport_type"],
+            data["title"],
+            data.get("description"),
+            data.get("planned_duration_seconds"),
+            data.get("planned_distance_meters"),
+            data.get("intensity", "moderate"),
             data.get("created_by_user_id"),
         )
         return dict(row)
@@ -1357,9 +1605,14 @@ class Database:
             Updated workout row as dict, or None if not found.
         """
         allowed = {
-            "planned_date", "sport_type", "title", "description",
-            "planned_duration_seconds", "planned_distance_meters",
-            "intensity", "completed",
+            "planned_date",
+            "sport_type",
+            "title",
+            "description",
+            "planned_duration_seconds",
+            "planned_distance_meters",
+            "intensity",
+            "completed",
         }
         updates = {k: v for k, v in data.items() if k in allowed and v is not None}
         if not updates:
@@ -1374,7 +1627,7 @@ class Database:
         idx = len(params) + 1
         params.extend([workout_id, user_id])
         query = f"""
-            UPDATE planned_workouts SET {', '.join(set_clauses)}
+            UPDATE planned_workouts SET {", ".join(set_clauses)}
             WHERE id = ${idx} AND user_id = ${idx + 1}
             RETURNING *
         """
@@ -1385,11 +1638,14 @@ class Database:
         """Delete a planned workout by ID and user_id. Returns True if deleted."""
         result = await self.pool.execute(
             "DELETE FROM planned_workouts WHERE id = $1 AND user_id = $2",
-            workout_id, user_id,
+            workout_id,
+            user_id,
         )
         return result == "DELETE 1"
 
-    async def get_planned_workout(self, workout_id: int, user_id: int) -> Optional[Dict[str, Any]]:
+    async def get_planned_workout(
+        self, workout_id: int, user_id: int
+    ) -> Optional[Dict[str, Any]]:
         """Get a single planned workout by ID.
 
         Args:
@@ -1401,13 +1657,18 @@ class Database:
         """
         row = await self.pool.fetchrow(
             "SELECT * FROM planned_workouts WHERE id = $1 AND user_id = $2",
-            workout_id, user_id,
+            workout_id,
+            user_id,
         )
         return dict(row) if row else None
 
     async def query_planned_workouts(
-        self, user_id: int, start_date: date, end_date: date,
-        limit: int = 200, offset: int = 0,
+        self,
+        user_id: int,
+        start_date: date,
+        end_date: date,
+        limit: int = 200,
+        offset: int = 0,
     ):
         """Query planned workouts for a user within a date range.
 
@@ -1423,16 +1684,27 @@ class Database:
         """
         total = await self.pool.fetchval(
             "SELECT COUNT(*) FROM planned_workouts WHERE user_id=$1 AND planned_date BETWEEN $2 AND $3",
-            user_id, start_date, end_date,
+            user_id,
+            start_date,
+            end_date,
         )
         rows = await self.pool.fetch(
             "SELECT * FROM planned_workouts WHERE user_id=$1 AND planned_date BETWEEN $2 AND $3"
             " ORDER BY planned_date ASC, id ASC LIMIT $4 OFFSET $5",
-            user_id, start_date, end_date, limit, offset,
+            user_id,
+            start_date,
+            end_date,
+            limit,
+            offset,
         )
         return rows, total
 
-    async def bulk_create_planned_workouts(self, user_id: int, workouts: List[Dict[str, Any]], created_by_user_id: Optional[str] = None) -> int:
+    async def bulk_create_planned_workouts(
+        self,
+        user_id: int,
+        workouts: List[Dict[str, Any]],
+        created_by_user_id: Optional[str] = None,
+    ) -> int:
         """Bulk create planned workouts from a list.
 
         Args:
@@ -1456,9 +1728,13 @@ class Database:
         records = [
             (
                 user_id,
-                w["planned_date"], w["sport_type"], w["title"],
-                w.get("description"), w.get("planned_duration_seconds"),
-                w.get("planned_distance_meters"), w.get("intensity", "moderate"),
+                w["planned_date"],
+                w["sport_type"],
+                w["title"],
+                w.get("description"),
+                w.get("planned_duration_seconds"),
+                w.get("planned_distance_meters"),
+                w.get("intensity", "moderate"),
                 created_by_user_id,
             )
             for w in workouts
@@ -1470,7 +1746,9 @@ class Database:
     # Coaching Operations
     # ============================================
 
-    async def get_athletes_for_coach(self, coach_better_auth_id: str) -> List[Dict[str, Any]]:
+    async def get_athletes_for_coach(
+        self, coach_better_auth_id: str
+    ) -> List[Dict[str, Any]]:
         """Get all active athletes linked to a coach.
 
         Args:
@@ -1479,16 +1757,21 @@ class Database:
         Returns:
             List of athlete dicts with athlete_user_id, display_name, email, status, linked_at.
         """
-        rows = await self.pool.fetch("""
+        rows = await self.pool.fetch(
+            """
             SELECT ca.athlete_user_id, gu.display_name, gu.email, ca.status, ca.linked_at
             FROM coach_athletes ca
             JOIN garmin_user gu ON gu.user_id = ca.athlete_user_id
             WHERE ca.coach_better_auth_id = $1 AND ca.status = 'active'
             ORDER BY ca.linked_at DESC
-        """, coach_better_auth_id)
+        """,
+            coach_better_auth_id,
+        )
         return [dict(r) for r in rows]
 
-    async def get_coaches_for_athlete(self, athlete_user_id: int) -> List[Dict[str, Any]]:
+    async def get_coaches_for_athlete(
+        self, athlete_user_id: int
+    ) -> List[Dict[str, Any]]:
         """Get all active coaches linked to an athlete.
 
         Args:
@@ -1497,17 +1780,22 @@ class Database:
         Returns:
             List of coach dicts with coach_better_auth_id, coach_name, coach_email, status, linked_at.
         """
-        rows = await self.pool.fetch("""
+        rows = await self.pool.fetch(
+            """
             SELECT ca.coach_better_auth_id, u.name AS coach_name, u.email AS coach_email,
                    ca.status, ca.linked_at
             FROM coach_athletes ca
             LEFT JOIN "User" u ON u.id = ca.coach_better_auth_id
             WHERE ca.athlete_user_id = $1 AND ca.status = 'active'
             ORDER BY ca.linked_at DESC
-        """, athlete_user_id)
+        """,
+            athlete_user_id,
+        )
         return [dict(r) for r in rows]
 
-    async def is_coach_of_athlete(self, coach_better_auth_id: str, athlete_user_id: int) -> bool:
+    async def is_coach_of_athlete(
+        self, coach_better_auth_id: str, athlete_user_id: int
+    ) -> bool:
         """Check if a coach is actively linked to an athlete.
 
         Args:
@@ -1517,23 +1805,35 @@ class Database:
         Returns:
             True if actively linked, False otherwise.
         """
-        result = await self.pool.fetchval("""
+        result = await self.pool.fetchval(
+            """
             SELECT EXISTS(
                 SELECT 1 FROM coach_athletes
                 WHERE coach_better_auth_id = $1 AND athlete_user_id = $2 AND status = 'active'
             )
-        """, coach_better_auth_id, athlete_user_id)
+        """,
+            coach_better_auth_id,
+            athlete_user_id,
+        )
         return result
 
-    async def unlink_coach_athlete(self, coach_better_auth_id: str, athlete_user_id: int) -> bool:
+    async def unlink_coach_athlete(
+        self, coach_better_auth_id: str, athlete_user_id: int
+    ) -> bool:
         """Unlink a coach-athlete relationship. Returns True if updated."""
-        result = await self.pool.execute("""
+        result = await self.pool.execute(
+            """
             UPDATE coach_athletes SET status = 'removed', removed_at = CURRENT_TIMESTAMP
             WHERE coach_better_auth_id = $1 AND athlete_user_id = $2 AND status = 'active'
-        """, coach_better_auth_id, athlete_user_id)
+        """,
+            coach_better_auth_id,
+            athlete_user_id,
+        )
         return result == "UPDATE 1"
 
-    async def create_invite_code(self, coach_better_auth_id: str, code: str) -> Dict[str, Any]:
+    async def create_invite_code(
+        self, coach_better_auth_id: str, code: str
+    ) -> Dict[str, Any]:
         """Create a new invite code for a coach.
 
         Args:
@@ -1543,14 +1843,20 @@ class Database:
         Returns:
             Created invite code row as dict.
         """
-        row = await self.pool.fetchrow("""
+        row = await self.pool.fetchrow(
+            """
             INSERT INTO invite_codes (coach_better_auth_id, code)
             VALUES ($1, $2)
             RETURNING *
-        """, coach_better_auth_id, code)
+        """,
+            coach_better_auth_id,
+            code,
+        )
         return dict(row)
 
-    async def get_invite_codes_for_coach(self, coach_better_auth_id: str) -> List[Dict[str, Any]]:
+    async def get_invite_codes_for_coach(
+        self, coach_better_auth_id: str
+    ) -> List[Dict[str, Any]]:
         """Get all invite codes for a coach, ordered by creation date.
 
         Args:
@@ -1559,14 +1865,19 @@ class Database:
         Returns:
             List of invite code rows as dicts.
         """
-        rows = await self.pool.fetch("""
+        rows = await self.pool.fetch(
+            """
             SELECT * FROM invite_codes
             WHERE coach_better_auth_id = $1
             ORDER BY created_at DESC
-        """, coach_better_auth_id)
+        """,
+            coach_better_auth_id,
+        )
         return [dict(r) for r in rows]
 
-    async def redeem_invite_code(self, code: str, athlete_user_id: int) -> Dict[str, Any]:
+    async def redeem_invite_code(
+        self, code: str, athlete_user_id: int
+    ) -> Dict[str, Any]:
         """Redeem an invite code and link coach to athlete.
 
         Args:
@@ -1578,28 +1889,40 @@ class Database:
         """
         async with self.pool.acquire() as conn:
             async with conn.transaction():
-                row = await conn.fetchrow("""
+                row = await conn.fetchrow(
+                    """
                     UPDATE invite_codes
                     SET status = 'redeemed', redeemed_by_user_id = $2, redeemed_at = CURRENT_TIMESTAMP
                     WHERE code = $1 AND status = 'pending' AND expires_at > CURRENT_TIMESTAMP
                     RETURNING *
-                """, code, athlete_user_id)
+                """,
+                    code,
+                    athlete_user_id,
+                )
                 if not row:
                     return None
-                await conn.execute("""
+                await conn.execute(
+                    """
                     INSERT INTO coach_athletes (coach_better_auth_id, athlete_user_id)
                     VALUES ($1, $2)
                     ON CONFLICT (coach_better_auth_id, athlete_user_id) DO UPDATE
                     SET status = 'active', removed_at = NULL, linked_at = CURRENT_TIMESTAMP
-                """, row["coach_better_auth_id"], athlete_user_id)
+                """,
+                    row["coach_better_auth_id"],
+                    athlete_user_id,
+                )
                 return dict(row)
 
     async def revoke_invite_code(self, code: str, coach_better_auth_id: str) -> bool:
         """Revoke a pending invite code. Returns True if revoked."""
-        result = await self.pool.execute("""
+        result = await self.pool.execute(
+            """
             UPDATE invite_codes SET status = 'revoked'
             WHERE code = $1 AND coach_better_auth_id = $2 AND status = 'pending'
-        """, code, coach_better_auth_id)
+        """,
+            code,
+            coach_better_auth_id,
+        )
         return result == "UPDATE 1"
 
     async def enable_coaching(self, better_auth_user_id: str) -> None:
@@ -1630,6 +1953,4 @@ class Database:
             return await self.pool.fetch(
                 "SELECT * FROM sync_state WHERE user_id = $1 ORDER BY category", user_id
             )
-        return await self.pool.fetch(
-            "SELECT * FROM sync_state ORDER BY category"
-        )
+        return await self.pool.fetch("SELECT * FROM sync_state ORDER BY category")

@@ -6,7 +6,11 @@ from ..auth import get_api_key
 from ..dependencies import get_db, get_user_id, date_range, pagination
 from ..schemas import Activity, ActivityDetail, ActivitySplit, ActivityUpdate, make_page
 
-router = APIRouter(prefix="/api/v1/activities", tags=["activities"], dependencies=[Depends(get_api_key)])
+router = APIRouter(
+    prefix="/api/v1/activities",
+    tags=["activities"],
+    dependencies=[Depends(get_api_key)],
+)
 
 
 @router.get("")
@@ -38,7 +42,9 @@ async def get_activity(
     """
     row = await db.query_activity_by_id(activity_id, user_id=user_id)
     if not row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Activity not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Activity not found"
+        )
     return ActivityDetail.model_validate(dict(row))
 
 
@@ -54,9 +60,13 @@ async def update_activity(
     Raises:
         HTTPException: 404 if activity not found.
     """
-    updated = await db.update_activity_custom_name(activity_id, body.custom_name, user_id=user_id)
+    updated = await db.update_activity_custom_name(
+        activity_id, body.custom_name, user_id=user_id
+    )
     if not updated:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Activity not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Activity not found"
+        )
     row = await db.query_activity_by_id(activity_id, user_id=user_id)
     return ActivityDetail.model_validate(dict(row))
 
