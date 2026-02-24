@@ -22,6 +22,7 @@ export function useCoachingStatus() {
     queryKey: ["coaching-status"],
     queryFn: () => coachingFetch<CoachingStatus>("status"),
     retry: false,
+    gcTime: 1000 * 60 * 10, // 10 min
   });
 }
 
@@ -46,6 +47,7 @@ export function useInviteCodes() {
   return useQuery<InviteCode[]>({
     queryKey: ["invite-codes"],
     queryFn: () => coachingFetch<InviteCode[]>("invite-codes"),
+    gcTime: 1000 * 60 * 10, // 10 min
   });
 }
 

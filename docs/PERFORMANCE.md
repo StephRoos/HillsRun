@@ -82,6 +82,8 @@ const Plot = dynamic(() => import("@/lib/plotly"), { ssr: false });
 
 **Strategy**: `staleTime` + manual invalidation after mutations (ADR-004). No polling.
 
+### staleTime
+
 | Query | staleTime | Invalidation trigger |
 |-------|-----------|---------------------|
 | Activities | 1 hour | Sync completion |
@@ -92,9 +94,17 @@ const Plot = dynamic(() => import("@/lib/plotly"), { ssr: false });
 | Sync status | 30 seconds | Manual sync trigger |
 | Coaching status | 5 minutes | Coach action |
 
-**Assessment**: The caching strategy is well-suited to Garmin data (synced hourly at most). No unnecessary re-fetches observed. The `queryKey` includes all relevant params (date range, limit, athlete ID), ensuring correct cache separation for multi-user (coach/athlete) scenarios.
+### gcTime (memory retention after inactive)
 
-**Potential improvement**: Add `gcTime` (formerly `cacheTime`) tuning for large paginated queries. Default is 5 minutes; activity lists with 100+ items could benefit from longer GC time to avoid re-fetching on navigation.
+| Query | gcTime | Rationale |
+|-------|--------|-----------|
+| Activities (list, detail, splits) | 30 minutes | Large paginated responses — avoid re-fetching on navigation |
+| Metric hooks (HRV, sleep, stress, body battery, fitness, body composition, daily summary, training readiness) | 1 hour | Historical data — changes only after sync |
+| VMA | Infinity | Rarely changes — user-set value |
+| Coaching status / invite codes | 10 minutes | Session-scoped data |
+| Sync status | Default (5 min) | Frequently polled, no benefit from longer retention |
+
+**Assessment**: The caching strategy is well-suited to Garmin data (synced hourly at most). No unnecessary re-fetches observed. The `queryKey` includes all relevant params (date range, limit, athlete ID), ensuring correct cache separation for multi-user (coach/athlete) scenarios.
 
 ---
 
@@ -118,7 +128,33 @@ Measured on NAS deployment (UGREEN NAS, ARM64, asyncpg + PostgreSQL):
 
 ---
 
-## 6. Recommendations
+## 6. Cache-Control Strategy
+
+HTTP `Cache-Control` headers are set by `CacheControlMiddleware` in `src/api/middleware.py`.
+
+### Rules
+
+| Endpoint group | Condition | Cache-Control |
+|----------------|-----------|---------------|
+| `/api/v1/daily/*` | `end_date` < today | `public, max-age=86400` (24 h) |
+| `/api/v1/body/*` | `end_date` < today | `public, max-age=86400` (24 h) |
+| `/api/v1/metrics/*` | `end_date` < today | `public, max-age=86400` (24 h) |
+| `/api/v1/activities` | `end_date` < today | `public, max-age=86400` (24 h) |
+| All cacheable endpoints | `end_date` == today or absent | `private, max-age=300` (5 min) |
+| `/api/v1/sync/*` | always | `no-store` |
+| `/api/v1/auth/*` | always | `no-store` |
+| `/api/v1/coaching/*` | always | `no-store` |
+| `/api/v1/nutrition/*` | always | `no-store` |
+
+### Rationale
+
+- **Historical data is immutable**: Garmin data for past dates never changes once synced. `public, max-age=86400` allows Cloudflare Tunnel / CDN edges to cache responses for 24 hours.
+- **Today's data may still be updated**: Sync can run at any time, so current-day data uses a short private cache (5 min).
+- **Sync / auth / coaching must never be cached**: These endpoints reflect mutable or sensitive state.
+
+---
+
+## 7. Recommendations
 
 ### Immediate (low effort)
 
@@ -132,19 +168,21 @@ Measured on NAS deployment (UGREEN NAS, ARM64, asyncpg + PostgreSQL):
 
 4. ~~**Plotly partial import**~~: Done — switched to `plotly.js-basic-dist` (~1.5 MB, down from ~4.4 MB). Error boundaries added on all chart components.
 
-5. **Virtual scrolling for activity list**: If activity lists grow beyond 200 items, consider `@tanstack/react-virtual` for the `/calendar` and `/dashboard` activity lists.
+5. ~~**Edge caching for static metrics**~~: Done — `CacheControlMiddleware` adds `Cache-Control: public, max-age=86400` for historical date queries on all daily/body/metrics/activities endpoints.
 
-6. **API pagination caching**: Consider implementing cursor-based pagination (instead of limit/offset) to enable infinite query cache merging in TanStack Query.
+6. ~~**gcTime tuning for large paginated queries**~~: Done — activity list hooks use 30 min gcTime; metric hooks use 1 hour; VMA uses Infinity; coaching hooks use 10 min.
+
+7. **Virtual scrolling for activity list**: If activity lists grow beyond 200 items, consider `@tanstack/react-virtual` for the `/calendar` and `/dashboard` activity lists.
+
+8. **API pagination caching**: Consider implementing cursor-based pagination (instead of limit/offset) to enable infinite query cache merging in TanStack Query.
 
 ### Long-term (significant effort)
 
-7. **Edge caching for static metrics**: HRV, sleep, and fitness data from previous days never changes. Add `Cache-Control: max-age=86400` headers on FastAPI for historical date queries.
-
-8. **Database connection pooling**: Add PgBouncer between FastAPI and PostgreSQL when scaling beyond 5 concurrent users. Current asyncpg pool (min=1, max=5) is sufficient for single-user.
+9. **Database connection pooling**: Add PgBouncer between FastAPI and PostgreSQL when scaling beyond 5 concurrent users. Current asyncpg pool (min=1, max=5) is sufficient for single-user.
 
 ---
 
-## 7. Build Warnings
+## 8. Build Warnings
 
 | Warning | Severity | Action |
 |---------|----------|--------|
@@ -159,5 +197,9 @@ Measured on NAS deployment (UGREEN NAS, ARM64, asyncpg + PostgreSQL):
 The Plotly bundle has been reduced from ~4.4 MB to ~1.5 MB by switching to `plotly.js-basic-dist`. All chart types used in the app (scatter, bar) are supported by the basic distribution. Plotly remains lazy-loaded (dynamic import, no SSR).
 
 Error boundaries have been added to all chart components (`/trends`, `/activity/[id]`) using React `ErrorBoundary` class components + `React.Suspense` with `ChartSkeleton` fallbacks. Chart rendering failures are now isolated and do not crash the full page.
+
+`Cache-Control` headers are now set by `CacheControlMiddleware` on all data endpoints. Historical queries (end_date before today) return `public, max-age=86400`; current-day queries return `private, max-age=300`; sync/auth/coaching/nutrition return `no-store`.
+
+TanStack Query `gcTime` has been tuned: activity hooks (30 min), metric hooks (1 hour), VMA (Infinity), coaching hooks (10 min). This reduces re-fetches on navigation for large paginated queries.
 
 No critical performance regressions. The app follows all Next.js best practices for a chart-heavy dashboard.

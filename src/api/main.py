@@ -8,6 +8,7 @@ from fastapi import FastAPI
 
 from ..config import DatabaseConfig
 from ..database import Database
+from .middleware import CacheControlMiddleware
 from .routers import (
     health,
     daily,
@@ -79,6 +80,8 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+app.add_middleware(CacheControlMiddleware)
 
 app.include_router(health.router)
 app.include_router(daily.router)

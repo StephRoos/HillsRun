@@ -19,6 +19,7 @@ export function useActivities(params?: {
   return useQuery({
     queryKey: ["activities", queryParams],
     queryFn: () => garminApi.getActivities(queryParams),
+    gcTime: 1000 * 60 * 30, // 30 min — large paginated queries
   });
 }
 
@@ -27,6 +28,7 @@ export function useActivity(id: string) {
     queryKey: ["activity", id],
     queryFn: () => garminApi.getActivity(id),
     enabled: !!id,
+    gcTime: 1000 * 60 * 30, // 30 min — activity detail is historical
   });
 }
 
@@ -35,6 +37,7 @@ export function useActivitySplits(id: string) {
     queryKey: ["activity-splits", id],
     queryFn: () => garminApi.getActivitySplits(id),
     enabled: !!id,
+    gcTime: 1000 * 60 * 30, // 30 min — splits are historical data
   });
 }
 

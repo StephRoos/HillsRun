@@ -6,6 +6,7 @@ export function useVma() {
   return useQuery({
     queryKey: ["vma"],
     queryFn: () => garminApi.getVma(),
+    gcTime: Infinity, // VMA rarely changes — keep in cache indefinitely
   });
 }
 
