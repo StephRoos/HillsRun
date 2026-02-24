@@ -475,6 +475,27 @@ class CoachingStatus(BaseModel):
     coaches: List[CoachInfo] = []
 
 
+class TrainingLoad(BaseModel):
+    """Training load details for a single activity."""
+
+    tss: Optional[float] = None
+    duration_minutes: Optional[int] = None
+    activity_type: Optional[str] = None
+    intensity: Optional[str] = None
+
+
+class NutritionDailyGoal(BaseModel):
+    """Recommended daily calorie intake based on Garmin training data."""
+
+    date: date
+    base_bmr_calories: Optional[int] = None
+    active_calories: Optional[int] = None
+    total_training_calories: Optional[int] = None
+    recommended_daily_intake: Optional[int] = None
+    training_load: Optional[TrainingLoad] = None
+    adjustment_factor: Optional[float] = None
+
+
 def make_page(rows, total: int, limit: int, offset: int, schema_class) -> dict:
     """Build a paginated response dict from DB rows.
 

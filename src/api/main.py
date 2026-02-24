@@ -20,6 +20,7 @@ from .routers import (
     planned_workouts,
     coaching,
     user,
+    nutrition,
 )
 
 logger = logging.getLogger(__name__)
@@ -90,3 +91,4 @@ app.include_router(auth_garmin.router)
 app.include_router(planned_workouts.router)
 app.include_router(coaching.router)
 app.include_router(user.router)
+app.include_router(nutrition.router)

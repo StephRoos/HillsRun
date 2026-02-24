@@ -1940,6 +1940,53 @@ class Database:
         )
         return bool(result)
 
+    async def query_nutrition_goal(
+        self, user_id: int, target_date: date
+    ) -> Optional[Dict[str, Any]]:
+        """Query daily summary and activity data for nutrition goal calculation.
+
+        Fetches BMR and active calories from daily_summary, plus the primary
+        activity of the day (longest by duration) for training load details.
+
+        Args:
+            user_id: User ID.
+            target_date: The date to query.
+
+        Returns:
+            Dict with keys: calendar_date, bmr_calories, active_calories,
+            activity_type, duration_seconds, training_stress_score. Returns
+            None if no daily summary row exists for the given date.
+        """
+        summary_row = await self.pool.fetchrow(
+            "SELECT calendar_date, bmr_calories, active_calories"
+            " FROM daily_summary WHERE user_id = $1 AND calendar_date = $2",
+            user_id,
+            target_date,
+        )
+        if not summary_row:
+            return None
+
+        result: Dict[str, Any] = dict(summary_row)
+
+        activity_row = await self.pool.fetchrow(
+            "SELECT activity_type, duration_seconds, training_stress_score"
+            " FROM activities"
+            " WHERE user_id = $1 AND start_timestamp::date = $2"
+            " ORDER BY duration_seconds DESC NULLS LAST LIMIT 1",
+            user_id,
+            target_date,
+        )
+        if activity_row:
+            result["activity_type"] = activity_row["activity_type"]
+            result["duration_seconds"] = activity_row["duration_seconds"]
+            result["training_stress_score"] = activity_row["training_stress_score"]
+        else:
+            result["activity_type"] = None
+            result["duration_seconds"] = None
+            result["training_stress_score"] = None
+
+        return result
+
     async def query_sync_status(self, user_id: Optional[int] = None):
         """Query sync status for all categories, optionally filtered by user.
 
