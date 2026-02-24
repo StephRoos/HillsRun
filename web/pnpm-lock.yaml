@@ -38,9 +38,9 @@ importers:
       next:
         specifier: 16.1.6
         version: 16.1.6(@babel/core@7.29.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
-      plotly.js:
-        specifier: ^3.3.1
-        version: 3.3.1(mapbox-gl@1.13.3)
+      plotly.js-basic-dist:
+        specifier: ^3.4.0
+        version: 3.4.0
       radix-ui:
         specifier: ^1.4.3
         version: 1.4.3(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -72,6 +72,9 @@ importers:
       '@types/node':
         specifier: ^20
         version: 20.19.33
+      '@types/plotly.js-basic-dist':
+        specifier: ^1.54.4
+        version: 1.54.4
       '@types/react':
         specifier: ^19
         version: 19.2.14
@@ -2196,6 +2199,9 @@ packages:
 
   '@types/pbf@3.0.5':
     resolution: {integrity: sha512-j3pOPiEcWZ34R6a6mN07mUkM4o4Lwf6hPNt8eilOeZhTFbxFXmKhvXl9Y28jotFPaI1bpPDJsbCprUoNke6OrA==}
+
+  '@types/plotly.js-basic-dist@1.54.4':
+    resolution: {integrity: sha512-4Hwb5fB4sa3+SlgIDu4kfnUzhfJO789Drh7w5LvU6VglzYRcziztckvejbsnaP/TTRuiqIzLLRwqoflD6o1mKg==}
 
   '@types/plotly.js@3.0.10':
     resolution: {integrity: sha512-q+MgO4aajC2HrO7FllTYWzrpdfbTjboSMfjkz/aXKjg1v7HNo1zMEFfAW7quKfk6SL+bH74A5ThBEps/7hZxOA==}
@@ -4810,6 +4816,9 @@ packages:
 
   pkg-types@2.3.0:
     resolution: {integrity: sha512-SIqCzDRg0s9npO5XQ3tNZioRY1uK06lA41ynBC1YmFTmnY6FjUjVt6s4LoADmwoig1qqD0oK8h1p/8mlMx8Oig==}
+
+  plotly.js-basic-dist@3.4.0:
+    resolution: {integrity: sha512-55w1KumCZDDRmEM1eArgvZ7ydEuKbsqqS4Sthri7J33bB2RMFkP5zcUngimMqx03F19gLQI5rHcCf6vaf0GgZw==}
 
   plotly.js@3.3.1:
     resolution: {integrity: sha512-SrGSZ02HvCWQIYsbQX4sgjgGo7k4T+Oz8a+RQwE5Caz+yu1vputBM1UThmiOPY51B5HzO9ajym8Rl4pmLj+i9Q==}
@@ -7993,6 +8002,10 @@ snapshots:
 
   '@types/pbf@3.0.5': {}
 
+  '@types/plotly.js-basic-dist@1.54.4':
+    dependencies:
+      '@types/plotly.js': 3.0.10
+
   '@types/plotly.js@3.0.10': {}
 
   '@types/react-dom@19.2.3(@types/react@19.2.14)':
@@ -10800,6 +10813,8 @@ snapshots:
       confbox: 0.2.4
       exsolve: 1.0.8
       pathe: 2.0.3
+
+  plotly.js-basic-dist@3.4.0: {}
 
   plotly.js@3.3.1(mapbox-gl@1.13.3):
     dependencies:

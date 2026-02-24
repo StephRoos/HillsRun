@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { Mountain, Route, Clock, Activity as ActivityIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
+import { ChartErrorFallback } from "@/components/ui/chart-error-fallback";
+import { ChartSkeleton } from "@/components/ui/chart-skeleton";
 import { useTrends, type Period } from "@/hooks/use-trends";
 import { formatDuration, formatDistance, formatElevation } from "@/lib/utils";
 import {
@@ -135,19 +138,51 @@ export default function TrendsPage() {
       {isPending ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-72" />
+            <ChartSkeleton key={i} variant="medium" />
           ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <WeeklyVolumeChart data={weeklyData} average={weeklyAverages.distance} weekTicks={weekTicks} />
-          <WeeklyElevationChart data={weeklyData} average={weeklyAverages.elevationGain} weekTicks={weekTicks} />
-          <Vo2MaxChart data={fitness} startDate={startDate} />
-          <HrvChart data={hrv} startDate={startDate} />
-          <TrainingLoadChart data={readiness} startDate={startDate} />
-          <SleepScoreChart data={sleep} startDate={startDate} />
-          <WeightChart data={weight} startDate={startDate} />
-          <StressChart data={stress} startDate={startDate} />
+          <ErrorBoundary fallback={<ChartErrorFallback />}>
+            <Suspense fallback={<ChartSkeleton variant="medium" />}>
+              <WeeklyVolumeChart data={weeklyData} average={weeklyAverages.distance} weekTicks={weekTicks} />
+            </Suspense>
+          </ErrorBoundary>
+          <ErrorBoundary fallback={<ChartErrorFallback />}>
+            <Suspense fallback={<ChartSkeleton variant="medium" />}>
+              <WeeklyElevationChart data={weeklyData} average={weeklyAverages.elevationGain} weekTicks={weekTicks} />
+            </Suspense>
+          </ErrorBoundary>
+          <ErrorBoundary fallback={<ChartErrorFallback />}>
+            <Suspense fallback={<ChartSkeleton variant="medium" />}>
+              <Vo2MaxChart data={fitness} startDate={startDate} />
+            </Suspense>
+          </ErrorBoundary>
+          <ErrorBoundary fallback={<ChartErrorFallback />}>
+            <Suspense fallback={<ChartSkeleton variant="medium" />}>
+              <HrvChart data={hrv} startDate={startDate} />
+            </Suspense>
+          </ErrorBoundary>
+          <ErrorBoundary fallback={<ChartErrorFallback />}>
+            <Suspense fallback={<ChartSkeleton variant="medium" />}>
+              <TrainingLoadChart data={readiness} startDate={startDate} />
+            </Suspense>
+          </ErrorBoundary>
+          <ErrorBoundary fallback={<ChartErrorFallback />}>
+            <Suspense fallback={<ChartSkeleton variant="medium" />}>
+              <SleepScoreChart data={sleep} startDate={startDate} />
+            </Suspense>
+          </ErrorBoundary>
+          <ErrorBoundary fallback={<ChartErrorFallback />}>
+            <Suspense fallback={<ChartSkeleton variant="medium" />}>
+              <WeightChart data={weight} startDate={startDate} />
+            </Suspense>
+          </ErrorBoundary>
+          <ErrorBoundary fallback={<ChartErrorFallback />}>
+            <Suspense fallback={<ChartSkeleton variant="medium" />}>
+              <StressChart data={stress} startDate={startDate} />
+            </Suspense>
+          </ErrorBoundary>
         </div>
       )}
     </div>

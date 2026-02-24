@@ -12,7 +12,7 @@ import type {
   StressData,
 } from "@/types/garmin";
 
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+const Plot = dynamic(() => import("@/lib/plotly"), { ssr: false });
 
 const LAYOUT_BASE: Record<string, unknown> = {
   paper_bgcolor: "transparent",

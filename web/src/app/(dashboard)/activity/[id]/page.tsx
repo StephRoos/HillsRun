@@ -1,8 +1,11 @@
 "use client";
 
-import { use } from "react";
+import { Suspense, use } from "react";
 import { useActivity, useActivitySplits } from "@/hooks/use-activities";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
+import { ChartErrorFallback } from "@/components/ui/chart-error-fallback";
+import { ChartSkeleton } from "@/components/ui/chart-skeleton";
 import { ActivityHeader } from "@/components/activity/activity-header";
 import { ActivityMetrics } from "@/components/activity/activity-metrics";
 import { SecondaryMetrics } from "@/components/activity/secondary-metrics";
@@ -54,12 +57,26 @@ export default function ActivityPage({
 
       {splits.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <SplitsElevationChart splits={splits} />
-          <SplitsPaceChart splits={splits} />
+          <ErrorBoundary fallback={<ChartErrorFallback />}>
+            <Suspense fallback={<ChartSkeleton variant="small" />}>
+              <SplitsElevationChart splits={splits} />
+            </Suspense>
+          </ErrorBoundary>
+          <ErrorBoundary fallback={<ChartErrorFallback />}>
+            <Suspense fallback={<ChartSkeleton variant="small" />}>
+              <SplitsPaceChart splits={splits} />
+            </Suspense>
+          </ErrorBoundary>
         </div>
       )}
 
-      {splits.length > 0 && <SplitsHrChart splits={splits} />}
+      {splits.length > 0 && (
+        <ErrorBoundary fallback={<ChartErrorFallback />}>
+          <Suspense fallback={<ChartSkeleton variant="small" />}>
+            <SplitsHrChart splits={splits} />
+          </Suspense>
+        </ErrorBoundary>
+      )}
 
       <SplitsTable splits={splits} />
       <SecondaryMetrics activity={activity} />

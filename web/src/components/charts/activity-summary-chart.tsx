@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ActivitySplit } from "@/types/garmin";
 
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+const Plot = dynamic(() => import("@/lib/plotly"), { ssr: false });
 
 const CHART_LAYOUT = {
   paper_bgcolor: "transparent",

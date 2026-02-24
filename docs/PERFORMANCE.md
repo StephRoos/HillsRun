@@ -27,7 +27,7 @@ Route (app)
 
 | Chunk | Size | Contents |
 |-------|------|----------|
-| `3fc5fe80.*.js` | **4.4 MB** | Plotly.js (dominant) |
+| `3fc5fe80.*.js` | **~1.5 MB** | Plotly.js basic-dist (was 4.4 MB with full build) |
 | `4258e3df-*.js` | 196 KB | app-router internals |
 | `5366-*.js` | 192 KB | React + dependencies |
 | `framework-*.js` | 188 KB | Next.js framework |
@@ -36,29 +36,35 @@ Route (app)
 | `polyfills-*.js` | 112 KB | Browser polyfills |
 
 ### Key observation
-The **4.4 MB Plotly chunk** is the dominant cost. This is expected and by design (ADR-005): Plotly.js is loaded dynamically (no SSR), so it is only downloaded when the user visits a chart-heavy page (`/dashboard` or `/trends`).
+The **~1.5 MB Plotly chunk** (down from 4.4 MB) uses `plotly.js-basic-dist` which supports scatter, bar, and pie charts — all chart types used in this app. This is expected and by design (ADR-005): Plotly.js is loaded dynamically (no SSR), so it is only downloaded when the user visits a chart-heavy page (`/trends` or `/activity/[id]`).
 
-Serwist service worker warns: `3fc5fe80.*.js is 4.61 MB, won't be precached` — this is acceptable; Plotly is not precached and will re-download on next visit if evicted from browser cache.
+Serwist service worker no longer warns about the Plotly chunk size exceeding the precache threshold.
 
 ---
 
 ## 2. Plotly.js — Tree-shaking Assessment
 
-**Current implementation**: Dynamic import via `next/dynamic` with `{ ssr: false }`.
+**Current implementation**: Custom Plotly wrapper via `next/dynamic` with `{ ssr: false }`.
 
 ```typescript
-// web/src/components/dashboard/trend-charts.tsx
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+// web/src/lib/plotly.ts
+import Plotly from "plotly.js-basic-dist";
+import createPlotlyComponent from "react-plotly.js/factory";
+const Plot = createPlotlyComponent(Plotly);
+export default Plot;
+
+// Usage in chart components:
+const Plot = dynamic(() => import("@/lib/plotly"), { ssr: false });
 ```
 
-**Tree-shaking status**: Plotly.js does NOT support tree-shaking. The full library (~4.5 MB) is always bundled. This is a known limitation of `plotly.js` (it registers all chart types at import time).
+**Tree-shaking status**: Plotly.js does NOT support tree-shaking. `plotly.js-basic-dist` (~1.5 MB) is used instead of the full bundle (~4.5 MB). This covers all chart types used in the app: scatter, bar.
+
+**Chart types supported by basic-dist**: scatter, bar, pie, histogram.
+
+**Error boundaries**: All chart components are wrapped with `<ErrorBoundary>` + `<Suspense>` to catch rendering failures without crashing the page. Chart fallbacks show a friendly "Impossible de charger le graphique" message with a retry button.
 
 **Alternatives if bundle size becomes critical**:
-- Use `plotly.js-basic-dist` (~1.5 MB) — supports scatter, bar, pie only
-- Use `plotly.js-dist-min` (~2.1 MB) — minified full version
 - Migrate to Recharts or Nivo (smaller, tree-shakeable, but less interactive)
-
-**Recommendation**: Keep current approach. The dynamic import ensures Plotly is only loaded on chart pages. For mobile users on slow connections, consider adding a lazy load threshold (intersection observer).
 
 ---
 
@@ -124,7 +130,7 @@ Measured on NAS deployment (UGREEN NAS, ARM64, asyncpg + PostgreSQL):
 
 ### Medium-term (moderate effort)
 
-4. **Plotly partial import**: Evaluate `plotly.js-basic-dist` if adding mobile users. Basic scatter charts (activities, HRV, trends) would work without the full Plotly suite.
+4. ~~**Plotly partial import**~~: Done — switched to `plotly.js-basic-dist` (~1.5 MB, down from ~4.4 MB). Error boundaries added on all chart components.
 
 5. **Virtual scrolling for activity list**: If activity lists grow beyond 200 items, consider `@tanstack/react-virtual` for the `/calendar` and `/dashboard` activity lists.
 
@@ -142,7 +148,7 @@ Measured on NAS deployment (UGREEN NAS, ARM64, asyncpg + PostgreSQL):
 
 | Warning | Severity | Action |
 |---------|----------|--------|
-| Serwist: 4.61 MB chunk won't be precached | Info | Expected — Plotly too large for SW cache |
+| Serwist: Plotly chunk precache | Info | Resolved — basic-dist is ~1.5 MB, within precache threshold |
 | Better-Auth base URL not set | Warning | Set `BETTER_AUTH_BASE_URL` env var in Vercel |
 | Compiled with warnings | Warning | Due to above warnings, not code issues |
 
@@ -150,9 +156,8 @@ Measured on NAS deployment (UGREEN NAS, ARM64, asyncpg + PostgreSQL):
 
 ## Summary
 
-The current bundle is dominated by Plotly.js (~4.4 MB uncompressed, ~1.2 MB Brotli). This is acceptable given:
-- Plotly is lazy-loaded (dynamic import, no SSR)
-- The app serves analytics-heavy users (athletes) who expect rich charts
-- Brotli compression reduces download size significantly
+The Plotly bundle has been reduced from ~4.4 MB to ~1.5 MB by switching to `plotly.js-basic-dist`. All chart types used in the app (scatter, bar) are supported by the basic distribution. Plotly remains lazy-loaded (dynamic import, no SSR).
+
+Error boundaries have been added to all chart components (`/trends`, `/activity/[id]`) using React `ErrorBoundary` class components + `React.Suspense` with `ChartSkeleton` fallbacks. Chart rendering failures are now isolated and do not crash the full page.
 
 No critical performance regressions. The app follows all Next.js best practices for a chart-heavy dashboard.
