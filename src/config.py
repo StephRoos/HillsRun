@@ -17,6 +17,7 @@ class DatabaseConfig:
     database: str = "garmin_connect"
     user: str = "garmin"
     password: str = ""
+    ssl: bool = False
     pool_min_size: int = 1
     pool_max_size: int = 10
 
@@ -106,6 +107,8 @@ class Config:
             ),
             user=cls._get_env_or_key(db_data, "user", "POSTGRES_USER", "garmin"),
             password=cls._get_env_or_key(db_data, "password", "POSTGRES_PASSWORD", ""),
+            ssl=cls._get_env_or_key(db_data, "ssl", "POSTGRES_SSL", "false").lower()
+            in ("true", "1", "yes"),
             pool_min_size=db_data.get("pool_min_size", 1),
             pool_max_size=db_data.get("pool_max_size", 10),
         )

@@ -27,12 +27,16 @@ class Database:
     async def connect(self) -> None:
         """Create database connection pool."""
         try:
+            import ssl as ssl_module
+
+            ssl_ctx = ssl_module.create_default_context() if self.config.ssl else False
             self.pool = await asyncpg.create_pool(
                 host=self.config.host,
                 port=self.config.port,
                 database=self.config.database,
                 user=self.config.user,
                 password=self.config.password,
+                ssl=ssl_ctx,
                 min_size=self.config.pool_min_size,
                 max_size=self.config.pool_max_size,
                 command_timeout=60,
