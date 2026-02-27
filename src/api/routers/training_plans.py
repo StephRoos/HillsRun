@@ -58,6 +58,12 @@ async def generate_training_plan(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(e),
         )
+    except Exception as e:
+        logger.exception(f"Plan generation failed for user {user_id}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Plan generation error: {e}",
+        )
     return result
 
 
