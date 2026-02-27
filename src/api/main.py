@@ -37,6 +37,7 @@ def _db_config_from_env() -> DatabaseConfig:
         database=os.environ.get("POSTGRES_DB", "garmin_connect"),
         user=os.environ.get("POSTGRES_USER", "garmin"),
         password=os.environ.get("POSTGRES_PASSWORD", ""),
+        ssl=os.environ.get("POSTGRES_SSL", "false").lower() in ("true", "1", "yes"),
     )
 
 
