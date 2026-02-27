@@ -63,10 +63,14 @@ async function resolveRequest(
 async function forwardError(res: Response): Promise<NextResponse> {
   try {
     const body = await res.json();
-    const message = body.detail ?? body.error ?? `Garmin API error: ${res.status}`;
+    const detail = body.detail;
+    const message = (typeof detail === "string" ? detail : null) ?? body.error ?? `Garmin API error: ${res.status}`;
     return NextResponse.json({ error: message }, { status: res.status });
   } catch {
-    return forwardError(res);
+    return NextResponse.json(
+      { error: `Garmin API error: ${res.status}` },
+      { status: res.status },
+    );
   }
 }
 
