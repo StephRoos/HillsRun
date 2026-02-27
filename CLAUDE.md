@@ -4,14 +4,14 @@
 Trail-focused Garmin dashboard for athletes and coaches. Syncs health/sport data from Garmin Connect, visualizes trends, and supports multi-athlete coaching. Part of the HillsRun + RecettesApp ecosystem.
 
 ## Stack
-- **Backend**: FastAPI (async) + asyncpg + Pydantic, Docker on NAS (ARM64)
-- **Database**: PostgreSQL (Garmin tables via raw SQL, auth tables via Prisma)
+- **Backend**: FastAPI (async) + asyncpg + Pydantic, deployed on Railway
+- **Database**: Neon PostgreSQL (Garmin tables via raw SQL, auth tables via Prisma) + NAS read-only replica
 - **Sync**: Python fetchers calling `garminconnect` lib, triggered on login + manual
 - **Frontend**: Next.js 16 (App Router) + React 19 + TanStack Query + shadcn/ui + Tailwind CSS v4
 - **Auth**: Better-Auth (email/password) + Prisma adapter
 - **Charts**: Plotly.js (dynamic import, no SSR)
 - **PWA**: Serwist service worker
-- **Tunnel**: Cloudflare Tunnel for remote access
+- **Tunnel**: Cloudflare Tunnel for NAS SSH access
 - **Tests**: Vitest (frontend), pytest (backend)
 
 ## Theme
@@ -89,22 +89,30 @@ uv run ruff format src/       # Format
 ### Deploy frontend (Vercel)
 - Auto-deploy: `git push` (Vercel Git integration, root = `web`)
 
-### Deploy backend (NAS Docker)
-```bash
-# Quick update (hot-patch running container)
-cat <file> | ssh nas "cat > /tmp/$(basename <file>) && docker cp /tmp/$(basename <file>) garmin-api:/app/<path>"
-ssh nas "docker restart garmin-api"
+### Deploy backend (Railway)
+- Auto-deploy: `git push` (Railway Git integration, root directory)
+- Config: `railway.toml` (nixpacks builder, uvicorn start command)
+- Custom domain: `api.hillsrun.com` (CNAME → Railway)
+- Env vars configured in Railway dashboard (see `.env.example`)
 
-# Full rebuild (when deps change)
-ssh nas "cd /volume1/docker/garmin-sync/HillsRun && docker build -f Dockerfile.api -t garmin-api:arm64 ."
+### NAS (PostgreSQL replica only)
+```bash
+# Start replica
+ssh nas "cd /volume1/docker/garmin-sync/HillsRun && docker compose -f docker-compose.nas.yml up -d"
+
+# Check replication health
+ssh nas "./scripts/check-replica.sh"
+```
+
+### Daily sync cron (on NAS)
+```bash
+0 5 * * * curl -s -X POST -H 'X-API-Key: <API_KEY>' https://api.hillsrun.com/api/v1/sync/trigger
 ```
 
 ### Remote access
-All via Cloudflare Tunnel — no VPN needed.
-- **SSH**: `ssh nas`
-- **API**: `https://api.hillsrun.com`
-- **DB**: `cloudflared access tcp --hostname db.hillsrun.com --url localhost:15432`
-- **Logs**: `ssh nas "docker logs garmin-api --tail 50"`
+- **SSH**: `ssh nas` (Cloudflare Tunnel)
+- **API**: `https://api.hillsrun.com` (Railway)
+- **NAS replica DB**: `ssh nas "psql -h localhost -U garmin -d garmin_connect"`
 
 ## Conventions
 - CRITICAL: `pnpm` for frontend, `uv` for Python (NEVER pip, NEVER npm)
@@ -125,6 +133,8 @@ All via Cloudflare Tunnel — no VPN needed.
 - ADR-006: Coach context via React Context + X-View-As-Athlete header
 - ADR-007: Threaded sync jobs (prevent blocking FastAPI event loop)
 - ADR-008: HillsRun theme shared with RecettesApp (dark mode, orange primary)
+- ADR-009: Backend on Railway (auto-deploy on push, no Docker management)
+- ADR-010: NAS PostgreSQL replica via Neon logical replication (local backup, read-only)
 
 ## Documentation
 - `PRD.md` — Product requirements (what and why)
@@ -135,38 +145,32 @@ All via Cloudflare Tunnel — no VPN needed.
 - `docs/PLAN-API.md` — API implementation plan
 - `docs/TROUBLESHOOTING.md` — Common issues
 
-## Deployment (Sprint 1)
+## Deployment
 
-### Database Migration
-Applied: `sql/07_fix_sync_state_null_conflict.sql` (2026-02-24)
-- Fixes ON CONFLICT constraint for NULL user_id in sync_state table
-- Adds partial unique index for legacy global sync entries
-- Enables proper upsert handling per-user vs. legacy sync
+### Infrastructure
+- **Frontend**: Vercel (auto-deploy on `git push`, root = `web`)
+- **Backend**: Railway (auto-deploy on `git push`, config = `railway.toml`)
+- **Database**: Neon Cloud PostgreSQL (primary, read-write)
+- **NAS**: PostgreSQL replica (read-only, via logical replication) + cron sync
 
-### Secret Rotation Procedure
-New secrets generated and stored in `/tmp/sprint1_secrets_rotation.txt`:
-1. **BETTER_AUTH_SECRET**: Session encryption for Better Auth (Vercel env var)
-2. **API_KEY**: X-API-Key for backend authentication (Vercel + NAS env var)
-3. **GARMIN_TOKEN_KEY**: Fernet symmetric key for OAuth token encryption (NAS env var only)
+### NAS Replica Setup
+1. Enable logical replication on Neon (Project Settings > Logical Replication)
+2. Create replicator role + publication on Neon (see `scripts/setup-replica.sh` header)
+3. Start replica: `docker compose -f docker-compose.nas.yml up -d`
+4. Init subscription: `./scripts/setup-replica.sh`
+5. Verify: `./scripts/check-replica.sh`
 
-Deployment steps documented in `scripts/deploy-sprint1.sh` (manual guide).
-
-### Daily Sync Cron Schedule
-Configured to run at 06:00 Europe/Paris time (05:00 UTC):
+### Daily Sync Cron (NAS)
+06:00 Europe/Paris (05:00 UTC):
 ```bash
-0 5 * * * curl -X POST -H 'X-API-Key: <API_KEY>' https://api.hillsrun.com/api/v1/sync/trigger
+0 5 * * * curl -s -X POST -H 'X-API-Key: <API_KEY>' https://api.hillsrun.com/api/v1/sync/trigger
 ```
-Logs: `/var/log/hillsrun-sync.log` on NAS
+Logs: `/var/log/hillsrun-sync.log`
 
-### Verification Checklist
-- [x] Backend tests: 119 passed
-- [x] Frontend tests: 144 passed
-- [x] Database migration applied
-- [x] Environment variables updated (NAS + Vercel)
-- [x] Docker container restarted
-- [x] Cron job configured
-- [ ] First scheduled sync executed (check next morning)
-- [ ] API endpoints verified with new keys
+### Environment Variables
+- **Railway**: `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_SSL`, `API_KEY`, `GARMIN_TOKEN_KEY`, `LOG_LEVEL`
+- **Vercel**: `BETTER_AUTH_SECRET`, `GARMIN_API_KEY`, `DATABASE_URL`, `NEXT_PUBLIC_*`
+- **NAS**: `REPLICA_PASSWORD`, `NEON_REPLICATION_CONNSTRING`
 
 ## Known Issues
 - `BETTER_AUTH_SECRET` has been rotated in Sprint 1 (was listed in specs/01-improvements/04-security-hardening.md)
