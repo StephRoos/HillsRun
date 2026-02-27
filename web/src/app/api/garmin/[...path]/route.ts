@@ -161,6 +161,35 @@ export async function PATCH(
   return NextResponse.json(data);
 }
 
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  const { path } = await params;
+  const { garminUserId, betterAuthUserId, coachBetterAuthId, error } = await resolveRequest(request, path);
+  if (error) return error;
+  const apiPath = `/api/v1/${path.join("/")}`;
+  const url = `${API_BASE}${apiPath}`;
+
+  const body = await request.text();
+
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: {
+      ...buildHeaders(garminUserId, betterAuthUserId, coachBetterAuthId),
+      "Content-Type": "application/json",
+    },
+    body: body || "{}",
+  });
+
+  if (!res.ok) {
+    return forwardError(res);
+  }
+
+  const data = await res.json();
+  return NextResponse.json(data);
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
