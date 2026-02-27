@@ -20,7 +20,7 @@
 set -euo pipefail
 
 REPLICA_HOST="${REPLICA_HOST:-localhost}"
-REPLICA_PORT="${REPLICA_PORT:-5432}"
+REPLICA_PORT="${REPLICA_PORT:-5435}"
 REPLICA_DB="${REPLICA_DB:-garmin_connect}"
 REPLICA_USER="${REPLICA_USER:-garmin}"
 
