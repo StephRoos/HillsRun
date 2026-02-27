@@ -57,8 +57,8 @@ async def _get_vo2_max(pool, user_id: int) -> Optional[float]:
     query = """
         SELECT COALESCE(vo2_max_running, vo2_max) as vo2_max
         FROM fitness_metrics
-        WHERE user_id = $1 AND date >= CURRENT_DATE - INTERVAL '7 days'
-        ORDER BY date DESC
+        WHERE user_id = $1 AND calendar_date >= CURRENT_DATE - INTERVAL '7 days'
+        ORDER BY calendar_date DESC
         LIMIT 1
     """
     row = await pool.fetchrow(query, user_id)
@@ -79,7 +79,7 @@ async def _get_avg_resting_hr(pool, user_id: int) -> Optional[int]:
         SELECT AVG(resting_heart_rate)::INTEGER as avg_rhr
         FROM daily_summary
         WHERE user_id = $1
-            AND date >= CURRENT_DATE - INTERVAL '7 days'
+            AND calendar_date >= CURRENT_DATE - INTERVAL '7 days'
             AND resting_heart_rate IS NOT NULL
     """
     row = await pool.fetchrow(query, user_id)
@@ -99,8 +99,8 @@ async def _get_recent_weight(pool, user_id: int) -> Optional[float]:
     query = """
         SELECT weight_kg
         FROM body_composition
-        WHERE user_id = $1 AND date >= CURRENT_DATE - INTERVAL '30 days'
-        ORDER BY date DESC
+        WHERE user_id = $1 AND timestamp >= CURRENT_DATE - INTERVAL '30 days'
+        ORDER BY timestamp DESC
         LIMIT 1
     """
     row = await pool.fetchrow(query, user_id)
@@ -160,7 +160,7 @@ async def _get_training_readiness(pool, user_id: int) -> dict:
             AVG(acute_load)::FLOAT as acute_load
         FROM training_readiness
         WHERE user_id = $1
-            AND date >= CURRENT_DATE - INTERVAL '7 days'
+            AND calendar_date >= CURRENT_DATE - INTERVAL '7 days'
     """
     row = await pool.fetchrow(query, user_id)
     if not row:
@@ -206,7 +206,7 @@ async def _get_avg_sleep_score(pool, user_id: int) -> Optional[float]:
         SELECT AVG(sleep_score)::FLOAT as avg_score
         FROM sleep_data
         WHERE user_id = $1
-            AND date >= CURRENT_DATE - INTERVAL '7 days'
+            AND calendar_date >= CURRENT_DATE - INTERVAL '7 days'
             AND sleep_score IS NOT NULL
     """
     row = await pool.fetchrow(query, user_id)
@@ -227,7 +227,7 @@ async def _get_avg_hrv(pool, user_id: int) -> Optional[float]:
         SELECT AVG(weekly_avg)::FLOAT as avg_hrv
         FROM hrv_data
         WHERE user_id = $1
-            AND date >= CURRENT_DATE - INTERVAL '7 days'
+            AND calendar_date >= CURRENT_DATE - INTERVAL '7 days'
             AND weekly_avg IS NOT NULL
     """
     row = await pool.fetchrow(query, user_id)
