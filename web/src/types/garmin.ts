@@ -240,3 +240,161 @@ export interface CoachingStatus {
   athletes: CoachAthlete[];
   coaches: CoachInfo[];
 }
+
+// Training Plans
+export interface WorkoutBlock {
+  name: string;
+  duration_seconds: number;
+  hr_zone: number | null;
+  description: string;
+}
+
+export interface AthleteProfile {
+  id: number;
+  user_id: number;
+  birth_date: string | null;
+  gender: string | null;
+  height_cm: number | null;
+  experience_level: string;
+  available_days_per_week: number;
+  available_slots: Record<string, string[]> | null;
+  injury_history: string | null;
+  has_hill_access: boolean;
+  has_gym_access: boolean;
+  fc_max: number | null;
+  fc_repos: number | null;
+  fthr: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface AthleteProfileCreate {
+  birth_date?: string;
+  gender?: string;
+  height_cm?: number;
+  experience_level?: string;
+  available_days_per_week?: number;
+  available_slots?: Record<string, string[]>;
+  injury_history?: string;
+  has_hill_access?: boolean;
+  has_gym_access?: boolean;
+  fc_max?: number;
+  fc_repos?: number;
+  fthr?: number;
+}
+
+export interface RaceTarget {
+  id: number;
+  user_id: number;
+  race_name: string;
+  race_date: string;
+  distance_km: number;
+  elevation_gain_m: number;
+  elevation_loss_m: number;
+  altitude_min_m: number;
+  altitude_max_m: number;
+  technical_percent: number;
+  cutoff_hours: number | null;
+  itra_points: number | null;
+  objective: string;
+  elevation_profile: Record<string, unknown> | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface RaceTargetCreate {
+  race_name: string;
+  race_date: string;
+  distance_km: number;
+  elevation_gain_m?: number;
+  elevation_loss_m?: number;
+  altitude_min_m?: number;
+  altitude_max_m?: number;
+  technical_percent?: number;
+  cutoff_hours?: number;
+  itra_points?: number;
+  objective?: string;
+}
+
+export interface GeneratePlanRequest {
+  race_target_id: number;
+  plan_name?: string;
+  total_weeks?: number;
+  start_date?: string;
+}
+
+export interface TrainingPlanSummary {
+  id: number;
+  user_id: number;
+  race_target_id: number;
+  name: string;
+  status: string;
+  start_date: string;
+  end_date: string;
+  total_weeks: number;
+  experience_level: string;
+  created_by_user_id: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface PlanWeekSummary {
+  id: number;
+  plan_id: number;
+  week_number: number;
+  phase: string;
+  is_recovery_week: boolean;
+  target_tss: number | null;
+  target_volume_km: number | null;
+  target_elevation_m: number | null;
+  target_sessions: number | null;
+  notes: string | null;
+}
+
+export interface PlanSession {
+  id: number;
+  plan_id: number;
+  week_id: number;
+  planned_workout_id: number | null;
+  day_of_week: number;
+  session_type: string;
+  title: string;
+  description: string | null;
+  sport_type: string;
+  target_duration_seconds: number | null;
+  target_distance_meters: number | null;
+  target_elevation_gain_m: number | null;
+  target_tss: number | null;
+  hr_zone_primary: number | null;
+  intensity: string;
+  blocks: WorkoutBlock[] | null;
+  sort_order: number;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface TrainingPlanDetail extends TrainingPlanSummary {
+  weeks: PlanWeekSummary[];
+  generation_params: Record<string, unknown> | null;
+}
+
+export interface PlanWeekDetail extends PlanWeekSummary {
+  sessions: PlanSession[];
+}
+
+export interface FitnessSnapshot {
+  vo2_max: number | null;
+  resting_hr: number | null;
+  max_hr: number | null;
+  weight_kg: number | null;
+  vma_kmh: number | null;
+  weekly_volume_km: number | null;
+  weekly_elevation_m: number | null;
+  avg_training_readiness: number | null;
+  chronic_load: number | null;
+  acute_load: number | null;
+  recent_long_run_km: number | null;
+  recent_long_run_duration_s: number | null;
+  avg_sleep_score: number | null;
+  avg_hrv: number | null;
+}

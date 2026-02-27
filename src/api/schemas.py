@@ -499,6 +499,198 @@ class NutritionDailyGoal(BaseModel):
     adjustment_factor: Optional[float] = None
 
 
+# Training Plans
+
+
+class AthleteProfileCreate(BaseModel):
+    """Request body for creating/updating athlete profile."""
+
+    birth_date: Optional[date] = None
+    gender: Optional[str] = None
+    height_cm: Optional[float] = None
+    experience_level: str = "intermediate"
+    available_days_per_week: int = 4
+    available_slots: Optional[dict] = None
+    injury_history: Optional[str] = None
+    has_hill_access: bool = True
+    has_gym_access: bool = False
+    fc_max: Optional[int] = None
+    fc_repos: Optional[int] = None
+    fthr: Optional[int] = None
+
+
+class AthleteProfileResponse(BaseModel):
+    """Athlete profile response."""
+
+    id: int
+    user_id: int
+    birth_date: Optional[date] = None
+    gender: Optional[str] = None
+    height_cm: Optional[float] = None
+    experience_level: str
+    available_days_per_week: int
+    available_slots: Optional[dict] = None
+    injury_history: Optional[str] = None
+    has_hill_access: bool
+    has_gym_access: bool
+    fc_max: Optional[int] = None
+    fc_repos: Optional[int] = None
+    fthr: Optional[int] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class RaceTargetCreate(BaseModel):
+    """Request body for creating a race target."""
+
+    race_name: str
+    race_date: date
+    distance_km: float
+    elevation_gain_m: int = 0
+    elevation_loss_m: int = 0
+    altitude_min_m: int = 0
+    altitude_max_m: int = 0
+    technical_percent: int = 0
+    cutoff_hours: Optional[float] = None
+    itra_points: Optional[int] = None
+    objective: str = "finish"
+    elevation_profile: Optional[dict] = None
+
+
+class RaceTargetResponse(BaseModel):
+    """Race target response."""
+
+    id: int
+    user_id: int
+    race_name: str
+    race_date: date
+    distance_km: float
+    elevation_gain_m: int
+    elevation_loss_m: int
+    altitude_min_m: int
+    altitude_max_m: int
+    technical_percent: int
+    cutoff_hours: Optional[float] = None
+    itra_points: Optional[int] = None
+    objective: str
+    elevation_profile: Optional[dict] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class GeneratePlanRequestSchema(BaseModel):
+    """Request body for generating a training plan."""
+
+    race_target_id: int
+    plan_name: Optional[str] = None
+    total_weeks: Optional[int] = Field(default=None, ge=6, le=30)
+    start_date: Optional[date] = None
+
+
+class TrainingPlanStatusUpdate(BaseModel):
+    """Request body for updating plan status."""
+
+    status: str
+
+
+class TrainingPlanSummary(BaseModel):
+    """Training plan summary for list views."""
+
+    id: int
+    user_id: int
+    race_target_id: int
+    name: str
+    status: str
+    start_date: date
+    end_date: date
+    total_weeks: int
+    experience_level: str
+    created_by_user_id: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class PlanWeekSummary(BaseModel):
+    """Training plan week summary."""
+
+    id: int
+    plan_id: int
+    week_number: int
+    phase: str
+    is_recovery_week: bool
+    target_tss: Optional[float] = None
+    target_volume_km: Optional[float] = None
+    target_elevation_m: Optional[int] = None
+    target_sessions: Optional[int] = None
+    notes: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class PlanSessionResponse(BaseModel):
+    """Training plan session response."""
+
+    id: int
+    plan_id: int
+    week_id: int
+    planned_workout_id: Optional[int] = None
+    day_of_week: int
+    session_type: str
+    title: str
+    description: Optional[str] = None
+    sport_type: str
+    target_duration_seconds: Optional[int] = None
+    target_distance_meters: Optional[float] = None
+    target_elevation_gain_m: Optional[int] = None
+    target_tss: Optional[float] = None
+    hr_zone_primary: Optional[int] = None
+    intensity: str
+    blocks: Optional[list] = None
+    sort_order: int = 0
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class TrainingPlanDetail(TrainingPlanSummary):
+    """Training plan detail with weeks."""
+
+    weeks: List[PlanWeekSummary] = []
+    generation_params: Optional[dict] = None
+
+
+class PlanWeekDetail(PlanWeekSummary):
+    """Plan week detail with sessions."""
+
+    sessions: List[PlanSessionResponse] = []
+
+
+class FitnessSnapshotResponse(BaseModel):
+    """Current fitness data snapshot."""
+
+    vo2_max: Optional[float] = None
+    resting_hr: Optional[int] = None
+    max_hr: Optional[int] = None
+    weight_kg: Optional[float] = None
+    vma_kmh: Optional[float] = None
+    weekly_volume_km: Optional[float] = None
+    weekly_elevation_m: Optional[int] = None
+    avg_training_readiness: Optional[float] = None
+    chronic_load: Optional[float] = None
+    acute_load: Optional[float] = None
+    recent_long_run_km: Optional[float] = None
+    recent_long_run_duration_s: Optional[int] = None
+    avg_sleep_score: Optional[float] = None
+    avg_hrv: Optional[float] = None
+
+
 def make_page(rows, total: int, limit: int, offset: int, schema_class) -> dict:
     """Build a paginated response dict from DB rows.
 

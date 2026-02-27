@@ -20,6 +20,7 @@ from .routers import (
     sync,
     auth_garmin,
     planned_workouts,
+    training_plans,
     coaching,
     user,
     nutrition,
@@ -94,6 +95,7 @@ app.include_router(wellness.router)
 app.include_router(sync.router)
 app.include_router(auth_garmin.router)
 app.include_router(planned_workouts.router)
+app.include_router(training_plans.router)
 app.include_router(coaching.router)
 app.include_router(user.router)
 app.include_router(nutrition.router)

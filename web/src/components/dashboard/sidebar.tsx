@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Calendar, TrendingUp, Settings, LogOut, Mountain, Users } from "lucide-react";
+import { LayoutDashboard, Calendar, TrendingUp, Settings, LogOut, Mountain, Users, Target } from "lucide-react";
 import { signOut, useSession } from "@/lib/auth-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import { setViewAsAthlete } from "@/lib/garmin-api";
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Calendar", href: "/calendar", icon: Calendar },
+  { label: "Training Plan", href: "/training-plan", icon: Target },
   { label: "Trends", href: "/trends", icon: TrendingUp },
   { label: "Settings", href: "/settings", icon: Settings },
 ];

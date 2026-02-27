@@ -16,6 +16,15 @@ import type {
   PlannedWorkoutUpdate,
   BulkImportResult,
   VmaData,
+  AthleteProfile,
+  AthleteProfileCreate,
+  RaceTarget,
+  RaceTargetCreate,
+  GeneratePlanRequest,
+  TrainingPlanSummary,
+  TrainingPlanDetail,
+  PlanWeekDetail,
+  FitnessSnapshot,
 } from "@/types/garmin";
 
 export class GarminNotConnectedError extends Error {
@@ -195,4 +204,82 @@ export const garminApi = {
     if (!res.ok) throw new Error(await parseErrorMessage(res));
     return res.json() as Promise<BulkImportResult>;
   },
+
+  // Training Plans
+  getTrainingPlans: (params?: Record<string, string>) =>
+    garminFetch<Page<TrainingPlanSummary>>("training-plans", params),
+
+  getTrainingPlan: (planId: number) =>
+    garminFetch<TrainingPlanDetail>(`training-plans/${planId}`),
+
+  getTrainingPlanWeek: (planId: number, weekNumber: number) =>
+    garminFetch<PlanWeekDetail>(`training-plans/${planId}/weeks/${weekNumber}`),
+
+  generateTrainingPlan: async (body: GeneratePlanRequest) => {
+    const res = await fetch("/api/garmin/training-plans/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getHeaders() },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(await parseErrorMessage(res));
+    return res.json() as Promise<Record<string, unknown>>;
+  },
+
+  updateTrainingPlanStatus: async (planId: number, status: string) => {
+    const res = await fetch(`/api/garmin/training-plans/${planId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...getHeaders() },
+      body: JSON.stringify({ status }),
+    });
+    if (!res.ok) throw new Error(await parseErrorMessage(res));
+    return res.json() as Promise<TrainingPlanSummary>;
+  },
+
+  deleteTrainingPlan: async (planId: number) => {
+    const res = await fetch(`/api/garmin/training-plans/${planId}`, {
+      method: "DELETE",
+      headers: getHeaders(),
+    });
+    if (!res.ok && res.status !== 204) throw new Error(await parseErrorMessage(res));
+  },
+
+  // Athlete Profile
+  getAthleteProfile: () =>
+    garminFetch<AthleteProfile>("training-plans/profile"),
+
+  updateAthleteProfile: async (body: AthleteProfileCreate) => {
+    const res = await fetch("/api/garmin/training-plans/profile", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...getHeaders() },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(await parseErrorMessage(res));
+    return res.json() as Promise<AthleteProfile>;
+  },
+
+  // Race Targets
+  getRaceTargets: () =>
+    garminFetch<RaceTarget[]>("training-plans/races"),
+
+  createRaceTarget: async (body: RaceTargetCreate) => {
+    const res = await fetch("/api/garmin/training-plans/races", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getHeaders() },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(await parseErrorMessage(res));
+    return res.json() as Promise<RaceTarget>;
+  },
+
+  deleteRaceTarget: async (raceId: number) => {
+    const res = await fetch(`/api/garmin/training-plans/races/${raceId}`, {
+      method: "DELETE",
+      headers: getHeaders(),
+    });
+    if (!res.ok && res.status !== 204) throw new Error(await parseErrorMessage(res));
+  },
+
+  // Fitness Snapshot
+  getFitnessSnapshot: () =>
+    garminFetch<FitnessSnapshot>("training-plans/fitness-snapshot"),
 };
