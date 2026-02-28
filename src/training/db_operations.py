@@ -264,7 +264,7 @@ async def update_training_plan_status(pool, plan_id: int, user_id: int, status: 
 
 
 async def delete_training_plan(pool, plan_id: int, user_id: int) -> bool:
-    """Delete a training plan (cascades to weeks, sessions).
+    """Delete a training plan (cascades to weeks, sessions, and planned workouts).
 
     Args:
         pool: asyncpg connection pool.
@@ -274,11 +274,18 @@ async def delete_training_plan(pool, plan_id: int, user_id: int) -> bool:
     Returns:
         True if deleted, False otherwise.
     """
-    result = await pool.execute(
-        "DELETE FROM training_plans WHERE id = $1 AND user_id = $2",
-        plan_id, user_id,
-    )
-    return result == "DELETE 1"
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            # Delete associated planned workouts from calendar first
+            await conn.execute(
+                "DELETE FROM planned_workouts WHERE plan_id = $1 AND user_id = $2",
+                plan_id, user_id,
+            )
+            result = await conn.execute(
+                "DELETE FROM training_plans WHERE id = $1 AND user_id = $2",
+                plan_id, user_id,
+            )
+            return result == "DELETE 1"
 
 
 # ============================================
