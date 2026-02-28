@@ -184,7 +184,7 @@ async def _get_vma(pool, user_id: int) -> Optional[float]:
         VMA in km/h or None.
     """
     query = """
-        SELECT vma
+        SELECT manual_vma as vma
         FROM garmin_user
         WHERE user_id = $1
     """
