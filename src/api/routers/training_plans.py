@@ -156,13 +156,22 @@ async def get_training_plan(
     user_id: int = Depends(get_user_id),
 ):
     """Get training plan detail with all weeks."""
-    plan = await db_ops.get_training_plan(db.pool, plan_id, user_id)
-    if not plan:
-        raise HTTPException(status_code=404, detail="Training plan not found")
+    try:
+        plan = await db_ops.get_training_plan(db.pool, plan_id, user_id)
+        if not plan:
+            raise HTTPException(status_code=404, detail="Training plan not found")
 
-    weeks = await db_ops.get_plan_weeks(db.pool, plan_id)
-    plan["weeks"] = weeks
-    return TrainingPlanDetail.model_validate(plan)
+        weeks = await db_ops.get_plan_weeks(db.pool, plan_id)
+        plan["weeks"] = weeks
+        return TrainingPlanDetail.model_validate(plan)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Failed to fetch plan {plan_id} for user {user_id}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error loading plan: {e}",
+        )
 
 
 @router.patch("/{plan_id}")

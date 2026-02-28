@@ -111,7 +111,7 @@ export default function TrainingPlanDetailPage() {
   const params = useParams();
   const router = useRouter();
   const planId = Number(params.planId);
-  const { data: plan, isPending } = useTrainingPlan(planId);
+  const { data: plan, isPending, error } = useTrainingPlan(planId);
   const deletePlan = useDeleteTrainingPlan();
   const updateStatus = useUpdateTrainingPlanStatus();
   const [activeWeek, setActiveWeek] = useState("1");
@@ -125,7 +125,11 @@ export default function TrainingPlanDetailPage() {
   }
 
   if (!plan) {
-    return <div className="text-center py-12 text-muted-foreground">Plan not found</div>;
+    return (
+      <div className="text-center py-12 text-muted-foreground">
+        {error ? `Error: ${error.message}` : "Plan not found"}
+      </div>
+    );
   }
 
   const weeks = plan.weeks ?? [];
