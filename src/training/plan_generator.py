@@ -1,5 +1,6 @@
 """Training plan generator — orchestrates all engine modules."""
 
+import json
 import logging
 from datetime import date, timedelta
 from typing import Any, Optional
@@ -128,11 +129,11 @@ async def generate_plan(
                 end_date,
                 total_weeks,
                 experience.value,
-                {
+                json.dumps({
                     "race_flags": race_flags.model_dump(),
                     "fitness_snapshot": fitness.model_dump(),
                     "experience": experience.value,
-                },
+                }),
                 coach_id,
             )
             plan_id = plan_row["id"]
@@ -228,7 +229,7 @@ async def generate_plan(
 
                     blocks_json = None
                     if session.blocks:
-                        blocks_json = [b.model_dump() for b in session.blocks]
+                        blocks_json = json.dumps([b.model_dump() for b in session.blocks])
 
                     session_tss = calculate_session_tss(
                         session.session_type,
