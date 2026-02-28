@@ -2,7 +2,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import date
-from src.training.plan_generator import generate_plan
+from src.training.plan_generator import generate_plan, _resolve_available_days
 from src.training.models import GeneratePlanRequest
 
 
@@ -122,3 +122,61 @@ async def test_generate_plan_no_race(mock_pool, mock_profile):
 
         with pytest.raises(ValueError, match="Race target"):
             await generate_plan(mock_pool, 67, request)
+
+
+# --- _resolve_available_days tests ---
+
+def test_resolve_available_days_from_slots():
+    """available_slots JSONB should take priority over integer."""
+    profile = {
+        "available_days_per_week": 3,
+        "available_slots": {
+            "monday": ["morning"],
+            "wednesday": ["evening"],
+            "friday": ["morning", "evening"],
+            "saturday": ["morning"],
+        },
+    }
+    days = _resolve_available_days(profile)
+    assert days == [1, 3, 5, 6]
+
+
+def test_resolve_available_days_from_slots_french():
+    """French day names should work."""
+    profile = {
+        "available_days_per_week": 2,
+        "available_slots": {
+            "mardi": ["matin"],
+            "samedi": ["matin"],
+            "dimanche": ["matin"],
+        },
+    }
+    days = _resolve_available_days(profile)
+    assert days == [2, 6, 7]
+
+
+def test_resolve_available_days_empty_slots_fallback():
+    """Empty available_slots should fall back to integer."""
+    profile = {"available_days_per_week": 3, "available_slots": {}}
+    days = _resolve_available_days(profile)
+    assert days == [2, 5, 6]  # 3-day heuristic
+
+
+def test_resolve_available_days_no_slots():
+    """No available_slots should use integer heuristic."""
+    profile = {"available_days_per_week": 4}
+    days = _resolve_available_days(profile)
+    assert days == [2, 4, 6, 7]
+
+
+def test_resolve_available_days_ignores_empty_slot_lists():
+    """Days with empty slot lists should be excluded."""
+    profile = {
+        "available_slots": {
+            "monday": ["morning"],
+            "tuesday": [],  # Empty — should be excluded
+            "saturday": ["morning"],
+        },
+    }
+    days = _resolve_available_days(profile)
+    assert days == [1, 6]

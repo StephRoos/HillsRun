@@ -8,6 +8,7 @@ from typing import Any, Optional
 from .models import (
     ExperienceLevel,
     GeneratePlanRequest,
+    RaceObjective,
 )
 from . import db_operations as db_ops
 from .fitness_snapshot import build_fitness_snapshot
@@ -90,8 +91,13 @@ async def generate_plan(
         bd = profile["birth_date"]
         age = today.year - bd.year - ((today.month, today.day) < (bd.month, bd.day))
 
+    hr_zones = None
     if fc_max or age:
-        calculate_hr_zones(fc_max=fc_max, fc_repos=fc_repos, age=age)
+        hr_zones = calculate_hr_zones(fc_max=fc_max, fc_repos=fc_repos, age=age)
+
+    # Extract race objective
+    objective_str = race.get("objective", "finish")
+    objective = RaceObjective(objective_str) if objective_str else RaceObjective.finish
 
     # Step 6: Determine plan duration and dates
     race_date = race["race_date"]
@@ -133,24 +139,15 @@ async def generate_plan(
                     "race_flags": race_flags.model_dump(),
                     "fitness_snapshot": fitness.model_dump(),
                     "experience": experience.value,
+                    "objective": objective.value,
+                    "hr_zones": [z.model_dump() for z in hr_zones] if hr_zones else None,
                 }),
                 coach_id,
             )
             plan_id = plan_row["id"]
 
             # Determine available days from profile
-            available_days = list(range(1, 8))  # Default: all days
-            days_per_week = profile.get("available_days_per_week", 4) or 4
-            if days_per_week < 7:
-                # Simple heuristic: spread evenly with weekend included
-                if days_per_week >= 5:
-                    available_days = [1, 2, 3, 4, 5, 6, 7][:days_per_week]
-                elif days_per_week == 4:
-                    available_days = [2, 4, 6, 7]  # Tue, Thu, Sat, Sun
-                elif days_per_week == 3:
-                    available_days = [2, 5, 6]  # Tue, Fri, Sat
-                else:
-                    available_days = [4, 6]  # Thu, Sat
+            available_days = _resolve_available_days(profile)
 
             current_long_run_km = fitness.recent_long_run_km or 0
             previous_week_tss = 0.0
@@ -176,7 +173,19 @@ async def generate_plan(
                     is_recovery_week=week_spec.is_recovery_week,
                     week_number=week_spec.week_number,
                     long_run_spec=long_run_spec,
+                    race_flags=race_flags,
+                    objective=objective,
                 )
+
+                # Inject personalized HR zones into sessions
+                if hr_zones:
+                    for s in sessions:
+                        if s.hr_zone_primary:
+                            zone = next((z for z in hr_zones if z.zone == s.hr_zone_primary), None)
+                            if zone:
+                                for block in s.blocks:
+                                    if block.hr_zone == s.hr_zone_primary:
+                                        block.description += f" ({zone.hr_min}-{zone.hr_max} bpm)"
 
                 # Calculate total TSS for validation
                 week_tss = sum(
@@ -304,3 +313,49 @@ async def generate_plan(
         "experience_level": experience.value,
         "status": "draft",
     }
+
+
+# Day name → ISO day number (1=Monday, 7=Sunday)
+_DAY_NAME_MAP = {
+    "monday": 1, "tuesday": 2, "wednesday": 3, "thursday": 4,
+    "friday": 5, "saturday": 6, "sunday": 7,
+    "lundi": 1, "mardi": 2, "mercredi": 3, "jeudi": 4,
+    "vendredi": 5, "samedi": 6, "dimanche": 7,
+}
+
+
+def _resolve_available_days(profile: dict) -> list[int]:
+    """Resolve available training days from athlete profile.
+
+    Uses available_slots JSONB if present (keys are day names, values are
+    time slot arrays). Falls back to available_days_per_week integer with
+    a heuristic spread.
+
+    Args:
+        profile: Athlete profile dict from DB.
+
+    Returns:
+        Sorted list of day numbers (1=Monday, 7=Sunday).
+    """
+    # Prefer available_slots JSONB when present
+    slots = profile.get("available_slots")
+    if slots and isinstance(slots, dict):
+        days = []
+        for day_name in slots:
+            day_num = _DAY_NAME_MAP.get(day_name.lower())
+            if day_num and slots[day_name]:  # Only include if slot list is non-empty
+                days.append(day_num)
+        if days:
+            return sorted(set(days))
+
+    # Fallback to integer heuristic
+    days_per_week = profile.get("available_days_per_week", 4) or 4
+    if days_per_week >= 7:
+        return list(range(1, 8))
+    if days_per_week >= 5:
+        return [1, 2, 3, 4, 5, 6, 7][:days_per_week]
+    if days_per_week == 4:
+        return [2, 4, 6, 7]  # Tue, Thu, Sat, Sun
+    if days_per_week == 3:
+        return [2, 5, 6]  # Tue, Fri, Sat
+    return [4, 6]  # Thu, Sat

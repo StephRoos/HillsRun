@@ -2,7 +2,9 @@
 
 from pydantic import BaseModel
 
-from .models import ExperienceLevel, Intensity, PlanPhase, SessionType, WorkoutBlock
+from typing import Optional
+
+from .models import ExperienceLevel, Intensity, PlanPhase, RaceFlags, SessionType, WorkoutBlock
 
 
 class SessionTemplate(BaseModel):
@@ -44,13 +46,23 @@ def get_session_template(
     return catalog[key]
 
 
-def get_phase_session_types(phase: PlanPhase, experience: ExperienceLevel) -> list[SessionType]:
+def get_phase_session_types(
+    phase: PlanPhase,
+    experience: ExperienceLevel,
+    race_flags: Optional[RaceFlags] = None,
+) -> list[SessionType]:
     """
     Get recommended session types for a specific training phase and experience level.
+
+    When race_flags are provided, session selection adapts to race characteristics:
+    - high_dplus: COT (hill repeats) introduced earlier and prioritized
+    - technical: DESC (downhill technique) introduced earlier
+    - high_altitude: more emphasis on aerobic base (Z1-Z2)
 
     Args:
         phase: Training periodization phase
         experience: Athlete experience level
+        race_flags: Optional race classification flags
 
     Returns:
         List of recommended SessionType values for this phase and level
@@ -64,18 +76,47 @@ def get_phase_session_types(phase: PlanPhase, experience: ExperienceLevel) -> li
 
     recommendations = base_sessions[phase].copy()
 
+    # --- Race flag adaptations ---
+
+    if race_flags and race_flags.high_dplus:
+        # High D+ race: introduce COT from base phase for all levels
+        if phase == PlanPhase.base and SessionType.COT not in recommendations:
+            recommendations.insert(2, SessionType.COT)
+        # In development, ensure COT is before INT (prioritize hills)
+        if phase == PlanPhase.development and SessionType.COT not in recommendations:
+            idx = recommendations.index(SessionType.INT) if SessionType.INT in recommendations else len(recommendations)
+            recommendations.insert(idx, SessionType.COT)
+
+    if race_flags and race_flags.technical:
+        # Technical race: introduce DESC from development phase
+        if phase == PlanPhase.development and SessionType.DESC not in recommendations:
+            recommendations.insert(-1, SessionType.DESC)  # Before RMU
+        if phase == PlanPhase.base and experience in (ExperienceLevel.advanced, ExperienceLevel.expert):
+            if SessionType.DESC not in recommendations:
+                recommendations.append(SessionType.DESC)
+
+    if race_flags and race_flags.high_altitude:
+        # High altitude: remove INT in taper (keep purely aerobic)
+        if phase == PlanPhase.taper and SessionType.INT in recommendations:
+            recommendations.remove(SessionType.INT)
+
+    # --- Standard experience-based adjustments ---
+
     if phase == PlanPhase.base and experience in (ExperienceLevel.advanced, ExperienceLevel.expert):
-        recommendations.insert(3, SessionType.COT)
+        if SessionType.COT not in recommendations:
+            recommendations.insert(3, SessionType.COT)
 
     if phase == PlanPhase.development:
         if SessionType.COT not in recommendations:
             recommendations.insert(4, SessionType.COT)
 
     if phase == PlanPhase.specific and experience in (ExperienceLevel.advanced, ExperienceLevel.expert):
-        recommendations.append(SessionType.RMU)
+        if SessionType.RMU not in recommendations:
+            recommendations.append(SessionType.RMU)
 
     if phase == PlanPhase.taper and experience in (ExperienceLevel.advanced, ExperienceLevel.expert):
-        recommendations.insert(1, SessionType.TMP)
+        if SessionType.TMP not in recommendations:
+            recommendations.insert(1, SessionType.TMP)
 
     return recommendations
 
