@@ -155,7 +155,7 @@ async def _get_training_readiness(pool, user_id: int) -> dict:
     """
     query = """
         SELECT
-            AVG(readiness_score)::FLOAT as avg_score,
+            AVG(score)::FLOAT as avg_score,
             AVG(chronic_load)::FLOAT as chronic_load,
             AVG(acute_load)::FLOAT as acute_load
         FROM training_readiness
