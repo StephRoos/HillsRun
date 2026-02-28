@@ -219,14 +219,28 @@ async def get_plan_week(
     user_id: int = Depends(get_user_id),
 ):
     """Get a specific week with all sessions."""
-    plan = await db_ops.get_training_plan(db.pool, plan_id, user_id)
-    if not plan:
-        raise HTTPException(status_code=404, detail="Training plan not found")
+    try:
+        plan = await db_ops.get_training_plan(db.pool, plan_id, user_id)
+        if not plan:
+            raise HTTPException(status_code=404, detail="Training plan not found")
 
-    week = await db_ops.get_plan_week_by_number(db.pool, plan_id, week_number)
-    if not week:
-        raise HTTPException(status_code=404, detail="Week not found")
+        week = await db_ops.get_plan_week_by_number(db.pool, plan_id, week_number)
+        if not week:
+            raise HTTPException(status_code=404, detail="Week not found")
 
-    sessions = await db_ops.get_plan_sessions_for_week(db.pool, week["id"])
-    week["sessions"] = sessions
-    return PlanWeekDetail.model_validate(week)
+        sessions = await db_ops.get_plan_sessions_for_week(db.pool, week["id"])
+        # Fix legacy sessions where blocks was double-encoded as string
+        for s in sessions:
+            if isinstance(s.get("blocks"), str):
+                import json
+                s["blocks"] = json.loads(s["blocks"])
+        week["sessions"] = sessions
+        return PlanWeekDetail.model_validate(week)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Failed to fetch week {week_number} for plan {plan_id}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error loading week: {e}",
+        )
