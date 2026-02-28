@@ -161,6 +161,11 @@ async def get_training_plan(
         if not plan:
             raise HTTPException(status_code=404, detail="Training plan not found")
 
+        # Fix legacy plans where generation_params was double-encoded as string
+        if isinstance(plan.get("generation_params"), str):
+            import json
+            plan["generation_params"] = json.loads(plan["generation_params"])
+
         weeks = await db_ops.get_plan_weeks(db.pool, plan_id)
         plan["weeks"] = weeks
         return TrainingPlanDetail.model_validate(plan)
