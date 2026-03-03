@@ -3,6 +3,7 @@
 from typing import Optional
 
 from .models import (
+    DayPreferences,
     ExperienceLevel,
     PlanPhase,
     RaceFlags,
@@ -22,6 +23,7 @@ def build_week(
     long_run_spec: dict | None = None,
     race_flags: Optional[RaceFlags] = None,
     objective: Optional[RaceObjective] = None,
+    day_preferences: Optional[DayPreferences] = None,
 ) -> list[SessionSpec]:
     """Build a week of training sessions placed on available days.
 
@@ -52,6 +54,8 @@ def build_week(
                        If provided, a long run session (SL) will be created and placed on weekend.
         race_flags: Optional race classification flags for session adaptation.
         objective: Optional race objective (finish/midpack/performance).
+        day_preferences: Optional preferred days for session categories.
+            Preferences are best-effort: safety constraints always take priority.
 
     Returns:
         List of SessionSpec objects ordered by day of week. May include non-training days (REST).
@@ -80,10 +84,13 @@ def build_week(
     # Build session plan
     sessions: list[SessionSpec] = []
 
-    # Step 1: Place long run on weekend if provided
+    # Step 1: Place long run — use preferred day if available, else weekend fallback
     long_run_day = None
     if long_run_spec:
-        long_run_day = _find_weekend_day(available_days_sorted)
+        if day_preferences and day_preferences.long_run and day_preferences.long_run in available_days_sorted:
+            long_run_day = day_preferences.long_run
+        else:
+            long_run_day = _find_weekend_day(available_days_sorted)
         if long_run_day:
             lr_session = _create_long_run_session(
                 day=long_run_day,
@@ -95,14 +102,21 @@ def build_week(
             sessions.append(lr_session)
             session_count -= 1
 
-    # Step 2: Place quality sessions on midweek days (prefer Tue/Wed/Thu)
+    # Step 2: Place quality sessions — preferred days first, then midweek fallback
     quality_placed = 0
     max_quality = _get_max_quality_sessions(experience, objective)
 
     # Order quality types based on race flags
     quality_types = _get_quality_type_order(phase_types, race_flags)
 
-    midweek_days = [d for d in available_days_sorted if 2 <= d <= 5]
+    # Build candidate days: preferred quality days first, then standard midweek
+    used_days = {s.day_of_week for s in sessions}
+    if day_preferences and day_preferences.quality:
+        preferred_quality = [d for d in day_preferences.quality if d in available_days_sorted and d not in used_days]
+        other_midweek = [d for d in available_days_sorted if 2 <= d <= 5 and d not in used_days and d not in preferred_quality]
+        midweek_days = preferred_quality + other_midweek
+    else:
+        midweek_days = [d for d in available_days_sorted if 2 <= d <= 5 and d not in used_days]
 
     for quality_type in quality_types:
         if quality_placed >= max_quality or session_count <= 0:
@@ -111,7 +125,7 @@ def build_week(
         if not midweek_days:
             continue
 
-        # Find a midweek day that respects constraints
+        # Find a day that respects constraints
         best_day = None
         for day in midweek_days:
             if _can_place_hard_session(day, sessions):
@@ -163,9 +177,14 @@ def build_week(
             sessions.append(session)
             session_count -= 1
 
-    # Step 3: Fill remaining days with EF/REC
+    # Step 3: Fill remaining days with EF/REC — preferred easy_run days first
     used_days = {s.day_of_week for s in sessions}
     remaining_days = [d for d in available_days_sorted if d not in used_days]
+
+    if day_preferences and day_preferences.easy_run:
+        preferred_ef = [d for d in day_preferences.easy_run if d in remaining_days]
+        other_remaining = [d for d in remaining_days if d not in preferred_ef]
+        remaining_days = preferred_ef + other_remaining
 
     for day in remaining_days:
         if session_count <= 0:
@@ -192,16 +211,30 @@ def build_week(
             sessions.append(session)
             session_count -= 1
 
-    # Step 4: Add RMU on non-running day if available and phase allows
+    # Step 4: Add RMU — use preferred strength days if valid, else first available
+    # RMU is cross-training, so it CAN be placed on recovery days (after SL/quality).
+    # Place up to max_rmu sessions (1 by default, up to 2 if preferences request it)
     if SessionType.RMU in phase_types and not is_recovery_week:
-        non_running_days = [d for d in range(1, 8) if d not in {s.day_of_week for s in sessions}]
-        # Exclude days adjacent to hard sessions
-        valid_rmu_days = [d for d in non_running_days if not _is_adjacent_to_hard(d, sessions)]
+        max_rmu = 1
+        if day_preferences and day_preferences.strength:
+            max_rmu = len(day_preferences.strength)
 
-        if valid_rmu_days:
+        non_running_days = [d for d in range(1, 8) if d not in {s.day_of_week for s in sessions}]
+        valid_rmu_days = non_running_days
+
+        # Preferred strength days get priority
+        if day_preferences and day_preferences.strength:
+            preferred = [d for d in day_preferences.strength if d in valid_rmu_days]
+            remaining = [d for d in valid_rmu_days if d not in preferred]
+            valid_rmu_days = preferred + remaining
+
+        rmu_placed = 0
+        for rmu_day in valid_rmu_days:
+            if rmu_placed >= max_rmu:
+                break
             template = get_session_template(SessionType.RMU, experience, phase)
             rmu_session = SessionSpec(
-                day_of_week=valid_rmu_days[0],
+                day_of_week=rmu_day,
                 session_type=SessionType.RMU,
                 title=template.title,
                 description=template.description,
@@ -212,6 +245,7 @@ def build_week(
                 blocks=template.blocks,
             )
             sessions.append(rmu_session)
+            rmu_placed += 1
 
     # Sort by day of week
     sessions.sort(key=lambda s: s.day_of_week)
@@ -366,11 +400,32 @@ def _create_long_run_session(
     )
 
 
+def _adjacent_days(day: int) -> tuple[int, int]:
+    """Return (previous_day, next_day) with wrap-around (Sun↔Mon).
+
+    Args:
+        day: Day of week (1-7).
+
+    Returns:
+        Tuple of (day before, day after) with 7→1 and 1→7 wrapping.
+    """
+    prev_day = 7 if day == 1 else day - 1
+    next_day = 1 if day == 7 else day + 1
+    return prev_day, next_day
+
+
+def _prev_day(day: int) -> int:
+    """Return previous day with wrap-around (Mon→Sun)."""
+    return 7 if day == 1 else day - 1
+
+
 def _can_place_hard_session(day: int, existing_sessions: list[SessionSpec]) -> bool:
     """Check if a hard session can be placed on a given day.
 
-    Constraint: No 2 consecutive hard days (need >= 1 easy day between Z3+ sessions).
-    48+ hours between Z4-Z5 sessions.
+    Constraints:
+    - Max 2 consecutive hard days; the 3rd day must be recovery.
+    - No hard session the day after a long run (SL needs recovery).
+    - Wraps around: Sunday (7) is adjacent to Monday (1).
 
     Args:
         day: Day of week (1-7).
@@ -380,35 +435,60 @@ def _can_place_hard_session(day: int, existing_sessions: list[SessionSpec]) -> b
         True if a hard session can be placed on this day.
     """
     hard_zones = [3, 4, 5]
+    hard_days = {s.day_of_week for s in existing_sessions
+                 if s.hr_zone_primary and s.hr_zone_primary in hard_zones}
 
-    # Check adjacent days
-    adjacent_days = [day - 1, day + 1]
+    prev, _ = _adjacent_days(day)
+
+    # No hard session the day after a long run (SL needs recovery)
     for session in existing_sessions:
-        if session.day_of_week in adjacent_days:
-            if session.hr_zone_primary and session.hr_zone_primary in hard_zones:
-                return False
+        if session.session_type == SessionType.SL and session.day_of_week == prev:
+            return False
+
+    # Allow up to 2 consecutive hard days, block 3rd
+    # Count how many consecutive hard days precede this day
+    count_before = 0
+    check = prev
+    while check in hard_days:
+        count_before += 1
+        check = _prev_day(check)
+
+    # Count how many consecutive hard days follow this day
+    _, nxt = _adjacent_days(day)
+    count_after = 0
+    check = nxt
+    while check in hard_days:
+        count_after += 1
+        _, check = _adjacent_days(check)
+
+    # Total streak including this day
+    if count_before + 1 + count_after >= 3:
+        return False
 
     return True
 
 
 def _is_adjacent_to_hard(day: int, existing_sessions: list[SessionSpec]) -> bool:
-    """Check if a day is adjacent to a hard session.
+    """Check if a day is adjacent to a hard or demanding session.
 
-    Used to avoid placing RMU next to hard runs.
+    Used to avoid placing RMU next to hard runs or long runs.
+    Wraps around: Sunday (7) is adjacent to Monday (1).
 
     Args:
         day: Day of week (1-7).
         existing_sessions: List of already-placed sessions.
 
     Returns:
-        True if the day is adjacent to a Z3+ session.
+        True if the day is adjacent to a Z3+ session or a long run.
     """
     hard_zones = [3, 4, 5]
-    adjacent_days = [day - 1, day + 1]
+    prev_day, next_day = _adjacent_days(day)
 
     for session in existing_sessions:
-        if session.day_of_week in adjacent_days:
+        if session.day_of_week in (prev_day, next_day):
             if session.hr_zone_primary and session.hr_zone_primary in hard_zones:
+                return True
+            if session.session_type == SessionType.SL:
                 return True
 
     return False

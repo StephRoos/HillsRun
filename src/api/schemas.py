@@ -517,6 +517,7 @@ class AthleteProfileCreate(BaseModel):
     fc_max: Optional[int] = None
     fc_repos: Optional[int] = None
     fthr: Optional[int] = None
+    day_preferences: Optional[dict] = None
 
 
 class AthleteProfileResponse(BaseModel):
@@ -536,6 +537,7 @@ class AthleteProfileResponse(BaseModel):
     fc_max: Optional[int] = None
     fc_repos: Optional[int] = None
     fthr: Optional[int] = None
+    day_preferences: Optional[dict] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -589,6 +591,7 @@ class GeneratePlanRequestSchema(BaseModel):
     plan_name: Optional[str] = None
     total_weeks: Optional[int] = Field(default=None, ge=6, le=30)
     start_date: Optional[date] = None
+    day_preferences: Optional[dict] = None
 
 
 class TrainingPlanStatusUpdate(BaseModel):

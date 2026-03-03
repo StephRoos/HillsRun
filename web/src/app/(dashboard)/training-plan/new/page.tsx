@@ -17,9 +17,22 @@ import {
   useGenerateTrainingPlan,
   useFitnessSnapshot,
 } from "@/hooks/use-training-plans";
-import type { AthleteProfileCreate, RaceTargetCreate } from "@/types/garmin";
+import { DayPreferencePicker } from "@/components/training-plan/day-preference-picker";
+import type { AthleteProfileCreate, DayPreferences, RaceTargetCreate } from "@/types/garmin";
 
 const STEPS = ["Profile", "Race", "Preferences", "Generate"];
+
+// Running sessions per week by experience level (mirrors _get_session_count in week_builder.py)
+const SESSION_COUNT: Record<string, number> = {
+  beginner: 3,
+  intermediate: 4,
+  advanced: 5,
+  expert: 6,
+};
+
+const DAY_LABELS: Record<number, string> = {
+  1: "Mon", 2: "Tue", 3: "Wed", 4: "Thu", 5: "Fri", 6: "Sat", 7: "Sun",
+};
 
 export default function NewTrainingPlanPage() {
   const router = useRouter();
@@ -47,6 +60,8 @@ export default function NewTrainingPlanPage() {
 
   const [planName, setPlanName] = useState("");
   const [totalWeeks, setTotalWeeks] = useState<number | undefined>();
+  const [dayPrefsOverride, setDayPrefsOverride] = useState<DayPreferences>({});
+  const [useDayOverride, setUseDayOverride] = useState(false);
   const generatePlan = useGenerateTrainingPlan();
   const { data: fitness } = useFitnessSnapshot();
 
@@ -61,6 +76,7 @@ export default function NewTrainingPlanPage() {
       birth_date: profile.birth_date ?? undefined,
       height_cm: profile.height_cm ?? undefined,
       gender: profile.gender ?? undefined,
+      day_preferences: profile.day_preferences ?? undefined,
     });
   }
 
@@ -82,10 +98,15 @@ export default function NewTrainingPlanPage() {
 
   async function handleGenerate() {
     if (!selectedRaceId) return;
+    // Send override preferences if enabled, otherwise backend uses profile defaults
+    const overridePrefs = useDayOverride && Object.keys(dayPrefsOverride).length > 0
+      ? dayPrefsOverride
+      : undefined;
     const result = await generatePlan.mutateAsync({
       race_target_id: selectedRaceId,
       plan_name: planName || undefined,
       total_weeks: totalWeeks,
+      day_preferences: overridePrefs,
     });
     const planId = (result as Record<string, unknown>).plan_id;
     router.push(`/training-plan/${planId}`);
@@ -196,6 +217,19 @@ export default function NewTrainingPlanPage() {
                 />
                 <Label>Gym access</Label>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Preferred Training Days</Label>
+              <p className="text-xs text-muted-foreground">
+                Optional: choose which days you prefer for each session type
+              </p>
+              <DayPreferencePicker
+                value={profileForm.day_preferences ?? {}}
+                onChange={(prefs) =>
+                  setProfileForm({ ...profileForm, day_preferences: prefs })
+                }
+                maxRunningSessions={SESSION_COUNT[profileForm.experience_level] ?? 4}
+              />
             </div>
             <Button
               onClick={handleSaveProfile}
@@ -347,6 +381,22 @@ export default function NewTrainingPlanPage() {
                 placeholder="6-30 weeks"
               />
             </div>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={useDayOverride}
+                  onCheckedChange={setUseDayOverride}
+                />
+                <Label>Override day preferences for this plan</Label>
+              </div>
+              {useDayOverride && (
+                <DayPreferencePicker
+                  value={dayPrefsOverride}
+                  onChange={setDayPrefsOverride}
+                  maxRunningSessions={SESSION_COUNT[profileForm.experience_level] ?? 4}
+                />
+              )}
+            </div>
             {fitness && (
               <div className="rounded-md border p-4 space-y-2">
                 <h4 className="font-medium text-sm">Current Fitness Snapshot</h4>
@@ -424,6 +474,25 @@ export default function NewTrainingPlanPage() {
               <div>
                 Race ID: <span className="font-medium">{selectedRaceId}</span>
               </div>
+              {(() => {
+                const prefs = useDayOverride ? dayPrefsOverride : profileForm.day_preferences;
+                if (!prefs || (!prefs.long_run && !prefs.quality?.length && !prefs.strength && !prefs.easy_run?.length)) return null;
+                return (
+                  <div className="pt-1 border-t space-y-0.5">
+                    <div className="font-medium text-xs text-muted-foreground">Day Preferences{useDayOverride ? " (override)" : ""}</div>
+                    {prefs.long_run && <div>Long Run: <span className="font-medium">{DAY_LABELS[prefs.long_run]}</span></div>}
+                    {prefs.quality && prefs.quality.length > 0 && (
+                      <div>Quality: <span className="font-medium">{prefs.quality.map((d) => DAY_LABELS[d]).join(", ")}</span></div>
+                    )}
+                    {prefs.easy_run && prefs.easy_run.length > 0 && (
+                      <div>Easy Run: <span className="font-medium">{prefs.easy_run.map((d) => DAY_LABELS[d]).join(", ")}</span></div>
+                    )}
+                    {prefs.strength && prefs.strength.length > 0 && (
+                      <div>Strength: <span className="font-medium">{prefs.strength.map((d) => DAY_LABELS[d]).join(", ")}</span></div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
             <Button
               onClick={handleGenerate}

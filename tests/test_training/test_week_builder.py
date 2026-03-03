@@ -2,7 +2,7 @@
 import pytest
 from src.training.week_builder import build_week, _get_max_quality_sessions, _get_quality_type_order
 from src.training.models import (
-    ExperienceLevel, PlanPhase, RaceCategory, RaceFlags, RaceObjective, SessionType,
+    DayPreferences, ExperienceLevel, PlanPhase, RaceCategory, RaceFlags, RaceObjective, SessionType,
 )
 
 
@@ -221,3 +221,216 @@ def test_quality_order_high_dplus():
         race_flags=flags,
     )
     assert order[0] == SessionType.COT
+
+
+# --- Day preferences tests ---
+
+def test_long_run_on_preferred_day():
+    """Long run should be placed on the preferred day when available."""
+    prefs = DayPreferences(long_run=7)  # Prefer Sunday
+    sessions = build_week(
+        available_days=[2, 4, 6, 7],
+        phase=PlanPhase.development,
+        experience=ExperienceLevel.intermediate,
+        is_recovery_week=False,
+        week_number=5,
+        long_run_spec={"target_km": 20, "target_duration_seconds": 8400, "progression_note": "Build"},
+        day_preferences=prefs,
+    )
+    sl = [s for s in sessions if s.session_type == SessionType.SL]
+    assert len(sl) == 1
+    assert sl[0].day_of_week == 7
+
+
+def test_quality_on_preferred_days():
+    """Quality sessions should be placed on preferred days when available."""
+    prefs = DayPreferences(quality=[2, 4])  # Prefer Tue, Thu
+    sessions = build_week(
+        available_days=[1, 2, 3, 4, 5, 6],
+        phase=PlanPhase.specific,
+        experience=ExperienceLevel.advanced,
+        is_recovery_week=False,
+        week_number=10,
+        long_run_spec={"target_km": 25, "target_duration_seconds": 9000, "progression_note": "Build"},
+        day_preferences=prefs,
+    )
+    quality = [s for s in sessions if s.session_type in (SessionType.COT, SessionType.TMP, SessionType.INT)]
+    # Advanced gets 2 quality sessions — both should be on preferred days
+    assert len(quality) >= 2
+    quality_days = {s.day_of_week for s in quality}
+    assert quality_days.issubset({2, 4})
+
+
+def test_strength_on_preferred_day():
+    """RMU should be placed on the preferred strength day when valid."""
+    # Use day 1 (Monday) as preferred strength — quality goes to 3 or 4,
+    # so day 1 should not be adjacent to hard sessions
+    prefs = DayPreferences(strength=[1])
+    sessions = build_week(
+        available_days=[3, 4, 6, 7],
+        phase=PlanPhase.development,
+        experience=ExperienceLevel.intermediate,
+        is_recovery_week=False,
+        week_number=5,
+        long_run_spec={"target_km": 20, "target_duration_seconds": 8400, "progression_note": "Build"},
+        day_preferences=prefs,
+    )
+    rmu = [s for s in sessions if s.session_type == SessionType.RMU]
+    if rmu:  # RMU placement depends on constraints being satisfied
+        assert rmu[0].day_of_week == 1
+
+
+def test_two_strength_sessions():
+    """Two preferred strength days should produce 2 RMU sessions when valid."""
+    # Sessions: quality on day 3, SL on day 7 → day 1 and 5 are free
+    # Day 1: not adjacent to hard (day 2 is free). Day 5: not adjacent to hard (day 4 is EF).
+    prefs = DayPreferences(long_run=7, strength=[1, 5])
+    sessions = build_week(
+        available_days=[3, 4, 7],
+        phase=PlanPhase.development,
+        experience=ExperienceLevel.intermediate,
+        is_recovery_week=False,
+        week_number=5,
+        long_run_spec={"target_km": 20, "target_duration_seconds": 8400, "progression_note": "Build"},
+        day_preferences=prefs,
+    )
+    rmu = [s for s in sessions if s.session_type == SessionType.RMU]
+    assert len(rmu) == 2
+    rmu_days = {s.day_of_week for s in rmu}
+    assert rmu_days == {1, 5}
+
+
+def test_preferred_day_not_available_falls_back():
+    """If preferred long_run day isn't in available_days, fall back to weekend."""
+    prefs = DayPreferences(long_run=7)  # Prefer Sunday but it's not available
+    sessions = build_week(
+        available_days=[2, 4, 6],  # No Sunday
+        phase=PlanPhase.development,
+        experience=ExperienceLevel.intermediate,
+        is_recovery_week=False,
+        week_number=5,
+        long_run_spec={"target_km": 20, "target_duration_seconds": 8400, "progression_note": "Build"},
+        day_preferences=prefs,
+    )
+    sl = [s for s in sessions if s.session_type == SessionType.SL]
+    assert len(sl) == 1
+    assert sl[0].day_of_week == 6  # Falls back to Saturday
+
+
+def test_no_preferences_same_as_before():
+    """Without day_preferences, behavior should be identical to the default."""
+    sessions_default = build_week(
+        available_days=[2, 4, 6, 7],
+        phase=PlanPhase.development,
+        experience=ExperienceLevel.intermediate,
+        is_recovery_week=False,
+        week_number=5,
+        long_run_spec={"target_km": 20, "target_duration_seconds": 8400, "progression_note": "Build"},
+    )
+    sessions_none = build_week(
+        available_days=[2, 4, 6, 7],
+        phase=PlanPhase.development,
+        experience=ExperienceLevel.intermediate,
+        is_recovery_week=False,
+        week_number=5,
+        long_run_spec={"target_km": 20, "target_duration_seconds": 8400, "progression_note": "Build"},
+        day_preferences=None,
+    )
+    # Same sessions on same days
+    assert [s.day_of_week for s in sessions_default] == [s.day_of_week for s in sessions_none]
+    assert [s.session_type for s in sessions_default] == [s.session_type for s in sessions_none]
+
+
+def test_no_quality_day_after_long_run():
+    """Quality session should never be placed the day after a long run."""
+    # Case 1: SL on Saturday (6) → Sunday (7) must not be quality
+    prefs1 = DayPreferences(long_run=6, quality=[7])
+    sessions1 = build_week(
+        available_days=[1, 2, 3, 4, 5, 6, 7],
+        phase=PlanPhase.development,
+        experience=ExperienceLevel.intermediate,
+        is_recovery_week=False,
+        week_number=5,
+        long_run_spec={"target_km": 20, "target_duration_seconds": 8400, "progression_note": "Build"},
+        day_preferences=prefs1,
+    )
+    quality1 = [s for s in sessions1 if s.session_type in (SessionType.COT, SessionType.TMP, SessionType.INT)]
+    for q in quality1:
+        assert q.day_of_week != 7, "Quality should not be placed the day after a long run"
+
+    # Case 2 (wrap-around): SL on Sunday (7) → Monday (1) must not be quality
+    prefs2 = DayPreferences(long_run=7, quality=[1])
+    sessions2 = build_week(
+        available_days=[1, 2, 3, 4, 5, 6, 7],
+        phase=PlanPhase.development,
+        experience=ExperienceLevel.intermediate,
+        is_recovery_week=False,
+        week_number=5,
+        long_run_spec={"target_km": 20, "target_duration_seconds": 8400, "progression_note": "Build"},
+        day_preferences=prefs2,
+    )
+    quality2 = [s for s in sessions2 if s.session_type in (SessionType.COT, SessionType.TMP, SessionType.INT)]
+    for q in quality2:
+        assert q.day_of_week != 1, "Quality on Monday should be blocked when long run is Sunday (wrap-around)"
+
+
+def test_two_adjacent_quality_allowed():
+    """Two consecutive quality days should be allowed (max 2 in a row)."""
+    # Advanced gets 2 quality sessions — prefer them on consecutive days 3, 4
+    prefs = DayPreferences(quality=[3, 4])
+    sessions = build_week(
+        available_days=[1, 2, 3, 4, 5, 6],
+        phase=PlanPhase.specific,
+        experience=ExperienceLevel.advanced,
+        is_recovery_week=False,
+        week_number=10,
+        long_run_spec={"target_km": 25, "target_duration_seconds": 9000, "progression_note": "Build"},
+        day_preferences=prefs,
+    )
+    quality = [s for s in sessions if s.session_type in (SessionType.COT, SessionType.TMP, SessionType.INT)]
+    quality_days = {q.day_of_week for q in quality}
+    # Both day 3 and 4 should be quality — 2 adjacent is now allowed
+    assert 3 in quality_days and 4 in quality_days, \
+        "Two adjacent quality sessions should be allowed"
+
+
+def test_three_consecutive_hard_blocked():
+    """Three consecutive hard days should be prevented by safety constraints."""
+    # Expert with performance objective gets up to 3 quality sessions
+    prefs = DayPreferences(quality=[2, 3, 4])
+    sessions = build_week(
+        available_days=[1, 2, 3, 4, 5, 6],
+        phase=PlanPhase.specific,
+        experience=ExperienceLevel.expert,
+        is_recovery_week=False,
+        week_number=10,
+        long_run_spec={"target_km": 30, "target_duration_seconds": 10800, "progression_note": "Build"},
+        day_preferences=prefs,
+        objective=RaceObjective.performance,
+    )
+    quality = [s for s in sessions if s.session_type in (SessionType.COT, SessionType.TMP, SessionType.INT)]
+    quality_days = [q.day_of_week for q in quality]
+    # Days 2, 3, 4 should NOT all be quality — max 2 consecutive
+    assert not (2 in quality_days and 3 in quality_days and 4 in quality_days), \
+        "Three consecutive quality sessions should be prevented"
+
+
+def test_easy_run_on_preferred_day():
+    """EF should be placed on preferred easy_run day when slots are limited."""
+    # Intermediate = 4 running sessions. SL on 7, quality on 3 → 1 EF slot left.
+    # Available: [1, 3, 5, 7]. Candidates for EF: [1, 5]. Prefer day 5.
+    prefs = DayPreferences(long_run=7, quality=[3], easy_run=[5])
+    sessions = build_week(
+        available_days=[1, 3, 5, 7],
+        phase=PlanPhase.development,
+        experience=ExperienceLevel.intermediate,
+        is_recovery_week=False,
+        week_number=5,
+        long_run_spec={"target_km": 20, "target_duration_seconds": 8400, "progression_note": "Build"},
+        day_preferences=prefs,
+    )
+    ef = [s for s in sessions if s.session_type == SessionType.EF]
+    # With 4 sessions total: SL(7) + quality(3) + EF + EF or fewer
+    # Preferred day 5 should be the first EF placed
+    ef_days = [s.day_of_week for s in ef]
+    assert 5 in ef_days, "Preferred easy_run day should be used"

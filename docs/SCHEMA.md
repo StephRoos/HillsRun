@@ -542,6 +542,34 @@ WHERE schemaname = 'public'
 ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
 ```
 
+## athlete_profiles — Day Preferences Column
+
+```sql
+-- Added by sql/10_day_preferences.sql
+ALTER TABLE athlete_profiles ADD COLUMN IF NOT EXISTS day_preferences JSONB;
+```
+
+**JSONB structure**:
+```json
+{
+  "long_run": 7,
+  "quality": [2, 4],
+  "easy_run": [1, 5],
+  "strength": [1, 5]
+}
+```
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `long_run` | int (1-7) | Preferred day for weekly long run |
+| `quality` | int[] (max 3) | Preferred days for hard sessions (tempo, intervals, hill repeats) |
+| `easy_run` | int[] (max 5) | Preferred days for easy/recovery runs |
+| `strength` | int[] (max 2) | Preferred days for cross-training (RMU) |
+
+Day numbers follow ISO convention: 1=Monday, 7=Sunday. All fields nullable.
+
+---
+
 ### Clean old heart rate samples
 
 ```sql

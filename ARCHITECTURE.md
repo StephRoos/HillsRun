@@ -959,8 +959,39 @@ uv run pytest --cov     # Coverage report
 3. **Deployment**: Self-hosted on NAS (cost-effective), Cloudflare Tunnel (secure), Vercel frontend (fast).
 4. **Architecture**: Minimal dependencies (no task queue, no WebSocket), explicit data flow (query → sync → invalidate).
 
+### Training Plan Engine
+
+The training plan engine generates periodized plans from athlete profile, race target, and fitness data.
+
+**Core modules** (`src/training/`):
+- `models.py` — Pydantic models: `DayPreferences`, `GeneratePlanRequest`, `SessionSpec`, `RaceFlags`, enums
+- `week_builder.py` — Weekly session placement with constraint-based scheduling
+- `plan_generator.py` — Orchestrates multi-week plan generation, resolves preferences
+- `session_catalog.py` — Session templates by type/phase/experience
+- `race_classifier.py` — Classifies races (trail categories, D+, technical, altitude)
+- `long_run_calculator.py` — Progressive long run distance/duration targets
+
+**Day Preferences** (`DayPreferences` model):
+Athletes can configure preferred days for each session category:
+- `long_run: int` — Single day (1-7) for the weekly long run
+- `quality: list[int]` — Up to 3 days for hard sessions (tempo, intervals, hill repeats)
+- `easy_run: list[int]` — Preferred days for easy/recovery runs (when more available days than session slots)
+- `strength: list[int]` — Up to 2 days for cross-training (RMU)
+
+Preferences are best-effort: safety constraints always override:
+- Max 2 consecutive hard days; 3rd day must be recovery
+- No hard session the day after a long run (wrap-around: Sun→Mon)
+- Strength (cross-training) allowed on any day including recovery days
+- Resolution priority: per-plan override > profile stored > engine defaults
+
+**Frontend** (`web/src/components/training-plan/day-preference-picker.tsx`):
+Interactive 7×N grid where athletes configure session placement:
+- Long Run (orange), Quality (red), Easy Run (blue), Strength (cyan)
+- Status summary row: REC (green, easy run day) / REST (gray, no session)
+- Auto-computes EF slots from `maxRunningSessions - allocated`; interactive when choice needed
+- Blocked days (post-SL, post-2-quality) disabled for hard sessions
+
 **Next milestones**:
 - Backend tests (pytest + mocks)
 - Mobile app (Expo, reuse FastAPI)
-- Training plan integration (AI-generated workouts)
 - Integration with RecettesApp (shared nutrition data)

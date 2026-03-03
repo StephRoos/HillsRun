@@ -21,7 +21,7 @@ from ..schemas import (
 )
 from ...training import db_operations as db_ops
 from ...training.fitness_snapshot import build_fitness_snapshot
-from ...training.models import GeneratePlanRequest
+from ...training.models import DayPreferences, GeneratePlanRequest
 from ...training.plan_generator import generate_plan
 
 logger = logging.getLogger(__name__)
@@ -50,6 +50,7 @@ async def generate_training_plan(
         plan_name=body.plan_name,
         total_weeks=body.total_weeks,
         start_date=body.start_date,
+        day_preferences=DayPreferences(**body.day_preferences) if body.day_preferences else None,
     )
     try:
         result = await generate_plan(db.pool, user_id, request)

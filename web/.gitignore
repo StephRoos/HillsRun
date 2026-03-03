@@ -46,3 +46,4 @@ public/swe-worker*
 
 # prisma
 /src/generated
+.env*.local

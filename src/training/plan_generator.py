@@ -6,6 +6,7 @@ from datetime import date, timedelta
 from typing import Any, Optional
 
 from .models import (
+    DayPreferences,
     ExperienceLevel,
     GeneratePlanRequest,
     RaceObjective,
@@ -118,7 +119,11 @@ async def generate_plan(
     # Step 8: Determine plan name
     plan_name = request.plan_name or f"Plan {race['race_name']} - {total_weeks} weeks"
 
-    # Step 9: Save plan and weeks/sessions in a transaction
+    # Step 9: Resolve available days and day preferences before saving
+    available_days = _resolve_available_days(profile)
+    day_prefs = _resolve_day_preferences(profile, request.day_preferences)
+
+    # Step 10: Save plan and weeks/sessions in a transaction
     async with pool.acquire() as conn:
         async with conn.transaction():
             # Create master plan
@@ -141,13 +146,11 @@ async def generate_plan(
                     "experience": experience.value,
                     "objective": objective.value,
                     "hr_zones": [z.model_dump() for z in hr_zones] if hr_zones else None,
+                    "day_preferences": day_prefs.model_dump() if day_prefs else None,
                 }),
                 coach_id,
             )
             plan_id = plan_row["id"]
-
-            # Determine available days from profile
-            available_days = _resolve_available_days(profile)
 
             current_long_run_km = fitness.recent_long_run_km or 0
             previous_week_tss = 0.0
@@ -165,7 +168,7 @@ async def generate_plan(
                     current_long_run_km=current_long_run_km,
                 )
 
-                # Build week sessions
+                # Build week sessions (preferences are best-effort, constraints win)
                 sessions = build_week(
                     available_days=available_days,
                     phase=week_spec.phase,
@@ -175,6 +178,7 @@ async def generate_plan(
                     long_run_spec=long_run_spec,
                     race_flags=race_flags,
                     objective=objective,
+                    day_preferences=day_prefs,
                 )
 
                 # Inject personalized HR zones into sessions
@@ -313,6 +317,31 @@ async def generate_plan(
         "experience_level": experience.value,
         "status": "draft",
     }
+
+
+def _resolve_day_preferences(
+    profile: dict,
+    request_override: Optional[DayPreferences] = None,
+) -> Optional[DayPreferences]:
+    """Resolve day preferences: request override > profile > None.
+
+    Args:
+        profile: Athlete profile dict from DB.
+        request_override: Optional override from the generation request.
+
+    Returns:
+        DayPreferences if any source provides them, else None.
+    """
+    # Request-level override takes full priority
+    if request_override:
+        return request_override
+
+    # Fall back to profile-stored preferences
+    prefs = profile.get("day_preferences")
+    if prefs and isinstance(prefs, dict):
+        return DayPreferences(**prefs)
+
+    return None
 
 
 # Day name → ISO day number (1=Monday, 7=Sunday)

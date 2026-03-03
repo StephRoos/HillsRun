@@ -44,12 +44,15 @@ async def upsert_athlete_profile(pool, user_id: int, data: dict[str, Any]) -> di
         "birth_date", "gender", "height_cm", "experience_level",
         "available_days_per_week", "available_slots", "injury_history",
         "has_hill_access", "has_gym_access", "fc_max", "fc_repos", "fthr",
+        "day_preferences",
     }
     fields = {k: v for k, v in data.items() if k in allowed}
 
     # Serialize JSONB fields
     if "available_slots" in fields and isinstance(fields["available_slots"], dict):
         fields["available_slots"] = json.dumps(fields["available_slots"])
+    if "day_preferences" in fields and isinstance(fields["day_preferences"], dict):
+        fields["day_preferences"] = json.dumps(fields["day_preferences"])
 
     columns = ["user_id"] + list(fields.keys())
     values = [user_id] + list(fields.values())

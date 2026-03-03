@@ -4,7 +4,7 @@ from datetime import date
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ExperienceLevel(str, Enum):
@@ -119,6 +119,54 @@ class RaceTargetInput(BaseModel):
     objective: RaceObjective = RaceObjective.finish
 
 
+class DayPreferences(BaseModel):
+    """Preferred days for each session category.
+
+    Day numbers follow ISO convention: 1=Monday, 7=Sunday.
+    """
+
+    long_run: Optional[int] = Field(default=None, ge=1, le=7)
+    quality: Optional[list[int]] = None
+    strength: Optional[list[int]] = None
+    easy_run: Optional[list[int]] = None
+
+    @field_validator("quality")
+    @classmethod
+    def validate_quality(cls, v: Optional[list[int]]) -> Optional[list[int]]:
+        """Ensure quality days are valid (1-7) and max 3 entries."""
+        if v is None:
+            return v
+        if len(v) > 3:
+            raise ValueError("quality must have at most 3 days")
+        if not all(1 <= d <= 7 for d in v):
+            raise ValueError("quality days must be between 1 and 7")
+        return v
+
+    @field_validator("strength")
+    @classmethod
+    def validate_strength(cls, v: Optional[list[int]]) -> Optional[list[int]]:
+        """Ensure strength days are valid (1-7) and max 2 entries."""
+        if v is None:
+            return v
+        if len(v) > 2:
+            raise ValueError("strength must have at most 2 days")
+        if not all(1 <= d <= 7 for d in v):
+            raise ValueError("strength days must be between 1 and 7")
+        return v
+
+    @field_validator("easy_run")
+    @classmethod
+    def validate_easy_run(cls, v: Optional[list[int]]) -> Optional[list[int]]:
+        """Ensure easy_run days are valid (1-7) and max 5 entries."""
+        if v is None:
+            return v
+        if len(v) > 5:
+            raise ValueError("easy_run must have at most 5 days")
+        if not all(1 <= d <= 7 for d in v):
+            raise ValueError("easy_run days must be between 1 and 7")
+        return v
+
+
 class GeneratePlanRequest(BaseModel):
     """Request to generate a training plan."""
 
@@ -126,6 +174,7 @@ class GeneratePlanRequest(BaseModel):
     plan_name: Optional[str] = None
     total_weeks: Optional[int] = Field(default=None, ge=6, le=30)
     start_date: Optional[date] = None
+    day_preferences: Optional[DayPreferences] = None
 
 
 class RaceFlags(BaseModel):

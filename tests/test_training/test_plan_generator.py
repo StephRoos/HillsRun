@@ -2,8 +2,8 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import date
-from src.training.plan_generator import generate_plan, _resolve_available_days
-from src.training.models import GeneratePlanRequest
+from src.training.plan_generator import generate_plan, _resolve_available_days, _resolve_day_preferences
+from src.training.models import DayPreferences, GeneratePlanRequest
 
 
 @pytest.fixture
@@ -180,3 +180,31 @@ def test_resolve_available_days_ignores_empty_slot_lists():
     }
     days = _resolve_available_days(profile)
     assert days == [1, 6]
+
+
+# --- _resolve_day_preferences tests ---
+
+def test_resolve_day_preferences_override_wins():
+    """Request override should take priority over profile preferences."""
+    profile = {"day_preferences": {"long_run": 6, "quality": [2, 4]}}
+    override = DayPreferences(long_run=7, quality=[3, 5])
+    result = _resolve_day_preferences(profile, override)
+    assert result is override
+    assert result.long_run == 7
+    assert result.quality == [3, 5]
+
+
+def test_resolve_day_preferences_from_profile():
+    """Profile day_preferences should be used when no override."""
+    profile = {"day_preferences": {"long_run": 7, "strength": [3]}}
+    result = _resolve_day_preferences(profile, None)
+    assert result is not None
+    assert result.long_run == 7
+    assert result.strength == [3]
+
+
+def test_resolve_day_preferences_none():
+    """No preferences anywhere should return None."""
+    profile = {"experience_level": "intermediate"}
+    result = _resolve_day_preferences(profile, None)
+    assert result is None

@@ -241,6 +241,14 @@ export interface CoachingStatus {
   coaches: CoachInfo[];
 }
 
+// Day preferences for training session placement
+export interface DayPreferences {
+  long_run?: number;
+  quality?: number[];
+  strength?: number[];
+  easy_run?: number[];
+}
+
 // Training Plans
 export interface WorkoutBlock {
   name: string;
@@ -264,6 +272,7 @@ export interface AthleteProfile {
   fc_max: number | null;
   fc_repos: number | null;
   fthr: number | null;
+  day_preferences: DayPreferences | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -281,6 +290,7 @@ export interface AthleteProfileCreate {
   fc_max?: number;
   fc_repos?: number;
   fthr?: number;
+  day_preferences?: DayPreferences;
 }
 
 export interface RaceTarget {
@@ -321,6 +331,7 @@ export interface GeneratePlanRequest {
   plan_name?: string;
   total_weeks?: number;
   start_date?: string;
+  day_preferences?: DayPreferences;
 }
 
 export interface TrainingPlanSummary {
