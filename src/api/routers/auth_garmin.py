@@ -6,7 +6,7 @@ import uuid
 import time
 from typing import Optional, Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request as FastAPIRequest
 from pydantic import BaseModel
 
 from garminconnect import Garmin, GarminConnectAuthenticationError
@@ -14,6 +14,7 @@ import garth
 
 from ..auth import get_api_key
 from ..dependencies import get_db
+from ..rate_limit import limiter, AUTH_RATE_LIMIT
 from ...token_manager import TokenManager
 
 logger = logging.getLogger(__name__)
@@ -131,7 +132,8 @@ async def _finalize_connect(
 
 
 @router.post("/connect", response_model=ConnectResponse)
-async def connect_garmin(request: ConnectRequest, db=Depends(get_db)):
+@limiter.limit(AUTH_RATE_LIMIT)
+async def connect_garmin(http_request: FastAPIRequest, request: ConnectRequest, db=Depends(get_db)):
     """Authenticate with Garmin Connect, store encrypted tokens, link to Better-Auth user."""
     token_key = os.environ.get("GARMIN_TOKEN_KEY", "")
     if not token_key:
@@ -184,7 +186,8 @@ async def connect_garmin(request: ConnectRequest, db=Depends(get_db)):
 
 
 @router.post("/connect/mfa", response_model=ConnectResponse)
-async def connect_garmin_mfa(request: MfaRequest, db=Depends(get_db)):
+@limiter.limit(AUTH_RATE_LIMIT)
+async def connect_garmin_mfa(http_request: FastAPIRequest, request: MfaRequest, db=Depends(get_db)):
     """Complete Garmin Connect login with MFA code."""
     token_key = os.environ.get("GARMIN_TOKEN_KEY", "")
     if not token_key:

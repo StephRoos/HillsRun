@@ -17,6 +17,7 @@ dependencies = [
     "requests>=2.31.0",
     "cryptography>=42.0.0",
     "python-multipart>=0.0.22",
+    "slowapi>=0.1.9",
 ]
 
 [project.optional-dependencies]

@@ -6,10 +6,13 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from fastapi import FastAPI
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from ..config import DatabaseConfig
 from ..database import Database
 from .middleware import CacheControlMiddleware
+from .rate_limit import limiter
 from .routers import (
     health,
     daily,
@@ -84,6 +87,10 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+# Rate limiting: 100 req/min global, stricter on auth endpoints
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(CacheControlMiddleware)
 
