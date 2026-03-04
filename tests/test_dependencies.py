@@ -66,8 +66,8 @@ class TestDateRange:
         assert end == test_end
 
     def test_date_range_with_only_start(self):
-        """Test date_range with only start date."""
-        test_start = date(2025, 1, 1)
+        """Test date_range with only start date (within 365-day limit)."""
+        test_start = date.today() - timedelta(days=60)
 
         start, end = date_range(test_start, None)
 
