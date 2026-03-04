@@ -88,7 +88,7 @@ async def _finalize_connect(
         existing_user_id = await db.get_user_by_email(request_email)
         if existing_user_id:
             logger.info(
-                f"Found existing garmin_user by email={request_email}, user_id={existing_user_id}"
+                f"Found existing garmin_user, user_id={existing_user_id}"
             )
 
     if existing_user_id:
@@ -113,10 +113,10 @@ async def _finalize_connect(
                 display_name=display_name,
                 email=request_email,
             )
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to link Garmin account in database")
             raise HTTPException(
-                status_code=500, detail=f"Failed to link Garmin account: {e}"
+                status_code=500, detail="Failed to link Garmin account"
             )
 
     await db.store_encrypted_tokens(user_id, encrypted)
@@ -150,13 +150,13 @@ async def connect_garmin(http_request: FastAPIRequest, request: ConnectRequest, 
     try:
         garmin_client = Garmin(request.email, request.password, return_on_mfa=True)
         result = garmin_client.login()
-    except GarminConnectAuthenticationError as e:
+    except GarminConnectAuthenticationError:
         raise HTTPException(
-            status_code=401, detail=f"Garmin authentication failed: {e}"
+            status_code=401, detail="Garmin authentication failed"
         )
-    except Exception as e:
+    except Exception:
         logger.exception("Garmin login error")
-        raise HTTPException(status_code=502, detail=f"Failed to connect to Garmin: {e}")
+        raise HTTPException(status_code=502, detail="Failed to connect to Garmin")
 
     # Check if MFA is required
     if isinstance(result, tuple) and len(result) == 2 and result[0] == "needs_mfa":
@@ -170,7 +170,7 @@ async def connect_garmin(http_request: FastAPIRequest, request: ConnectRequest, 
             "existing_user_id": existing_user_id,
             "created": time.time(),
         }
-        logger.info(f"MFA required for {request.email}, session_id={session_id}")
+        logger.info(f"MFA required, session_id={session_id}")
         return ConnectResponse(
             connected=False, needs_mfa=True, mfa_session_id=session_id
         )
@@ -208,9 +208,9 @@ async def connect_garmin_mfa(http_request: FastAPIRequest, request: MfaRequest, 
         oauth1, oauth2 = garth.sso.resume_login(
             session["client_state"], request.mfa_code
         )
-    except Exception as e:
+    except Exception:
         logger.exception("MFA verification failed")
-        raise HTTPException(status_code=401, detail=f"MFA verification failed: {e}")
+        raise HTTPException(status_code=401, detail="MFA verification failed")
 
     garmin_client = session["garmin_client"]
     # Set the real OAuth tokens (login() with return_on_mfa stored intermediate state)
