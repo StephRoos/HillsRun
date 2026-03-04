@@ -61,7 +61,10 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      - name: Build (includes typecheck)
+      - name: Type check
+        run: pnpm exec tsc --noEmit
+
+      - name: Build
         run: pnpm build
         env:
           DATABASE_URL: "postgresql://fake:fake@localhost:5432/fake"
