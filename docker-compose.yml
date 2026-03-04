@@ -4,6 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: garmin-sync
+    env_file:
+      - .env
     environment:
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
@@ -29,6 +31,8 @@ services:
       context: .
       dockerfile: Dockerfile.api
     container_name: garmin-api
+    env_file:
+      - .env
     environment:
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
