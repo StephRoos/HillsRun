@@ -4,6 +4,9 @@ from datetime import date, timedelta
 from typing import Optional
 from fastapi import Query, HTTPException, status, Request
 
+# Maximum date range allowed to prevent abuse (365 days)
+_MAX_DATE_RANGE_DAYS = 365
+
 
 def get_db(request: Request):
     """Extract the Database instance from app state."""
@@ -51,10 +54,16 @@ def date_range(
         Tuple of (start_date, end_date).
     """
     today = date.today()
-    return (
-        start_date or today - timedelta(days=30),
-        end_date or today,
-    )
+    start = start_date or today - timedelta(days=30)
+    end = end_date or today
+
+    if (end - start).days > _MAX_DATE_RANGE_DAYS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Date range cannot exceed {_MAX_DATE_RANGE_DAYS} days",
+        )
+
+    return start, end
 
 
 def pagination(
