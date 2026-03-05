@@ -1,9 +1,20 @@
 """Sync manager for orchestrating data synchronization."""
 
+import asyncio
 import logging
 import os
+import time
 from datetime import date
 from typing import Optional, Dict, Any, List
+
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    before_sleep_log,
+)
+import asyncpg
 
 from .config import Config
 from .database import Database
@@ -15,6 +26,37 @@ from .fetchers.advanced_metrics import AdvancedMetricsFetcher
 from .fetchers.wellness import WellnessFetcher
 
 logger = logging.getLogger(__name__)
+
+# Per-user locks to prevent concurrent syncs for the same user
+_user_locks: Dict[int, asyncio.Lock] = {}
+_user_locks_guard = asyncio.Lock()
+
+# Transient exceptions worth retrying at the category level
+_CATEGORY_RETRYABLE = (
+    ConnectionError,
+    TimeoutError,
+    asyncpg.PostgresConnectionError,
+    asyncpg.InterfaceError,
+    asyncio.TimeoutError,
+)
+
+# Category sync timeout (seconds)
+CATEGORY_SYNC_TIMEOUT = 300
+
+
+async def _get_user_lock(user_id: int) -> asyncio.Lock:
+    """Get or create an asyncio.Lock for a specific user.
+
+    Args:
+        user_id: User ID to get lock for
+
+    Returns:
+        asyncio.Lock for the user
+    """
+    async with _user_locks_guard:
+        if user_id not in _user_locks:
+            _user_locks[user_id] = asyncio.Lock()
+        return _user_locks[user_id]
 
 
 class SyncManager:
@@ -118,7 +160,10 @@ class SyncManager:
         end_date: Optional[date] = None,
         dry_run: bool = False,
     ) -> Dict[str, Any]:
-        """Perform synchronization.
+        """Perform synchronization with per-user locking.
+
+        Acquires an async lock per user_id to prevent concurrent syncs
+        for the same user. Each category is synced with retry + timeout.
 
         Args:
             categories: Optional list of categories to sync (defaults to config)
@@ -134,20 +179,43 @@ class SyncManager:
         if not self.db or not self.garmin_client or not self.user_id:
             raise RuntimeError("Sync manager not initialized. Call initialize() first.")
 
-        # Use provided values or defaults from config
+        # Acquire per-user lock to prevent concurrent syncs
+        lock = await _get_user_lock(self.user_id)
+        if lock.locked():
+            raise RuntimeError(
+                f"Sync already in progress for user_id={self.user_id}"
+            )
+
+        async with lock:
+            return await self._sync_locked(
+                categories, mode, days_back, start_date, end_date, dry_run
+            )
+
+    async def _sync_locked(
+        self,
+        categories: Optional[List[str]],
+        mode: Optional[str],
+        days_back: Optional[int],
+        start_date: Optional[date],
+        end_date: Optional[date],
+        dry_run: bool,
+    ) -> Dict[str, Any]:
+        """Internal sync logic, called while holding the per-user lock."""
         categories = categories or self.config.sync.categories
         mode = mode or self.config.sync.mode
         days_back = days_back or self.config.sync.days_back
 
-        logger.info(f"Starting sync - Mode: {mode}, Categories: {categories}")
+        logger.info(
+            f"[user={self.user_id}] Starting sync - Mode: {mode}, Categories: {categories}"
+        )
+        sync_start = time.monotonic()
 
         if dry_run:
-            logger.info("DRY RUN MODE - No data will be written")
+            logger.info(f"[user={self.user_id}] DRY RUN MODE - No data will be written")
             return await self._dry_run_sync(
                 categories, mode, days_back, start_date, end_date
             )
 
-        # Perform actual sync
         report = {
             "mode": mode,
             "categories": {},
@@ -156,35 +224,104 @@ class SyncManager:
         }
 
         for category in categories:
-            logger.info(f"Syncing category: {category}")
+            cat_start = time.monotonic()
+            logger.info(f"[user={self.user_id}] Syncing category: {category}")
 
             try:
-                records, error = await self._sync_category(
-                    category, mode, days_back, start_date, end_date
+                # Wrap category sync in a timeout
+                records, error = await asyncio.wait_for(
+                    self._sync_category_with_retry(
+                        category, mode, days_back, start_date, end_date
+                    ),
+                    timeout=CATEGORY_SYNC_TIMEOUT,
                 )
 
+                cat_duration = time.monotonic() - cat_start
                 report["categories"][category] = {
                     "records": records,
                     "status": "success" if error is None else "partial",
                     "error": error,
+                    "duration_seconds": round(cat_duration, 1),
                 }
                 report["total_records"] += records
 
                 if error:
                     report["errors"].append(f"{category}: {error}")
 
+                logger.info(
+                    f"[user={self.user_id}] {category}: {records} records in {cat_duration:.1f}s"
+                )
+
+            except asyncio.TimeoutError:
+                cat_duration = time.monotonic() - cat_start
+                error_msg = f"{category}: timed out after {CATEGORY_SYNC_TIMEOUT}s"
+                logger.error(f"[user={self.user_id}] {error_msg}")
+                report["categories"][category] = {
+                    "records": 0,
+                    "status": "failed",
+                    "error": error_msg,
+                    "duration_seconds": round(cat_duration, 1),
+                }
+                report["errors"].append(error_msg)
+
             except Exception as e:
+                cat_duration = time.monotonic() - cat_start
                 error_msg = f"Failed to sync {category}: {e}"
-                logger.exception(error_msg)
+                logger.exception(f"[user={self.user_id}] {error_msg}")
                 report["categories"][category] = {
                     "records": 0,
                     "status": "failed",
                     "error": str(e),
+                    "duration_seconds": round(cat_duration, 1),
                 }
                 report["errors"].append(error_msg)
 
-        logger.info(f"Sync complete - Total records: {report['total_records']}")
+        total_duration = time.monotonic() - sync_start
+        report["duration_seconds"] = round(total_duration, 1)
+        logger.info(
+            f"[user={self.user_id}] Sync complete - "
+            f"{report['total_records']} records in {total_duration:.1f}s"
+        )
         return report
+
+    async def _sync_category_with_retry(
+        self,
+        category: str,
+        mode: str,
+        days_back: int,
+        start_date: Optional[date],
+        end_date: Optional[date],
+    ) -> tuple[int, Optional[str]]:
+        """Sync a category with tenacity retry on transient errors.
+
+        Retries up to 3 times with exponential backoff (2s → 30s)
+        on connection/timeout errors.
+
+        Args:
+            category: Category name
+            mode: Sync mode
+            days_back: Days to go back
+            start_date: Optional start date
+            end_date: Optional end date
+
+        Returns:
+            Tuple of (records_count, error_message)
+        """
+        # Build retry decorator dynamically so it's testable
+        retrying = retry(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential(min=2, max=30),
+            retry=retry_if_exception_type(_CATEGORY_RETRYABLE),
+            before_sleep=before_sleep_log(logger, logging.WARNING),
+            reraise=True,
+        )
+
+        @retrying
+        async def _do_sync():
+            fetcher = self._get_fetcher(category)
+            return await fetcher.fetch(mode, days_back, start_date, end_date)
+
+        return await _do_sync()
 
     async def _sync_category(
         self,
@@ -194,7 +331,7 @@ class SyncManager:
         start_date: Optional[date],
         end_date: Optional[date],
     ) -> tuple[int, Optional[str]]:
-        """Sync a specific category.
+        """Sync a specific category (no retry, for backward compat).
 
         Args:
             category: Category name
