@@ -263,6 +263,8 @@ class SyncManager:
                     "duration_seconds": round(cat_duration, 1),
                 }
                 report["errors"].append(error_msg)
+                # Persist failure in DB so sync_state reflects the error
+                await self._record_sync_failure(category, error_msg)
 
             except Exception as e:
                 cat_duration = time.monotonic() - cat_start
@@ -275,6 +277,8 @@ class SyncManager:
                     "duration_seconds": round(cat_duration, 1),
                 }
                 report["errors"].append(error_msg)
+                # Persist failure in DB so sync_state reflects the error
+                await self._record_sync_failure(category, str(e))
 
         total_duration = time.monotonic() - sync_start
         report["duration_seconds"] = round(total_duration, 1)
@@ -376,6 +380,27 @@ class SyncManager:
             user_id=self.user_id,
             category=category,
         )
+
+    async def _record_sync_failure(self, category: str, error_msg: str) -> None:
+        """Record a category sync failure in DB sync_state.
+
+        Called when a category fails completely (timeout, exception after retries).
+        This ensures the DB has a persistent record of the failure, not just the
+        in-memory job report.
+        """
+        try:
+            await self.db.update_sync_state(
+                category=category,
+                last_sync_date=date.today(),
+                records_synced=0,
+                sync_status="failed",
+                error_message=error_msg[:500],  # Truncate long error messages
+                user_id=self.user_id,
+            )
+        except Exception as e:
+            logger.warning(
+                f"[user={self.user_id}] Could not record sync failure for {category}: {e}"
+            )
 
     async def _dry_run_sync(
         self,

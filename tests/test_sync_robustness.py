@@ -357,3 +357,63 @@ class TestSyncErrorHandling:
         m = SyncManager(test_config)
         with pytest.raises(RuntimeError, match="not initialized"):
             await m.sync()
+
+
+# ---------------------------------------------------------------------------
+# Sync failure persistence tests
+# ---------------------------------------------------------------------------
+
+
+class TestSyncFailurePersistence:
+    """Tests for _record_sync_failure persisting errors to DB sync_state."""
+
+    @pytest.mark.asyncio
+    async def test_exception_records_failure_in_db(self, manager, mock_db):
+        """When a category raises, sync_state is updated with 'failed' status."""
+        mock_fetcher = MagicMock()
+        mock_fetcher.fetch = AsyncMock(side_effect=RuntimeError("Garmin down"))
+
+        with patch.object(manager, "_get_fetcher", return_value=mock_fetcher):
+            report = await manager.sync(categories=["daily_health"])
+
+        # Verify DB was called to record the failure
+        mock_db.update_sync_state.assert_called_once()
+        call_kwargs = mock_db.update_sync_state.call_args
+        assert call_kwargs.kwargs["category"] == "daily_health"
+        assert call_kwargs.kwargs["sync_status"] == "failed"
+        assert "Garmin down" in call_kwargs.kwargs["error_message"]
+
+    @pytest.mark.asyncio
+    async def test_timeout_records_failure_in_db(self, manager, mock_db):
+        """When a category times out, sync_state is updated with 'failed' status."""
+        async def slow_fetch(*args, **kwargs):
+            await asyncio.sleep(10)
+            return (0, None)
+
+        mock_fetcher = MagicMock()
+        mock_fetcher.fetch = AsyncMock(side_effect=slow_fetch)
+
+        with (
+            patch.object(manager, "_get_fetcher", return_value=mock_fetcher),
+            patch("src.sync_manager.CATEGORY_SYNC_TIMEOUT", 0.1),
+        ):
+            report = await manager.sync(categories=["daily_health"])
+
+        mock_db.update_sync_state.assert_called_once()
+        call_kwargs = mock_db.update_sync_state.call_args
+        assert call_kwargs.kwargs["sync_status"] == "failed"
+        assert "timed out" in call_kwargs.kwargs["error_message"]
+
+    @pytest.mark.asyncio
+    async def test_record_failure_db_error_does_not_crash(self, manager, mock_db):
+        """If recording failure in DB also fails, sync continues gracefully."""
+        mock_fetcher = MagicMock()
+        mock_fetcher.fetch = AsyncMock(side_effect=RuntimeError("API error"))
+        mock_db.update_sync_state = AsyncMock(side_effect=Exception("DB down too"))
+
+        with patch.object(manager, "_get_fetcher", return_value=mock_fetcher):
+            report = await manager.sync(categories=["daily_health", "activities"])
+
+        # Both categories should still be reported
+        assert report["categories"]["daily_health"]["status"] == "failed"
+        assert report["categories"]["activities"]["status"] == "failed"
