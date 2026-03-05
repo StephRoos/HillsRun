@@ -21,18 +21,13 @@ from src.utils.retry import safe_api_call
 # ---------------------------------------------------------------------------
 
 def _make_garth_http_error(status_code: int) -> GarthHTTPError:
-    """Build a GarthHTTPError whose .response.status_code equals status_code."""
+    """Build a GarthHTTPError whose .error.status_code equals status_code.
+
+    GarthHTTPError is a dataclass with msg (str) and error (response object).
+    """
     response = MagicMock()
     response.status_code = status_code
-    # GarthHTTPError expects (response, error_message) in most versions;
-    # fall back to a generic instantiation if the signature differs.
-    try:
-        return GarthHTTPError(response, f"HTTP {status_code} error")
-    except TypeError:
-        err = GarthHTTPError.__new__(GarthHTTPError)
-        err.response = response
-        err.args = (f"HTTP {status_code} error",)
-        return err
+    return GarthHTTPError(msg=f"HTTP {status_code} error", error=response)
 
 
 # ---------------------------------------------------------------------------

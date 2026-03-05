@@ -83,7 +83,9 @@ def safe_api_call(func: Callable) -> Callable:
             return True, result, None
         except GarthHTTPError as e:
             error_str = str(e)
-            status_code = getattr(getattr(e, "response", None), "status_code", None)
+            # GarthHTTPError is a dataclass: .error holds the HTTP response object
+            response = getattr(e, "error", None) or getattr(e, "response", None)
+            status_code = getattr(response, "status_code", None)
 
             if status_code == 400 or "400" in error_str:
                 msg = "Endpoint not available (400) - Feature may not be enabled"
