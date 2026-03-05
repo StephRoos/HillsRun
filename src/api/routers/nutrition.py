@@ -2,24 +2,47 @@
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from ..auth import get_api_key
-from ..dependencies import get_db, get_user_id
+from ..dependencies import get_db
 from ..schemas import NutritionDailyGoal, TrainingLoad
 
 router = APIRouter(
     prefix="/api/v1/nutrition", tags=["nutrition"], dependencies=[Depends(get_api_key)]
 )
 
+# Per-user rate limit: 100 requests/day (daily goal rarely changes)
+_nutrition_limiter = Limiter(key_func=get_remote_address)
+_NUTRITION_RATE_LIMIT = "100/day"
+
 _RECOVERY_MARGIN = 1.1
 
 
+def _get_better_auth_id(request: Request) -> str:
+    """Extract X-Better-Auth-User-Id header, raising 401 if missing.
+
+    This endpoint is designed for cross-service calls from RecettesApp,
+    which identifies users via their Better-Auth user ID.
+    """
+    value = request.headers.get("X-Better-Auth-User-Id")
+    if not value:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="X-Better-Auth-User-Id header required",
+        )
+    return value
+
+
 @router.get("/daily-goal", response_model=NutritionDailyGoal)
+@_nutrition_limiter.limit(_NUTRITION_RATE_LIMIT)
 async def get_daily_calorie_goal(
+    request: Request,
     target_date: date = Query(default_factory=date.today, alias="date"),
     db=Depends(get_db),
-    user_id: int = Depends(get_user_id),
+    better_auth_id: str = Depends(_get_better_auth_id),
 ):
     """Return recommended daily calorie intake for a given date.
 
@@ -27,15 +50,27 @@ async def get_daily_calorie_goal(
     daily summary with a 10% recovery margin on active calories. Also
     returns training load details from the primary activity of the day.
 
+    Auth: X-API-Key + X-Better-Auth-User-Id (cross-service from RecettesApp).
+
     Args:
+        request: FastAPI request (needed for rate limiting).
         target_date: Date to compute the goal for (defaults to today).
         db: Database dependency.
-        user_id: Resolved Garmin user ID.
+        better_auth_id: Better-Auth user ID from header.
 
     Returns:
         NutritionDailyGoal with calorie breakdown and training load.
-        Returns HTTP 204 when no Garmin data is available for the date.
+        HTTP 204 when no Garmin data is available for the date.
+        HTTP 404 when no Garmin account is linked to this Better-Auth user.
     """
+    # Resolve Better-Auth user ID → Garmin user_id
+    user_id = await db.get_user_by_better_auth_id(better_auth_id)
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No Garmin account linked to this user",
+        )
+
     data = await db.query_nutrition_goal(user_id, target_date)
     if data is None:
         return Response(status_code=204)

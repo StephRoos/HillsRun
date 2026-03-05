@@ -103,7 +103,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins,
     allow_methods=["GET", "POST", "PATCH", "DELETE"],
-    allow_headers=["X-API-Key", "X-Garmin-User-Id", "X-Coach-Better-Auth-Id"],
+    allow_headers=["X-API-Key", "X-Garmin-User-Id", "X-Coach-Better-Auth-Id", "X-Better-Auth-User-Id"],
     allow_credentials=False,
 )
 
