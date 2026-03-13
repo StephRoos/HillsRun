@@ -79,7 +79,11 @@ def build_week(
 
     # If recovery week, limit session types
     if is_recovery_week:
-        phase_types = [t for t in phase_types if t in (SessionType.EF, SessionType.SL, SessionType.REC)]
+        phase_types = [
+            t
+            for t in phase_types
+            if t in (SessionType.EF, SessionType.SL, SessionType.REC)
+        ]
 
     # Build session plan
     sessions: list[SessionSpec] = []
@@ -87,7 +91,11 @@ def build_week(
     # Step 1: Place long run — use preferred day if available, else weekend fallback
     long_run_day = None
     if long_run_spec:
-        if day_preferences and day_preferences.long_run and day_preferences.long_run in available_days_sorted:
+        if (
+            day_preferences
+            and day_preferences.long_run
+            and day_preferences.long_run in available_days_sorted
+        ):
             long_run_day = day_preferences.long_run
         else:
             long_run_day = _find_weekend_day(available_days_sorted)
@@ -112,11 +120,21 @@ def build_week(
     # Build candidate days: preferred quality days first, then standard midweek
     used_days = {s.day_of_week for s in sessions}
     if day_preferences and day_preferences.quality:
-        preferred_quality = [d for d in day_preferences.quality if d in available_days_sorted and d not in used_days]
-        other_midweek = [d for d in available_days_sorted if 2 <= d <= 5 and d not in used_days and d not in preferred_quality]
+        preferred_quality = [
+            d
+            for d in day_preferences.quality
+            if d in available_days_sorted and d not in used_days
+        ]
+        other_midweek = [
+            d
+            for d in available_days_sorted
+            if 2 <= d <= 5 and d not in used_days and d not in preferred_quality
+        ]
         midweek_days = preferred_quality + other_midweek
     else:
-        midweek_days = [d for d in available_days_sorted if 2 <= d <= 5 and d not in used_days]
+        midweek_days = [
+            d for d in available_days_sorted if 2 <= d <= 5 and d not in used_days
+        ]
 
     for quality_type in quality_types:
         if quality_placed >= max_quality or session_count <= 0:
@@ -140,7 +158,14 @@ def build_week(
                 title=template.title,
                 description=template.description,
                 sport_type=template.sport_type,
-                target_duration_seconds=int((template.duration_range_minutes[0] + template.duration_range_minutes[1]) / 2 * 60),
+                target_duration_seconds=int(
+                    (
+                        template.duration_range_minutes[0]
+                        + template.duration_range_minutes[1]
+                    )
+                    / 2
+                    * 60
+                ),
                 intensity=template.intensity,
                 hr_zone_primary=template.hr_zone_primary,
                 blocks=template.blocks,
@@ -169,7 +194,14 @@ def build_week(
                 title=template.title,
                 description=template.description,
                 sport_type=template.sport_type,
-                target_duration_seconds=int((template.duration_range_minutes[0] + template.duration_range_minutes[1]) / 2 * 60),
+                target_duration_seconds=int(
+                    (
+                        template.duration_range_minutes[0]
+                        + template.duration_range_minutes[1]
+                    )
+                    / 2
+                    * 60
+                ),
                 intensity=template.intensity,
                 hr_zone_primary=template.hr_zone_primary,
                 blocks=template.blocks,
@@ -193,7 +225,9 @@ def build_week(
         # Choose EF or REC based on recovery needs
         session_type = SessionType.EF if quality_placed > 0 else SessionType.REC
         if session_type not in phase_types:
-            session_type = SessionType.EF if SessionType.EF in phase_types else SessionType.REC
+            session_type = (
+                SessionType.EF if SessionType.EF in phase_types else SessionType.REC
+            )
 
         if session_type in phase_types:
             template = get_session_template(session_type, experience, phase)
@@ -203,7 +237,14 @@ def build_week(
                 title=template.title,
                 description=template.description,
                 sport_type=template.sport_type,
-                target_duration_seconds=int((template.duration_range_minutes[0] + template.duration_range_minutes[1]) / 2 * 60),
+                target_duration_seconds=int(
+                    (
+                        template.duration_range_minutes[0]
+                        + template.duration_range_minutes[1]
+                    )
+                    / 2
+                    * 60
+                ),
                 intensity=template.intensity,
                 hr_zone_primary=template.hr_zone_primary,
                 blocks=template.blocks,
@@ -219,7 +260,9 @@ def build_week(
         if day_preferences and day_preferences.strength:
             max_rmu = len(day_preferences.strength)
 
-        non_running_days = [d for d in range(1, 8) if d not in {s.day_of_week for s in sessions}]
+        non_running_days = [
+            d for d in range(1, 8) if d not in {s.day_of_week for s in sessions}
+        ]
         valid_rmu_days = non_running_days
 
         # Preferred strength days get priority
@@ -239,7 +282,14 @@ def build_week(
                 title=template.title,
                 description=template.description,
                 sport_type=template.sport_type,
-                target_duration_seconds=int((template.duration_range_minutes[0] + template.duration_range_minutes[1]) / 2 * 60),
+                target_duration_seconds=int(
+                    (
+                        template.duration_range_minutes[0]
+                        + template.duration_range_minutes[1]
+                    )
+                    / 2
+                    * 60
+                ),
                 intensity=template.intensity,
                 hr_zone_primary=template.hr_zone_primary,
                 blocks=template.blocks,
@@ -389,7 +439,8 @@ def _create_long_run_session(
         day_of_week=day,
         session_type=SessionType.SL,
         title=template.title,
-        description=template.description + f" ({long_run_spec.get('progression_note', '')})",
+        description=template.description
+        + f" ({long_run_spec.get('progression_note', '')})",
         sport_type=template.sport_type,
         target_duration_seconds=long_run_spec.get("target_duration_seconds", 0),
         target_distance_meters=long_run_spec.get("target_km", 0) * 1000,
@@ -435,8 +486,11 @@ def _can_place_hard_session(day: int, existing_sessions: list[SessionSpec]) -> b
         True if a hard session can be placed on this day.
     """
     hard_zones = [3, 4, 5]
-    hard_days = {s.day_of_week for s in existing_sessions
-                 if s.hr_zone_primary and s.hr_zone_primary in hard_zones}
+    hard_days = {
+        s.day_of_week
+        for s in existing_sessions
+        if s.hr_zone_primary and s.hr_zone_primary in hard_zones
+    }
 
     prev, _ = _adjacent_days(day)
 

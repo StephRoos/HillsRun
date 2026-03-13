@@ -182,9 +182,7 @@ class SyncManager:
         # Acquire per-user lock to prevent concurrent syncs
         lock = await _get_user_lock(self.user_id)
         if lock.locked():
-            raise RuntimeError(
-                f"Sync already in progress for user_id={self.user_id}"
-            )
+            raise RuntimeError(f"Sync already in progress for user_id={self.user_id}")
 
         async with lock:
             return await self._sync_locked(

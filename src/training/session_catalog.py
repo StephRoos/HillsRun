@@ -4,7 +4,14 @@ from pydantic import BaseModel
 
 from typing import Optional
 
-from .models import ExperienceLevel, Intensity, PlanPhase, RaceFlags, SessionType, WorkoutBlock
+from .models import (
+    ExperienceLevel,
+    Intensity,
+    PlanPhase,
+    RaceFlags,
+    SessionType,
+    WorkoutBlock,
+)
 
 
 class SessionTemplate(BaseModel):
@@ -41,7 +48,9 @@ def get_session_template(
     key = (session_type, experience, phase)
 
     if key not in catalog:
-        raise ValueError(f"No template found for {session_type.value} at {experience.value} level in {phase.value} phase")
+        raise ValueError(
+            f"No template found for {session_type.value} at {experience.value} level in {phase.value} phase"
+        )
 
     return catalog[key]
 
@@ -68,9 +77,29 @@ def get_phase_session_types(
         List of recommended SessionType values for this phase and level
     """
     base_sessions = {
-        PlanPhase.base: [SessionType.EF, SessionType.SL, SessionType.REC, SessionType.RMU],
-        PlanPhase.development: [SessionType.EF, SessionType.SL, SessionType.TMP, SessionType.INT, SessionType.REC, SessionType.RMU],
-        PlanPhase.specific: [SessionType.EF, SessionType.SL, SessionType.TMP, SessionType.INT, SessionType.COT, SessionType.DESC, SessionType.REC],
+        PlanPhase.base: [
+            SessionType.EF,
+            SessionType.SL,
+            SessionType.REC,
+            SessionType.RMU,
+        ],
+        PlanPhase.development: [
+            SessionType.EF,
+            SessionType.SL,
+            SessionType.TMP,
+            SessionType.INT,
+            SessionType.REC,
+            SessionType.RMU,
+        ],
+        PlanPhase.specific: [
+            SessionType.EF,
+            SessionType.SL,
+            SessionType.TMP,
+            SessionType.INT,
+            SessionType.COT,
+            SessionType.DESC,
+            SessionType.REC,
+        ],
         PlanPhase.taper: [SessionType.EF, SessionType.SL, SessionType.REC],
     }
 
@@ -84,14 +113,21 @@ def get_phase_session_types(
             recommendations.insert(2, SessionType.COT)
         # In development, ensure COT is before INT (prioritize hills)
         if phase == PlanPhase.development and SessionType.COT not in recommendations:
-            idx = recommendations.index(SessionType.INT) if SessionType.INT in recommendations else len(recommendations)
+            idx = (
+                recommendations.index(SessionType.INT)
+                if SessionType.INT in recommendations
+                else len(recommendations)
+            )
             recommendations.insert(idx, SessionType.COT)
 
     if race_flags and race_flags.technical:
         # Technical race: introduce DESC from development phase
         if phase == PlanPhase.development and SessionType.DESC not in recommendations:
             recommendations.insert(-1, SessionType.DESC)  # Before RMU
-        if phase == PlanPhase.base and experience in (ExperienceLevel.advanced, ExperienceLevel.expert):
+        if phase == PlanPhase.base and experience in (
+            ExperienceLevel.advanced,
+            ExperienceLevel.expert,
+        ):
             if SessionType.DESC not in recommendations:
                 recommendations.append(SessionType.DESC)
 
@@ -102,7 +138,10 @@ def get_phase_session_types(
 
     # --- Standard experience-based adjustments ---
 
-    if phase == PlanPhase.base and experience in (ExperienceLevel.advanced, ExperienceLevel.expert):
+    if phase == PlanPhase.base and experience in (
+        ExperienceLevel.advanced,
+        ExperienceLevel.expert,
+    ):
         if SessionType.COT not in recommendations:
             recommendations.insert(3, SessionType.COT)
 
@@ -110,11 +149,17 @@ def get_phase_session_types(
         if SessionType.COT not in recommendations:
             recommendations.insert(4, SessionType.COT)
 
-    if phase == PlanPhase.specific and experience in (ExperienceLevel.advanced, ExperienceLevel.expert):
+    if phase == PlanPhase.specific and experience in (
+        ExperienceLevel.advanced,
+        ExperienceLevel.expert,
+    ):
         if SessionType.RMU not in recommendations:
             recommendations.append(SessionType.RMU)
 
-    if phase == PlanPhase.taper and experience in (ExperienceLevel.advanced, ExperienceLevel.expert):
+    if phase == PlanPhase.taper and experience in (
+        ExperienceLevel.advanced,
+        ExperienceLevel.expert,
+    ):
         if SessionType.TMP not in recommendations:
             recommendations.insert(1, SessionType.TMP)
 
@@ -143,9 +188,24 @@ def _build_catalog() -> dict:
                 hr_zone_primary=2,
                 duration_range_minutes=duration_range,
                 blocks=[
-                    WorkoutBlock(name="Warmup", duration_seconds=600, hr_zone=1, description="Easy jog Z1"),
-                    WorkoutBlock(name="Main", duration_seconds=(duration_range[0] - 5) * 60, hr_zone=2, description="Steady Z2"),
-                    WorkoutBlock(name="Cooldown", duration_seconds=300, hr_zone=1, description="Easy jog Z1"),
+                    WorkoutBlock(
+                        name="Warmup",
+                        duration_seconds=600,
+                        hr_zone=1,
+                        description="Easy jog Z1",
+                    ),
+                    WorkoutBlock(
+                        name="Main",
+                        duration_seconds=(duration_range[0] - 5) * 60,
+                        hr_zone=2,
+                        description="Steady Z2",
+                    ),
+                    WorkoutBlock(
+                        name="Cooldown",
+                        duration_seconds=300,
+                        hr_zone=1,
+                        description="Easy jog Z1",
+                    ),
                 ],
             )
 
@@ -155,14 +215,26 @@ def _build_catalog() -> dict:
             duration_range = _get_duration_range(SessionType.SL, experience)
             main_duration = max(0, (duration_range[0] - 5) * 60)
             blocks = [
-                WorkoutBlock(name="Warmup", duration_seconds=900, hr_zone=1, description="Easy jog Z1"),
+                WorkoutBlock(
+                    name="Warmup",
+                    duration_seconds=900,
+                    hr_zone=1,
+                    description="Easy jog Z1",
+                ),
                 WorkoutBlock(
                     name="Main",
                     duration_seconds=main_duration,
                     hr_zone=2,
-                    description="Long run Z2 with Z3 surges in development/specific phases" if phase in (PlanPhase.development, PlanPhase.specific) else "Long run Z2",
+                    description="Long run Z2 with Z3 surges in development/specific phases"
+                    if phase in (PlanPhase.development, PlanPhase.specific)
+                    else "Long run Z2",
                 ),
-                WorkoutBlock(name="Cooldown", duration_seconds=600, hr_zone=1, description="Easy jog Z1"),
+                WorkoutBlock(
+                    name="Cooldown",
+                    duration_seconds=600,
+                    hr_zone=1,
+                    description="Easy jog Z1",
+                ),
             ]
             catalog[(SessionType.SL, experience, phase)] = SessionTemplate(
                 session_type=SessionType.SL,
@@ -189,9 +261,24 @@ def _build_catalog() -> dict:
                 hr_zone_primary=3,
                 duration_range_minutes=duration_range,
                 blocks=[
-                    WorkoutBlock(name="Warmup", duration_seconds=900, hr_zone=2, description="Z1-Z2 progressive warmup"),
-                    WorkoutBlock(name="Tempo", duration_seconds=tempo_duration, hr_zone=3, description="Steady Z3"),
-                    WorkoutBlock(name="Cooldown", duration_seconds=600, hr_zone=1, description="Easy jog Z1"),
+                    WorkoutBlock(
+                        name="Warmup",
+                        duration_seconds=900,
+                        hr_zone=2,
+                        description="Z1-Z2 progressive warmup",
+                    ),
+                    WorkoutBlock(
+                        name="Tempo",
+                        duration_seconds=tempo_duration,
+                        hr_zone=3,
+                        description="Steady Z3",
+                    ),
+                    WorkoutBlock(
+                        name="Cooldown",
+                        duration_seconds=600,
+                        hr_zone=1,
+                        description="Easy jog Z1",
+                    ),
                 ],
             )
 
@@ -199,7 +286,16 @@ def _build_catalog() -> dict:
     for phase in PlanPhase:
         for experience in ExperienceLevel:
             duration_range = _get_duration_range(SessionType.INT, experience)
-            num_intervals = 8 if experience == ExperienceLevel.beginner else (10 if experience in (ExperienceLevel.intermediate, ExperienceLevel.advanced) else 12)
+            num_intervals = (
+                8
+                if experience == ExperienceLevel.beginner
+                else (
+                    10
+                    if experience
+                    in (ExperienceLevel.intermediate, ExperienceLevel.advanced)
+                    else 12
+                )
+            )
             interval_duration = 180 if experience == ExperienceLevel.beginner else 240
             catalog[(SessionType.INT, experience, phase)] = SessionTemplate(
                 session_type=SessionType.INT,
@@ -210,14 +306,24 @@ def _build_catalog() -> dict:
                 hr_zone_primary=4,
                 duration_range_minutes=duration_range,
                 blocks=[
-                    WorkoutBlock(name="Warmup", duration_seconds=900, hr_zone=2, description="Z1-Z2 progressive warmup"),
+                    WorkoutBlock(
+                        name="Warmup",
+                        duration_seconds=900,
+                        hr_zone=2,
+                        description="Z1-Z2 progressive warmup",
+                    ),
                     WorkoutBlock(
                         name="Intervals",
                         duration_seconds=num_intervals * (interval_duration + 60),
                         hr_zone=4,
                         description=f"{num_intervals} × {interval_duration // 60}min Z4 / 1min recovery Z1",
                     ),
-                    WorkoutBlock(name="Cooldown", duration_seconds=600, hr_zone=1, description="Easy jog Z1"),
+                    WorkoutBlock(
+                        name="Cooldown",
+                        duration_seconds=600,
+                        hr_zone=1,
+                        description="Easy jog Z1",
+                    ),
                 ],
             )
 
@@ -225,7 +331,16 @@ def _build_catalog() -> dict:
     for phase in PlanPhase:
         for experience in ExperienceLevel:
             duration_range = _get_duration_range(SessionType.COT, experience)
-            num_reps = 6 if experience == ExperienceLevel.beginner else (8 if experience in (ExperienceLevel.intermediate, ExperienceLevel.advanced) else 10)
+            num_reps = (
+                6
+                if experience == ExperienceLevel.beginner
+                else (
+                    8
+                    if experience
+                    in (ExperienceLevel.intermediate, ExperienceLevel.advanced)
+                    else 10
+                )
+            )
             catalog[(SessionType.COT, experience, phase)] = SessionTemplate(
                 session_type=SessionType.COT,
                 title="Cotes",
@@ -235,14 +350,24 @@ def _build_catalog() -> dict:
                 hr_zone_primary=3,
                 duration_range_minutes=duration_range,
                 blocks=[
-                    WorkoutBlock(name="Warmup", duration_seconds=900, hr_zone=2, description="Jog uphill Z2"),
+                    WorkoutBlock(
+                        name="Warmup",
+                        duration_seconds=900,
+                        hr_zone=2,
+                        description="Jog uphill Z2",
+                    ),
                     WorkoutBlock(
                         name="Hill Repeats",
                         duration_seconds=num_reps * (150 + 120),
                         hr_zone=3,
                         description=f"{num_reps} × 2-3min uphill Z3-Z4 / jog down Z1",
                     ),
-                    WorkoutBlock(name="Cooldown", duration_seconds=600, hr_zone=1, description="Easy jog Z1"),
+                    WorkoutBlock(
+                        name="Cooldown",
+                        duration_seconds=600,
+                        hr_zone=1,
+                        description="Easy jog Z1",
+                    ),
                 ],
             )
 
@@ -258,9 +383,24 @@ def _build_catalog() -> dict:
                 hr_zone_primary=2,
                 duration_range_minutes=(30, 45),
                 blocks=[
-                    WorkoutBlock(name="Warmup", duration_seconds=600, hr_zone=2, description="Jog flat terrain Z2"),
-                    WorkoutBlock(name="Technical Downhill Drills", duration_seconds=1800, hr_zone=2, description="Controlled technical descents Z2"),
-                    WorkoutBlock(name="Cooldown", duration_seconds=300, hr_zone=1, description="Easy jog Z1"),
+                    WorkoutBlock(
+                        name="Warmup",
+                        duration_seconds=600,
+                        hr_zone=2,
+                        description="Jog flat terrain Z2",
+                    ),
+                    WorkoutBlock(
+                        name="Technical Downhill Drills",
+                        duration_seconds=1800,
+                        hr_zone=2,
+                        description="Controlled technical descents Z2",
+                    ),
+                    WorkoutBlock(
+                        name="Cooldown",
+                        duration_seconds=300,
+                        hr_zone=1,
+                        description="Easy jog Z1",
+                    ),
                 ],
             )
 
@@ -276,7 +416,12 @@ def _build_catalog() -> dict:
                 hr_zone_primary=1,
                 duration_range_minutes=(20, 30),
                 blocks=[
-                    WorkoutBlock(name="Easy Jog", duration_seconds=1500, hr_zone=1, description="Conversational pace Z1"),
+                    WorkoutBlock(
+                        name="Easy Jog",
+                        duration_seconds=1500,
+                        hr_zone=1,
+                        description="Conversational pace Z1",
+                    ),
                 ],
             )
 
@@ -292,13 +437,22 @@ def _build_catalog() -> dict:
                 hr_zone_primary=2,
                 duration_range_minutes=(30, 45),
                 blocks=[
-                    WorkoutBlock(name="Warmup", duration_seconds=600, hr_zone=1, description="Dynamic stretching and mobility Z1"),
+                    WorkoutBlock(
+                        name="Warmup",
+                        duration_seconds=600,
+                        hr_zone=1,
+                        description="Dynamic stretching and mobility Z1",
+                    ),
                     WorkoutBlock(
                         name="Strength Circuit",
                         duration_seconds=1800,
                         description="Squats, lunges, core, plyometrics (3-4 sets × 8-12 reps)",
                     ),
-                    WorkoutBlock(name="Cooldown", duration_seconds=300, description="Static stretching and recovery"),
+                    WorkoutBlock(
+                        name="Cooldown",
+                        duration_seconds=300,
+                        description="Static stretching and recovery",
+                    ),
                 ],
             )
 
@@ -319,7 +473,9 @@ def _build_catalog() -> dict:
     return catalog
 
 
-def _get_duration_range(session_type: SessionType, experience: ExperienceLevel) -> tuple[int, int]:
+def _get_duration_range(
+    session_type: SessionType, experience: ExperienceLevel
+) -> tuple[int, int]:
     """
     Get the duration range in minutes for a session type and experience level.
 

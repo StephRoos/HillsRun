@@ -43,7 +43,11 @@ def build_periodization(
     for i in range(base_weeks):
         is_recovery = (i + 1) % recovery_pattern == 0
         weeks.append(
-            WeekSpec(week_number=week_number, phase=PlanPhase.base, is_recovery_week=is_recovery)
+            WeekSpec(
+                week_number=week_number,
+                phase=PlanPhase.base,
+                is_recovery_week=is_recovery,
+            )
         )
         week_number += 1
 
@@ -52,7 +56,9 @@ def build_periodization(
         is_recovery = (i + 1) % recovery_pattern == 0
         weeks.append(
             WeekSpec(
-                week_number=week_number, phase=PlanPhase.development, is_recovery_week=is_recovery
+                week_number=week_number,
+                phase=PlanPhase.development,
+                is_recovery_week=is_recovery,
             )
         )
         week_number += 1
@@ -62,7 +68,9 @@ def build_periodization(
         is_recovery = (i + 1) % recovery_pattern == 0
         weeks.append(
             WeekSpec(
-                week_number=week_number, phase=PlanPhase.specific, is_recovery_week=is_recovery
+                week_number=week_number,
+                phase=PlanPhase.specific,
+                is_recovery_week=is_recovery,
             )
         )
         week_number += 1
@@ -70,7 +78,9 @@ def build_periodization(
     # Taper phase (no recovery weeks, already reduced load)
     for i in range(taper_weeks):
         weeks.append(
-            WeekSpec(week_number=week_number, phase=PlanPhase.taper, is_recovery_week=False)
+            WeekSpec(
+                week_number=week_number, phase=PlanPhase.taper, is_recovery_week=False
+            )
         )
         week_number += 1
 
@@ -81,7 +91,9 @@ def build_periodization(
     return weeks
 
 
-def _calculate_phase_durations(total_weeks: int, race_category: RaceCategory) -> dict[str, int]:
+def _calculate_phase_durations(
+    total_weeks: int, race_category: RaceCategory
+) -> dict[str, int]:
     """Calculate phase durations based on total weeks and race category.
 
     Base percentages: base 30%, development 30%, specific 25%, taper 15%.

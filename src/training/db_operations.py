@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 # Athlete Profile Operations
 # ============================================
 
+
 async def get_athlete_profile(pool, user_id: int) -> Optional[dict[str, Any]]:
     """Fetch athlete profile for a user.
 
@@ -28,7 +29,9 @@ async def get_athlete_profile(pool, user_id: int) -> Optional[dict[str, Any]]:
     return dict(row) if row else None
 
 
-async def upsert_athlete_profile(pool, user_id: int, data: dict[str, Any]) -> dict[str, Any]:
+async def upsert_athlete_profile(
+    pool, user_id: int, data: dict[str, Any]
+) -> dict[str, Any]:
     """Create or update athlete profile.
 
     Args:
@@ -41,9 +44,18 @@ async def upsert_athlete_profile(pool, user_id: int, data: dict[str, Any]) -> di
     """
     # Build upsert query with only provided fields
     allowed = {
-        "birth_date", "gender", "height_cm", "experience_level",
-        "available_days_per_week", "available_slots", "injury_history",
-        "has_hill_access", "has_gym_access", "fc_max", "fc_repos", "fthr",
+        "birth_date",
+        "gender",
+        "height_cm",
+        "experience_level",
+        "available_days_per_week",
+        "available_slots",
+        "injury_history",
+        "has_hill_access",
+        "has_gym_access",
+        "fc_max",
+        "fc_repos",
+        "fthr",
         "day_preferences",
     }
     fields = {k: v for k, v in data.items() if k in allowed}
@@ -60,7 +72,9 @@ async def upsert_athlete_profile(pool, user_id: int, data: dict[str, Any]) -> di
 
     # Build ON CONFLICT SET clause
     update_parts = [f"{col} = EXCLUDED.{col}" for col in fields.keys()]
-    update_clause = ", ".join(update_parts) if update_parts else "user_id = EXCLUDED.user_id"
+    update_clause = (
+        ", ".join(update_parts) if update_parts else "user_id = EXCLUDED.user_id"
+    )
 
     query = f"""
         INSERT INTO athlete_profiles ({", ".join(columns)})
@@ -76,7 +90,10 @@ async def upsert_athlete_profile(pool, user_id: int, data: dict[str, Any]) -> di
 # Race Target Operations
 # ============================================
 
-async def create_race_target(pool, user_id: int, data: dict[str, Any]) -> dict[str, Any]:
+
+async def create_race_target(
+    pool, user_id: int, data: dict[str, Any]
+) -> dict[str, Any]:
     """Create a new race target.
 
     Args:
@@ -110,7 +127,9 @@ async def create_race_target(pool, user_id: int, data: dict[str, Any]) -> dict[s
         data.get("cutoff_hours"),
         data.get("itra_points"),
         data.get("objective", "finish"),
-        json.dumps(data["elevation_profile"]) if data.get("elevation_profile") else None,
+        json.dumps(data["elevation_profile"])
+        if data.get("elevation_profile")
+        else None,
     )
     return dict(row)
 
@@ -128,7 +147,8 @@ async def get_race_target(pool, race_id: int, user_id: int) -> Optional[dict[str
     """
     row = await pool.fetchrow(
         "SELECT * FROM race_targets WHERE id = $1 AND user_id = $2",
-        race_id, user_id,
+        race_id,
+        user_id,
     )
     return dict(row) if row else None
 
@@ -163,7 +183,8 @@ async def delete_race_target(pool, race_id: int, user_id: int) -> bool:
     """
     result = await pool.execute(
         "DELETE FROM race_targets WHERE id = $1 AND user_id = $2",
-        race_id, user_id,
+        race_id,
+        user_id,
     )
     return result == "DELETE 1"
 
@@ -172,7 +193,10 @@ async def delete_race_target(pool, race_id: int, user_id: int) -> bool:
 # Training Plan Operations
 # ============================================
 
-async def create_training_plan(pool, user_id: int, data: dict[str, Any]) -> dict[str, Any]:
+
+async def create_training_plan(
+    pool, user_id: int, data: dict[str, Any]
+) -> dict[str, Any]:
     """Create a new training plan (master entity).
 
     Args:
@@ -201,13 +225,17 @@ async def create_training_plan(pool, user_id: int, data: dict[str, Any]) -> dict
         data["end_date"],
         data["total_weeks"],
         data["experience_level"],
-        json.dumps(data["generation_params"]) if data.get("generation_params") else None,
+        json.dumps(data["generation_params"])
+        if data.get("generation_params")
+        else None,
         data.get("created_by_user_id"),
     )
     return dict(row)
 
 
-async def get_training_plan(pool, plan_id: int, user_id: int) -> Optional[dict[str, Any]]:
+async def get_training_plan(
+    pool, plan_id: int, user_id: int
+) -> Optional[dict[str, Any]]:
     """Fetch a training plan with ownership check.
 
     Args:
@@ -220,12 +248,15 @@ async def get_training_plan(pool, plan_id: int, user_id: int) -> Optional[dict[s
     """
     row = await pool.fetchrow(
         "SELECT * FROM training_plans WHERE id = $1 AND user_id = $2",
-        plan_id, user_id,
+        plan_id,
+        user_id,
     )
     return dict(row) if row else None
 
 
-async def list_training_plans(pool, user_id: int, limit: int = 50, offset: int = 0) -> tuple[list[dict[str, Any]], int]:
+async def list_training_plans(
+    pool, user_id: int, limit: int = 50, offset: int = 0
+) -> tuple[list[dict[str, Any]], int]:
     """List training plans for a user with pagination.
 
     Args:
@@ -242,12 +273,16 @@ async def list_training_plans(pool, user_id: int, limit: int = 50, offset: int =
     )
     rows = await pool.fetch(
         "SELECT * FROM training_plans WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
-        user_id, limit, offset,
+        user_id,
+        limit,
+        offset,
     )
     return [dict(r) for r in rows], total
 
 
-async def update_training_plan_status(pool, plan_id: int, user_id: int, status: str) -> Optional[dict[str, Any]]:
+async def update_training_plan_status(
+    pool, plan_id: int, user_id: int, status: str
+) -> Optional[dict[str, Any]]:
     """Update training plan status (draft/active/completed/cancelled).
 
     Args:
@@ -261,7 +296,9 @@ async def update_training_plan_status(pool, plan_id: int, user_id: int, status: 
     """
     row = await pool.fetchrow(
         "UPDATE training_plans SET status = $1 WHERE id = $2 AND user_id = $3 RETURNING *",
-        status, plan_id, user_id,
+        status,
+        plan_id,
+        user_id,
     )
     return dict(row) if row else None
 
@@ -282,11 +319,13 @@ async def delete_training_plan(pool, plan_id: int, user_id: int) -> bool:
             # Delete associated planned workouts from calendar first
             await conn.execute(
                 "DELETE FROM planned_workouts WHERE plan_id = $1 AND user_id = $2",
-                plan_id, user_id,
+                plan_id,
+                user_id,
             )
             result = await conn.execute(
                 "DELETE FROM training_plans WHERE id = $1 AND user_id = $2",
-                plan_id, user_id,
+                plan_id,
+                user_id,
             )
             return result == "DELETE 1"
 
@@ -294,6 +333,7 @@ async def delete_training_plan(pool, plan_id: int, user_id: int) -> bool:
 # ============================================
 # Plan Week Operations
 # ============================================
+
 
 async def create_plan_week(pool, plan_id: int, data: dict[str, Any]) -> dict[str, Any]:
     """Create a training plan week.
@@ -346,7 +386,9 @@ async def get_plan_weeks(pool, plan_id: int) -> list[dict[str, Any]]:
     return [dict(r) for r in rows]
 
 
-async def get_plan_week_by_number(pool, plan_id: int, week_number: int) -> Optional[dict[str, Any]]:
+async def get_plan_week_by_number(
+    pool, plan_id: int, week_number: int
+) -> Optional[dict[str, Any]]:
     """Fetch a specific week by plan and week number.
 
     Args:
@@ -359,7 +401,8 @@ async def get_plan_week_by_number(pool, plan_id: int, week_number: int) -> Optio
     """
     row = await pool.fetchrow(
         "SELECT * FROM training_plan_weeks WHERE plan_id = $1 AND week_number = $2",
-        plan_id, week_number,
+        plan_id,
+        week_number,
     )
     return dict(row) if row else None
 
@@ -367,6 +410,7 @@ async def get_plan_week_by_number(pool, plan_id: int, week_number: int) -> Optio
 # ============================================
 # Plan Session Operations
 # ============================================
+
 
 async def create_plan_session(pool, data: dict[str, Any]) -> dict[str, Any]:
     """Create a training plan session.
@@ -390,7 +434,9 @@ async def create_plan_session(pool, data: dict[str, Any]) -> dict[str, Any]:
     """
     blocks = data.get("blocks")
     if blocks and not isinstance(blocks, str):
-        blocks = json.dumps([b.model_dump() if hasattr(b, 'model_dump') else b for b in blocks])
+        blocks = json.dumps(
+            [b.model_dump() if hasattr(b, "model_dump") else b for b in blocks]
+        )
 
     row = await pool.fetchrow(
         query,
@@ -455,6 +501,7 @@ async def get_plan_sessions(pool, plan_id: int) -> list[dict[str, Any]]:
 # Planned Workout Creation (links sessions to calendar)
 # ============================================
 
+
 async def create_planned_workout_for_session(
     pool, user_id: int, plan_id: int, session_data: dict[str, Any], workout_date: date
 ) -> dict[str, Any]:
@@ -474,7 +521,9 @@ async def create_planned_workout_for_session(
     """
     blocks = session_data.get("blocks")
     if blocks and not isinstance(blocks, str):
-        blocks = json.dumps([b.model_dump() if hasattr(b, 'model_dump') else b for b in blocks])
+        blocks = json.dumps(
+            [b.model_dump() if hasattr(b, "model_dump") else b for b in blocks]
+        )
 
     query = """
         INSERT INTO planned_workouts (

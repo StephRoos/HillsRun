@@ -140,14 +140,20 @@ async def generate_plan(
                 end_date,
                 total_weeks,
                 experience.value,
-                json.dumps({
-                    "race_flags": race_flags.model_dump(),
-                    "fitness_snapshot": fitness.model_dump(),
-                    "experience": experience.value,
-                    "objective": objective.value,
-                    "hr_zones": [z.model_dump() for z in hr_zones] if hr_zones else None,
-                    "day_preferences": day_prefs.model_dump() if day_prefs else None,
-                }),
+                json.dumps(
+                    {
+                        "race_flags": race_flags.model_dump(),
+                        "fitness_snapshot": fitness.model_dump(),
+                        "experience": experience.value,
+                        "objective": objective.value,
+                        "hr_zones": [z.model_dump() for z in hr_zones]
+                        if hr_zones
+                        else None,
+                        "day_preferences": day_prefs.model_dump()
+                        if day_prefs
+                        else None,
+                    }
+                ),
                 coach_id,
             )
             plan_id = plan_row["id"]
@@ -185,11 +191,16 @@ async def generate_plan(
                 if hr_zones:
                     for s in sessions:
                         if s.hr_zone_primary:
-                            zone = next((z for z in hr_zones if z.zone == s.hr_zone_primary), None)
+                            zone = next(
+                                (z for z in hr_zones if z.zone == s.hr_zone_primary),
+                                None,
+                            )
                             if zone:
                                 for block in s.blocks:
                                     if block.hr_zone == s.hr_zone_primary:
-                                        block.description += f" ({zone.hr_min}-{zone.hr_max} bpm)"
+                                        block.description += (
+                                            f" ({zone.hr_min}-{zone.hr_max} bpm)"
+                                        )
 
                 # Calculate total TSS for validation
                 week_tss = sum(
@@ -203,13 +214,17 @@ async def generate_plan(
 
                 # Validate progression (skip first week)
                 if previous_week_tss > 0 and not week_spec.is_recovery_week:
-                    is_valid, max_tss = validate_weekly_progression(week_tss, previous_week_tss)
+                    is_valid, max_tss = validate_weekly_progression(
+                        week_tss, previous_week_tss
+                    )
                     if not is_valid:
                         # Scale down sessions proportionally
                         scale = max_tss / week_tss if week_tss > 0 else 1.0
                         for s in sessions:
                             if s.target_duration_seconds:
-                                s.target_duration_seconds = int(s.target_duration_seconds * scale)
+                                s.target_duration_seconds = int(
+                                    s.target_duration_seconds * scale
+                                )
                         week_tss = max_tss
 
                 if not week_spec.is_recovery_week:
@@ -242,7 +257,9 @@ async def generate_plan(
 
                     blocks_json = None
                     if session.blocks:
-                        blocks_json = json.dumps([b.model_dump() for b in session.blocks])
+                        blocks_json = json.dumps(
+                            [b.model_dump() for b in session.blocks]
+                        )
 
                     session_tss = calculate_session_tss(
                         session.session_type,
@@ -265,9 +282,13 @@ async def generate_plan(
                         session.description,
                         session.target_duration_seconds,
                         session.target_distance_meters,
-                        session.intensity.value if hasattr(session.intensity, 'value') else str(session.intensity),
+                        session.intensity.value
+                        if hasattr(session.intensity, "value")
+                        else str(session.intensity),
                         plan_id,
-                        session.session_type.value if hasattr(session.session_type, 'value') else str(session.session_type),
+                        session.session_type.value
+                        if hasattr(session.session_type, "value")
+                        else str(session.session_type),
                         session.hr_zone_primary,
                         session.target_elevation_gain_m,
                         blocks_json,
@@ -288,7 +309,9 @@ async def generate_plan(
                         week_id,
                         planned_workout_id,
                         session.day_of_week,
-                        session.session_type.value if hasattr(session.session_type, 'value') else str(session.session_type),
+                        session.session_type.value
+                        if hasattr(session.session_type, "value")
+                        else str(session.session_type),
                         session.title,
                         session.description,
                         session.sport_type,
@@ -297,7 +320,9 @@ async def generate_plan(
                         session.target_elevation_gain_m,
                         round(session_tss, 1),
                         session.hr_zone_primary,
-                        session.intensity.value if hasattr(session.intensity, 'value') else str(session.intensity),
+                        session.intensity.value
+                        if hasattr(session.intensity, "value")
+                        else str(session.intensity),
                         blocks_json,
                         idx,
                     )
@@ -346,10 +371,20 @@ def _resolve_day_preferences(
 
 # Day name → ISO day number (1=Monday, 7=Sunday)
 _DAY_NAME_MAP = {
-    "monday": 1, "tuesday": 2, "wednesday": 3, "thursday": 4,
-    "friday": 5, "saturday": 6, "sunday": 7,
-    "lundi": 1, "mardi": 2, "mercredi": 3, "jeudi": 4,
-    "vendredi": 5, "samedi": 6, "dimanche": 7,
+    "monday": 1,
+    "tuesday": 2,
+    "wednesday": 3,
+    "thursday": 4,
+    "friday": 5,
+    "saturday": 6,
+    "sunday": 7,
+    "lundi": 1,
+    "mardi": 2,
+    "mercredi": 3,
+    "jeudi": 4,
+    "vendredi": 5,
+    "samedi": 6,
+    "dimanche": 7,
 }
 
 

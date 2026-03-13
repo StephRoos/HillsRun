@@ -50,7 +50,9 @@ async def generate_training_plan(
         plan_name=body.plan_name,
         total_weeks=body.total_weeks,
         start_date=body.start_date,
-        day_preferences=DayPreferences(**body.day_preferences) if body.day_preferences else None,
+        day_preferences=DayPreferences(**body.day_preferences)
+        if body.day_preferences
+        else None,
     )
     try:
         result = await generate_plan(db.pool, user_id, request)
@@ -165,6 +167,7 @@ async def get_training_plan(
         # Fix legacy plans where generation_params was double-encoded as string
         if isinstance(plan.get("generation_params"), str):
             import json
+
             plan["generation_params"] = json.loads(plan["generation_params"])
 
         weeks = await db_ops.get_plan_weeks(db.pool, plan_id)
@@ -194,7 +197,9 @@ async def update_training_plan_status(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Invalid status. Allowed: {sorted(valid_statuses)}",
         )
-    plan = await db_ops.update_training_plan_status(db.pool, plan_id, user_id, body.status)
+    plan = await db_ops.update_training_plan_status(
+        db.pool, plan_id, user_id, body.status
+    )
     if not plan:
         raise HTTPException(status_code=404, detail="Training plan not found")
     return TrainingPlanSummary.model_validate(plan)
@@ -234,6 +239,7 @@ async def get_plan_week(
         for s in sessions:
             if isinstance(s.get("blocks"), str):
                 import json
+
                 s["blocks"] = json.loads(s["blocks"])
         week["sessions"] = sessions
         return PlanWeekDetail.model_validate(week)
