@@ -1,5 +1,6 @@
 """Garmin account connection endpoints (connect/status/disconnect)."""
 
+import asyncio
 import logging
 import os
 import uuid
@@ -23,9 +24,9 @@ router = APIRouter(
     prefix="/api/v1/auth", tags=["auth_garmin"], dependencies=[Depends(get_api_key)]
 )
 
-# Temporary in-memory store for pending MFA sessions (TTL: 5 minutes)
+# Temporary in-memory store for pending MFA sessions (TTL: 10 minutes)
 _mfa_sessions: dict[str, dict[str, Any]] = {}
-_MFA_TTL = 300
+_MFA_TTL = 600
 
 
 def _cleanup_expired_mfa():
@@ -34,6 +35,17 @@ def _cleanup_expired_mfa():
     expired = [k for k, v in _mfa_sessions.items() if now - v["created"] > _MFA_TTL]
     for k in expired:
         del _mfa_sessions[k]
+
+
+async def _mfa_cleanup_loop():
+    """Background task: purge expired MFA sessions every minute.
+
+    Runs indefinitely until cancelled, providing proactive cleanup independent
+    of incoming requests so stale sessions don't accumulate in memory.
+    """
+    while True:
+        await asyncio.sleep(60)
+        _cleanup_expired_mfa()
 
 
 class ConnectRequest(BaseModel):
@@ -87,9 +99,7 @@ async def _finalize_connect(
         # Fallback: look up by email to prevent duplicate user creation
         existing_user_id = await db.get_user_by_email(request_email)
         if existing_user_id:
-            logger.info(
-                f"Found existing garmin_user, user_id={existing_user_id}"
-            )
+            logger.info(f"Found existing garmin_user, user_id={existing_user_id}")
 
     if existing_user_id:
         # Re-connecting an existing user — update tokens + display_name + link
@@ -115,9 +125,7 @@ async def _finalize_connect(
             )
         except Exception:
             logger.exception("Failed to link Garmin account in database")
-            raise HTTPException(
-                status_code=500, detail="Failed to link Garmin account"
-            )
+            raise HTTPException(status_code=500, detail="Failed to link Garmin account")
 
     await db.store_encrypted_tokens(user_id, encrypted)
     logger.info(
@@ -133,7 +141,9 @@ async def _finalize_connect(
 
 @router.post("/connect", response_model=ConnectResponse)
 @limiter.limit(AUTH_RATE_LIMIT)
-async def connect_garmin(http_request: FastAPIRequest, request: ConnectRequest, db=Depends(get_db)):
+async def connect_garmin(
+    http_request: FastAPIRequest, request: ConnectRequest, db=Depends(get_db)
+):
     """Authenticate with Garmin Connect, store encrypted tokens, link to Better-Auth user."""
     token_key = os.environ.get("GARMIN_TOKEN_KEY", "")
     if not token_key:
@@ -151,9 +161,7 @@ async def connect_garmin(http_request: FastAPIRequest, request: ConnectRequest, 
         garmin_client = Garmin(request.email, request.password, return_on_mfa=True)
         result = garmin_client.login()
     except GarminConnectAuthenticationError:
-        raise HTTPException(
-            status_code=401, detail="Garmin authentication failed"
-        )
+        raise HTTPException(status_code=401, detail="Garmin authentication failed")
     except Exception:
         logger.exception("Garmin login error")
         raise HTTPException(status_code=502, detail="Failed to connect to Garmin")
@@ -187,7 +195,9 @@ async def connect_garmin(http_request: FastAPIRequest, request: ConnectRequest, 
 
 @router.post("/connect/mfa", response_model=ConnectResponse)
 @limiter.limit(AUTH_RATE_LIMIT)
-async def connect_garmin_mfa(http_request: FastAPIRequest, request: MfaRequest, db=Depends(get_db)):
+async def connect_garmin_mfa(
+    http_request: FastAPIRequest, request: MfaRequest, db=Depends(get_db)
+):
     """Complete Garmin Connect login with MFA code."""
     token_key = os.environ.get("GARMIN_TOKEN_KEY", "")
     if not token_key:

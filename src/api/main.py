@@ -1,5 +1,6 @@
 """FastAPI application for HillsRun API."""
 
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -69,6 +70,7 @@ def _validate_token_key():
 async def lifespan(app: FastAPI):
     """Application lifespan: configure logging, validate keys, connect DB."""
     from ..utils.logging_config import setup_logging
+    from .routers.auth_garmin import _mfa_cleanup_loop
 
     setup_logging(log_level=os.environ.get("LOG_LEVEL", "INFO"))
     _validate_token_key()
@@ -78,7 +80,9 @@ async def lifespan(app: FastAPI):
     app.state.user_id = await db.query_first_user()
     app.state.start_time = datetime.now(timezone.utc)
     logger.info(f"API started, user_id={app.state.user_id}")
+    mfa_cleanup_task = asyncio.create_task(_mfa_cleanup_loop())
     yield
+    mfa_cleanup_task.cancel()
     await db.disconnect()
 
 
@@ -97,13 +101,18 @@ app.add_middleware(CacheControlMiddleware)
 
 # CORS: only allow requests from the HillsRun frontend
 _allowed_origins = os.environ.get(
-    "CORS_ALLOWED_ORIGINS", "https://hillsrun.com,https://www.hillsrun.com"
+    "CORS_ALLOWED_ORIGINS", "https://app.hillsrun.com,http://localhost:3000"
 ).split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins,
     allow_methods=["GET", "POST", "PATCH", "DELETE"],
-    allow_headers=["X-API-Key", "X-Garmin-User-Id", "X-Coach-Better-Auth-Id", "X-Better-Auth-User-Id"],
+    allow_headers=[
+        "X-API-Key",
+        "X-Garmin-User-Id",
+        "X-Coach-Better-Auth-Id",
+        "X-Better-Auth-User-Id",
+    ],
     allow_credentials=False,
 )
 
