@@ -1,5 +1,12 @@
 # HillsRun
 
+> **Statut : en prod, dev figé depuis 2026-04-21.**
+> Frontend (Vercel) + backend (Railway) + Neon PostgreSQL + replica NAS opérationnels.
+> Sync Garmin quotidien via cron NAS (05:00 UTC).
+> **Aucune nouvelle feature prévue.** Seul usage futur : rédaction du case study portfolio.
+> **Conditions de reprise** : pas de reprise dev — uniquement case study + éventuel article blog (« Comment j'ai connecté Garmin à mon propre dashboard »).
+> Cadre dans la réduction de 9 à 3 projets actifs (roadmap v2 2026-04-21).
+
 [![CI](https://github.com/stpmusic/HillsRun/actions/workflows/ci.yml/badge.svg)](https://github.com/stpmusic/HillsRun/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-black.svg)](https://nextjs.org/)
