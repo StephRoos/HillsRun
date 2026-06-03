@@ -228,7 +228,7 @@ export default function NewTrainingPlanPage() {
                 onChange={(prefs) =>
                   setProfileForm({ ...profileForm, day_preferences: prefs })
                 }
-                maxRunningSessions={SESSION_COUNT[profileForm.experience_level] ?? 4}
+                maxRunningSessions={SESSION_COUNT[profileForm.experience_level ?? ""] ?? 4}
               />
             </div>
             <Button
@@ -393,7 +393,7 @@ export default function NewTrainingPlanPage() {
                 <DayPreferencePicker
                   value={dayPrefsOverride}
                   onChange={setDayPrefsOverride}
-                  maxRunningSessions={SESSION_COUNT[profileForm.experience_level] ?? 4}
+                  maxRunningSessions={SESSION_COUNT[profileForm.experience_level ?? ""] ?? 4}
                 />
               )}
             </div>

@@ -1,0 +1,104 @@
+# Coolify production compose — HillsRun on UM880 Pro.
+# Managed by Coolify — auto-deployed on push to the deployed branch.
+# Set ALL secrets/values as environment variables in Coolify's UI (not here).
+#
+# Topology:
+#   web  → public via Traefik + Cloudflare Tunnel (hillsrun.com)
+#   api  → INTERNAL only (http://api:8000), reached by web's /api/garmin/* proxy
+#   db   → INTERNAL Postgres (primary, replaces Neon), volume-backed
+#   sync → daily cron that triggers the in-process Garmin sync on the api
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-garmin_connect}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-garmin_connect}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-garmin_connect}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_SSL: "false"
+      API_KEY: ${API_KEY}
+      GARMIN_TOKEN_KEY: ${GARMIN_TOKEN_KEY}
+      GARMIN_TOKENS_DIR: /tokens
+      CONFIG_PATH: /app/config/config.yaml
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      TZ: ${TZ:-Europe/Paris}
+    volumes:
+      - garmin_tokens:/tokens
+    # No ports, no Traefik labels: api stays inside the Docker network only.
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_* must be inlined at build time into the client bundle.
+        NEXT_PUBLIC_BETTER_AUTH_URL: ${NEXT_PUBLIC_BETTER_AUTH_URL}
+    environment:
+      HOSTNAME: "0.0.0.0"
+      PORT: "3000"
+      # Prisma (auth tables) → same Postgres as the api.
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-garmin_connect}
+      # Server-side proxy target — internal api service.
+      GARMIN_API_URL: http://api:8000
+      GARMIN_API_KEY: ${API_KEY}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-https://hillsrun.com}
+      NEXT_PUBLIC_BETTER_AUTH_URL: ${NEXT_PUBLIC_BETTER_AUTH_URL:-https://hillsrun.com}
+      TZ: ${TZ:-Europe/Paris}
+    # Exposure + TLS are managed by Coolify, NOT hand-written labels: the domain
+    # is set via the app's `docker_compose_domains` (web -> hillsrun.com,www),
+    # and Coolify generates the Traefik routers + handles Let's Encrypt (HTTP-01),
+    # exactly like ladtc. Hand-written labels here would conflict with Coolify's.
+    # api/db/sync get no domain and stay internal. web listens on 3000.
+    expose:
+      - "3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  sync:
+    # Daily Garmin sync — replaces the cron previously on the NAS Ugreen.
+    # Triggers the in-process sync endpoint on the internal api at 06:00 Europe/Paris.
+    image: alpine:3.20
+    environment:
+      API_KEY: ${API_KEY}
+      TZ: ${TZ:-Europe/Paris}
+    command:
+      - sh
+      - -c
+      - |
+        apk add --no-cache curl tzdata >/dev/null 2>&1
+        printf '0 6 * * * curl -s -X POST -H "X-API-Key: %s" http://api:8000/api/v1/sync/trigger >> /var/log/sync.log 2>&1\n' "$$API_KEY" > /etc/crontabs/root
+        touch /var/log/sync.log
+        crond -f -l 8
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  garmin_tokens:

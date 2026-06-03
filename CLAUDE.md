@@ -4,8 +4,8 @@
 Trail-focused Garmin dashboard for athletes and coaches. Syncs health/sport data from Garmin Connect, visualizes trends, and supports multi-athlete coaching. Part of the HillsRun + RecettesApp ecosystem.
 
 ## Stack
-- **Backend**: FastAPI (async) + asyncpg + Pydantic, deployed on Railway
-- **Database**: Neon PostgreSQL (Garmin tables via raw SQL, auth tables via Prisma) + NAS read-only replica
+- **Backend**: FastAPI (async) + asyncpg + Pydantic, self-hosted on UM880 (Coolify, internal-only)
+- **Database**: Self-hosted PostgreSQL 16 on UM880 (Garmin tables via raw SQL, auth tables via Prisma)
 - **Sync**: Python fetchers calling `garminconnect` lib, triggered on login + manual
 - **Frontend**: Next.js 16 (App Router) + React 19 + TanStack Query + shadcn/ui + Tailwind CSS v4
 - **Auth**: Better-Auth (email/password) + Prisma adapter
@@ -51,7 +51,7 @@ config/config.yaml            # Sync config (categories, rate limits)
 ```
 
 ## API Endpoints
-Base URL: `https://api.hillsrun.com` | Header: `X-API-Key`
+Base URL (internal): `http://api:8000` | Header: `X-API-Key`
 
 | Group | Endpoints |
 |---|---|
@@ -86,33 +86,26 @@ uv run ruff check src/        # Lint
 uv run ruff format src/       # Format
 ```
 
-### Deploy frontend (Vercel)
-- Auto-deploy: `git push` (Vercel Git integration, root = `web`)
+### Deploy (UM880 / Coolify)
+- Everything runs from `docker-compose.coolify.yml` on the UM880, managed by Coolify.
+- Auto-deploy: `git push` to the deployed branch → Coolify rebuilds.
+- Services: `web` (Next.js, public via Traefik + Cloudflare Tunnel → `hillsrun.com`),
+  `api` (FastAPI, **internal-only** `http://api:8000`), `db` (Postgres 16, primary),
+  `sync` (daily cron 06:00 Europe/Paris).
+- Env vars set in the Coolify UI — full list and runbook in `docs/DEPLOY-UM880.md`.
+- Frontend → backend: same-origin proxy `/api/garmin/*` forwards to `http://api:8000`
+  (no public `api.hillsrun.com` anymore).
 
-### Deploy backend (Railway)
-- Auto-deploy: `git push` (Railway Git integration, root directory)
-- Config: `railway.toml` (nixpacks builder, uvicorn start command)
-- Custom domain: `api.hillsrun.com` (CNAME → Railway)
-- Env vars configured in Railway dashboard (see `.env.example`)
-
-### NAS (PostgreSQL replica only)
+### Daily sync cron (UM880)
+Handled by the `sync` service in the compose (hits the internal api):
 ```bash
-# Start replica
-ssh nas "cd /volume1/docker/garmin-sync/HillsRun && docker compose -f docker-compose.nas.yml up -d"
-
-# Check replication health
-ssh nas "./scripts/check-replica.sh"
-```
-
-### Daily sync cron (on NAS)
-```bash
-0 5 * * * curl -s -X POST -H 'X-API-Key: <API_KEY>' https://api.hillsrun.com/api/v1/sync/trigger
+0 6 * * * curl -s -X POST -H 'X-API-Key: <API_KEY>' http://api:8000/api/v1/sync/trigger
 ```
 
 ### Remote access
-- **SSH**: `ssh nas` (Cloudflare Tunnel)
-- **API**: `https://api.hillsrun.com` (Railway)
-- **NAS replica DB**: `ssh nas "psql -h localhost -U garmin -d garmin_connect"`
+- **SSH**: `ssh um880`
+- **App**: `https://hillsrun.com`
+- **DB**: `ssh um880 "docker exec <db_container> psql -U garmin -d garmin_connect"`
 
 ## Conventions
 - CRITICAL: `pnpm` for frontend, `uv` for Python (NEVER pip, NEVER npm)
@@ -133,8 +126,10 @@ ssh nas "./scripts/check-replica.sh"
 - ADR-006: Coach context via React Context + X-View-As-Athlete header
 - ADR-007: Threaded sync jobs (prevent blocking FastAPI event loop)
 - ADR-008: HillsRun theme shared with RecettesApp (dark mode, orange primary)
-- ADR-009: Backend on Railway (auto-deploy on push, no Docker management)
-- ADR-010: NAS PostgreSQL replica via Neon logical replication (local backup, read-only)
+- ADR-009: ~~Backend on Railway~~ → Superseded: self-hosted on UM880 (Coolify), api internal-only
+- ADR-010: ~~NAS PostgreSQL replica via Neon logical replication~~ → Superseded: primary Postgres self-hosted on UM880 (Neon retired)
+- ADR-011: Single Coolify compose on UM880 (web public + api/db/sync internal); see docs/DEPLOY-UM880.md
+- ADR-012: Exposure via Cloudflare Tunnel (no inbound ports). Tunnel ingress → https://localhost:443 (noTLSVerify) to avoid the http→https redirect loop; DNS = CNAME proxied to cfargotunnel; cert served by Cloudflare edge (no origin Let's Encrypt, port 80 closed). domains set via Coolify docker_compose_domains, not hand-written labels.
 
 ## Documentation
 - `PRD.md` — Product requirements (what and why)
@@ -147,30 +142,19 @@ ssh nas "./scripts/check-replica.sh"
 
 ## Deployment
 
-### Infrastructure
-- **Frontend**: Vercel (auto-deploy on `git push`, root = `web`)
-- **Backend**: Railway (auto-deploy on `git push`, config = `railway.toml`)
-- **Database**: Neon Cloud PostgreSQL (primary, read-write)
-- **NAS**: PostgreSQL replica (read-only, via logical replication) + cron sync
+Full runbook: `docs/DEPLOY-UM880.md`. Pre-UM880 configs archived in `legacy/`.
 
-### NAS Replica Setup
-1. Enable logical replication on Neon (Project Settings > Logical Replication)
-2. Create replicator role + publication on Neon (see `scripts/setup-replica.sh` header)
-3. Start replica: `docker compose -f docker-compose.nas.yml up -d`
-4. Init subscription: `./scripts/setup-replica.sh`
-5. Verify: `./scripts/check-replica.sh`
+### Infrastructure (UM880 / Coolify)
+- **Single compose**: `docker-compose.coolify.yml` (auto-deploy on `git push`)
+- **web**: Next.js, public via Traefik + Cloudflare Tunnel → `hillsrun.com`
+- **api**: FastAPI, internal-only `http://api:8000` (`Dockerfile.api`)
+- **db**: self-hosted Postgres 16 (primary, replaces Neon)
+- **sync**: daily cron 06:00 Europe/Paris → internal api
 
-### Daily Sync Cron (NAS)
-06:00 Europe/Paris (05:00 UTC):
-```bash
-0 5 * * * curl -s -X POST -H 'X-API-Key: <API_KEY>' https://api.hillsrun.com/api/v1/sync/trigger
-```
-Logs: `/var/log/hillsrun-sync.log`
-
-### Environment Variables
-- **Railway**: `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_SSL`, `API_KEY`, `GARMIN_TOKEN_KEY`, `LOG_LEVEL`
-- **Vercel**: `BETTER_AUTH_SECRET`, `GARMIN_API_KEY`, `DATABASE_URL`, `NEXT_PUBLIC_*`
-- **NAS**: `REPLICA_PASSWORD`, `NEON_REPLICATION_CONNSTRING`
+### Environment Variables (Coolify UI)
+`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `API_KEY`, `GARMIN_TOKEN_KEY`,
+`BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_BETTER_AUTH_URL`, `LOG_LEVEL`, `TZ`.
+`DATABASE_URL`, `GARMIN_API_URL`, `GARMIN_API_KEY` are derived in the compose.
 
 ## Known Issues
 - `BETTER_AUTH_SECRET` has been rotated in Sprint 1 (was listed in specs/01-improvements/04-security-hardening.md)
