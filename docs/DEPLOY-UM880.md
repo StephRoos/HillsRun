@@ -111,30 +111,42 @@ ssh um880 "docker exec <db_container> psql -U garmin -d garmin_connect \
 
 ---
 
-## Étape 3 — Exposition (Coolify domaine + DNS Cloudflare)
+## Étape 3 — Exposition (Cloudflare Tunnel, PAS de port entrant)
 
-**Pas de Cloudflare Tunnel.** L'exposition réelle (constatée sur ladtc) :
-Cloudflare proxy (orange cloud) → IP publique maison → port-forward routeur 80/443
-→ `coolify-proxy` (Traefik v3) → conteneur. hillsrun.com et ladtc.be sont sur le
-**même compte Cloudflare** (NS `sid`/`kenia.ns.cloudflare.com`).
+**Architecture réelle** (vérifiée) : la maison n'a **aucun port entrant ouvert** (ni 80
+ni 443). Tout passe par un **Cloudflare Tunnel** — `cloudflared` tourne sur le UM880
+(process hôte `cloudflared tunnel run --token …`, tunnel id `6b5cb58d-2344-4653-8d0b-ba7723f8ac6d`)
+et établit une connexion **sortante** vers Cloudflare. C'est ainsi que ladtc est exposé.
+Conséquence : pas de challenge Let's Encrypt HTTP-01 possible (port 80 fermé) — le
+**certificat est servi par l'edge Cloudflare** (Universal SSL), pas par l'origine.
 
-1. **Exposition** : gérée par **Coolify** via le champ `docker_compose_domains` de
-   l'app (mapping `web` → `https://hillsrun.com,https://www.hillsrun.com`). Coolify
-   génère alors les routers Traefik **et** gère Let's Encrypt (challenge HTTP-01 sur
-   le port 80), comme ladtc. NE PAS écrire de labels Traefik à la main dans le compose
-   (ils entrent en conflit). `api`/`db`/`sync` n'ont pas de domaine → internes.
-   ATTENTION : l'émission LE via HTTP-01 ne marche **pas** derrière le proxy Cloudflare.
-   Séquence : DNS en **grey-cloud** d'abord (émission directe du cert) → vérifier le
-   cert → repasser en **proxied**.
-2. **Cloudflare DNS** (dashboard, zone hillsrun.com) : pointer `hillsrun.com` (et `www`)
-   sur l'origine maison **exactement comme `ladtc.be`** (enregistrement A/CNAME
-   **proxifié**, orange cloud). SSL/TLS mode **Full** (le cert Let's Encrypt vit à l'origine).
-3. **Ne pas encore** retirer l'enregistrement Vercel : tester d'abord via le domaine
-   temporaire fourni par Coolify (sslip.io) ou en forçant le `/etc/hosts` local vers
-   l'IP du UM880.
+Trois éléments à configurer :
 
-> `api.hillsrun.com` n'est **plus exposé** : supprimer l'enregistrement DNS (CNAME
-> Railway) à la fin. L'API reste interne au réseau Docker.
+1. **Coolify** — `docker_compose_domains` de l'app (mapping service → domaine), via
+   l'API `PATCH /applications/{uuid}` avec un **tableau** :
+   ```json
+   {"docker_compose_domains":[{"name":"web","domain":"https://hillsrun.com,https://www.hillsrun.com"}]}
+   ```
+   Coolify génère alors les routers Traefik. NE PAS écrire de labels Traefik à la main
+   dans le compose (conflit). `api`/`db`/`sync` n'ont pas de domaine → internes.
+
+2. **Ingress du tunnel** — ajouter les hostnames sur le tunnel UM880, **vers l'entrypoint
+   HTTPS de Traefik** (et non `http://localhost:80`, qui provoque une boucle de
+   redirection http→https) :
+   ```
+   hillsrun.com      → https://localhost:443   (originRequest: noTLSVerify=true, httpHostHeader=hillsrun.com)
+   www.hillsrun.com  → https://localhost:443   (idem httpHostHeader=www.hillsrun.com)
+   ```
+   API : `PUT /accounts/{acc}/cfd_tunnel/{tunnel}/configurations` (renvoyer la config
+   ingress complète, hostnames insérés avant le catch-all `http_status:404`).
+
+3. **DNS Cloudflare** — `hillsrun.com` et `www` en **CNAME proxifié** vers
+   `6b5cb58d-2344-4653-8d0b-ba7723f8ac6d.cfargotunnel.com` (PAS un A record vers l'IP
+   publique → donnerait un 522). SSL/TLS mode **Full**.
+
+> Note API Cloudflare : changer l'enregistrement **apex** de A → CNAME peut renvoyer un
+> `10405` trompeur (réessayer / recréer). `api.hillsrun.com` n'est plus exposé : supprimer
+> son CNAME Railway + le TXT `_railway-verify` à la fin.
 
 ---
 

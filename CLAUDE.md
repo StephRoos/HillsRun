@@ -129,6 +129,7 @@ Handled by the `sync` service in the compose (hits the internal api):
 - ADR-009: ~~Backend on Railway~~ → Superseded: self-hosted on UM880 (Coolify), api internal-only
 - ADR-010: ~~NAS PostgreSQL replica via Neon logical replication~~ → Superseded: primary Postgres self-hosted on UM880 (Neon retired)
 - ADR-011: Single Coolify compose on UM880 (web public + api/db/sync internal); see docs/DEPLOY-UM880.md
+- ADR-012: Exposure via Cloudflare Tunnel (no inbound ports). Tunnel ingress → https://localhost:443 (noTLSVerify) to avoid the http→https redirect loop; DNS = CNAME proxied to cfargotunnel; cert served by Cloudflare edge (no origin Let's Encrypt, port 80 closed). domains set via Coolify docker_compose_domains, not hand-written labels.
 
 ## Documentation
 - `PRD.md` — Product requirements (what and why)
