@@ -118,9 +118,10 @@ Cloudflare proxy (orange cloud) → IP publique maison → port-forward routeur 
 → `coolify-proxy` (Traefik v3) → conteneur. hillsrun.com et ladtc.be sont sur le
 **même compte Cloudflare** (NS `sid`/`kenia.ns.cloudflare.com`).
 
-1. **Coolify UI** : sur le service `web`, champ **Domains** = `https://hillsrun.com`
-   (+ `https://www.hillsrun.com`). Coolify génère les labels Traefik et provisionne
-   le certificat Let's Encrypt automatiquement. Laisser `api`/`db`/`sync` **sans domaine**.
+1. **Exposition** : déjà gérée par les **labels Traefik du compose** sur le service
+   `web` (Coolify les applique tels quels pour les apps docker-compose — vérifié en
+   prod). Rien à configurer côté Coolify. `api`/`db`/`sync` restent internes.
+   Le certificat Let's Encrypt s'émet automatiquement dès que le DNS pointe sur le UM880.
 2. **Cloudflare DNS** (dashboard, zone hillsrun.com) : pointer `hillsrun.com` (et `www`)
    sur l'origine maison **exactement comme `ladtc.be`** (enregistrement A/CNAME
    **proxifié**, orange cloud). SSL/TLS mode **Full** (le cert Let's Encrypt vit à l'origine).
