@@ -12,6 +12,8 @@ const withSerwist = withSerwistInit({
 });
 
 const nextConfig: NextConfig = {
+  // Standalone build for the Docker image deployed on UM880 (Coolify).
+  output: "standalone",
   experimental: {
     optimizePackageImports: ["lucide-react"],
   },
@@ -50,7 +52,9 @@ const nextConfig: NextConfig = {
           "style-src 'self' 'unsafe-inline'",
           "img-src 'self' data: blob:",
           "font-src 'self'",
-          "connect-src 'self' https://api.hillsrun.com",
+          // API is internal-only on UM880: the browser only calls same-origin
+          // /api/garmin/* (server-side proxy forwards to http://api:8000).
+          "connect-src 'self'",
           "frame-ancestors 'none'",
         ].join("; "),
       },
