@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 
 const { mockConnectMutate, mockMfaMutate, mockHookState } = vi.hoisted(() => ({
   mockConnectMutate: vi.fn(),
@@ -23,6 +23,13 @@ vi.mock("@/hooks/use-garmin-account", () => ({
 }));
 
 import { GarminConnectForm } from "../garmin-connect-form";
+
+// Formes minimales de ce que le mock de `mutate` reçoit (le hook réel n'exporte
+// pas son type de résultat ; on décrit seulement ce que ces tests consomment).
+type Credentials = { email: string; password: string };
+type ConnectMutateOpts = {
+  onSuccess: (data: { needs_mfa?: boolean; mfa_session_id?: string }) => void;
+};
 
 describe("GarminConnectForm", () => {
   beforeEach(() => {
@@ -74,7 +81,7 @@ describe("GarminConnectForm", () => {
   });
 
   it("switches to MFA form after MFA response", () => {
-    mockConnectMutate.mockImplementation((_creds: any, opts: any) => {
+    mockConnectMutate.mockImplementation((_creds: Credentials, opts: ConnectMutateOpts) => {
       opts.onSuccess({ needs_mfa: true, mfa_session_id: "sess-123" });
     });
 
@@ -105,7 +112,7 @@ describe("GarminConnectForm", () => {
   });
 
   it("cancel button returns to credentials form", () => {
-    mockConnectMutate.mockImplementation((_creds: any, opts: any) => {
+    mockConnectMutate.mockImplementation((_creds: Credentials, opts: ConnectMutateOpts) => {
       opts.onSuccess({ needs_mfa: true, mfa_session_id: "sess-123" });
     });
 

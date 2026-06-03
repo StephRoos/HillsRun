@@ -23,7 +23,7 @@ vi.mock("sonner", () => ({
 }));
 
 vi.mock("../activity-card", () => ({
-  ActivityCard: ({ activity }: { activity: any }) => (
+  ActivityCard: ({ activity }: { activity: Activity }) => (
     <div data-testid={`activity-card-${activity.activity_id}`}>
       {activity.activity_name}
     </div>
@@ -89,11 +89,13 @@ const createWrapper = () => {
     },
   });
 
-  return ({ children }: { children: React.ReactNode }) => (
+  const Wrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>
       {children}
     </QueryClientProvider>
   );
+  Wrapper.displayName = "TestQueryWrapper";
+  return Wrapper;
 };
 
 describe("ActivityList", () => {
@@ -113,7 +115,7 @@ describe("ActivityList", () => {
       failureCount: 0,
       failureReason: null,
       status: "pending",
-    } as any);
+    } as unknown as ReturnType<typeof useActivities>);
 
     const { container } = render(<ActivityList />, { wrapper: createWrapper() });
     const skeletons = container.querySelectorAll("[data-slot='skeleton']");
@@ -132,7 +134,7 @@ describe("ActivityList", () => {
       failureCount: 1,
       failureReason: new Error("Failed to load activities"),
       status: "error",
-    } as any);
+    } as unknown as ReturnType<typeof useActivities>);
 
     render(<ActivityList />, { wrapper: createWrapper() });
 
@@ -151,7 +153,7 @@ describe("ActivityList", () => {
       failureCount: 0,
       failureReason: null,
       status: "success",
-    } as any);
+    } as unknown as ReturnType<typeof useActivities>);
 
     render(<ActivityList />, { wrapper: createWrapper() });
 
@@ -188,7 +190,7 @@ describe("ActivityList", () => {
       failureCount: 0,
       failureReason: null,
       status: "success",
-    } as any);
+    } as unknown as ReturnType<typeof useActivities>);
 
     render(<ActivityList />, { wrapper: createWrapper() });
 
@@ -212,7 +214,7 @@ describe("ActivityList", () => {
       failureCount: 0,
       failureReason: null,
       status: "success",
-    } as any);
+    } as unknown as ReturnType<typeof useActivities>);
 
     render(<ActivityList />, { wrapper: createWrapper() });
 
@@ -236,7 +238,7 @@ describe("ActivityList", () => {
       failureCount: 0,
       failureReason: null,
       status: "success",
-    } as any);
+    } as unknown as ReturnType<typeof useActivities>);
 
     render(<ActivityList />, { wrapper: createWrapper() });
 

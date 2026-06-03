@@ -1,6 +1,7 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import type { CoachingStatus, InviteCode } from "@/types/garmin";
 
 const {
   mockSetAthlete,
@@ -18,8 +19,8 @@ const {
   mockRemoveAthleteMutate: vi.fn(),
   mockRemoveCoachMutate: vi.fn(),
   mockData: {
-    statusData: null as any,
-    inviteCodesData: null as any,
+    statusData: null as CoachingStatus | null,
+    inviteCodesData: null as InviteCode[] | null,
   },
 }));
 
@@ -81,9 +82,10 @@ describe("CoachingSection", () => {
 
   it("renders athletes list when present", () => {
     mockData.statusData = {
+      coaching_enabled: true,
       athletes: [
-        { athlete_user_id: 1, display_name: "Alice", email: "alice@test.com" },
-        { athlete_user_id: 2, display_name: null, email: "bob@test.com" },
+        { athlete_user_id: 1, display_name: "Alice", email: "alice@test.com", status: "active", linked_at: null },
+        { athlete_user_id: 2, display_name: null, email: "bob@test.com", status: "active", linked_at: null },
       ],
       coaches: [],
     };
@@ -97,9 +99,10 @@ describe("CoachingSection", () => {
 
   it("renders coaches list when present", () => {
     mockData.statusData = {
+      coaching_enabled: true,
       athletes: [],
       coaches: [
-        { coach_better_auth_id: "c1", coach_name: "Coach Mike", coach_email: "mike@coach.com" },
+        { coach_better_auth_id: "c1", coach_name: "Coach Mike", coach_email: "mike@coach.com", status: "active", linked_at: null },
       ],
     };
 
@@ -117,7 +120,7 @@ describe("CoachingSection", () => {
   });
 
   it("does not show athletes section when empty", () => {
-    mockData.statusData = { athletes: [], coaches: [] };
+    mockData.statusData = { coaching_enabled: true, athletes: [], coaches: [] };
 
     render(<CoachingSection />);
 
@@ -126,8 +129,8 @@ describe("CoachingSection", () => {
 
   it("shows pending invite codes", () => {
     mockData.inviteCodesData = [
-      { id: 1, code: "ABC123", status: "pending" },
-      { id: 2, code: "XYZ789", status: "redeemed" },
+      { id: 1, code: "ABC123", status: "pending", coach_better_auth_id: "c1", redeemed_by_user_id: null, created_at: null, expires_at: null, redeemed_at: null },
+      { id: 2, code: "XYZ789", status: "redeemed", coach_better_auth_id: "c1", redeemed_by_user_id: 5, created_at: null, expires_at: null, redeemed_at: null },
     ];
 
     render(<CoachingSection />);
@@ -139,8 +142,9 @@ describe("CoachingSection", () => {
 
   it("renders view button for each athlete", () => {
     mockData.statusData = {
+      coaching_enabled: true,
       athletes: [
-        { athlete_user_id: 1, display_name: "Alice", email: "alice@test.com" },
+        { athlete_user_id: 1, display_name: "Alice", email: "alice@test.com", status: "active", linked_at: null },
       ],
       coaches: [],
     };
@@ -152,8 +156,9 @@ describe("CoachingSection", () => {
 
   it("displays fallback for athlete without name or email", () => {
     mockData.statusData = {
+      coaching_enabled: true,
       athletes: [
-        { athlete_user_id: 99, display_name: null, email: null },
+        { athlete_user_id: 99, display_name: null, email: null, status: "active", linked_at: null },
       ],
       coaches: [],
     };
