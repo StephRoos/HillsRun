@@ -67,26 +67,13 @@ services:
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-https://hillsrun.com}
       NEXT_PUBLIC_BETTER_AUTH_URL: ${NEXT_PUBLIC_BETTER_AUTH_URL:-https://hillsrun.com}
       TZ: ${TZ:-Europe/Paris}
-    # Coolify (Traefik v3) passes these compose labels through as-is for
-    # docker-compose apps — verified on the live deployment. Only the web
-    # service is exposed; api/db/sync carry no labels and stay internal.
-    # Let's Encrypt is issued once DNS for hillsrun.com points at the UM880.
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.middlewares.gzip.compress=true"
-      # HTTP router
-      - "traefik.http.routers.hillsrun-http.entryPoints=http"
-      - "traefik.http.routers.hillsrun-http.rule=Host(`hillsrun.com`) || Host(`www.hillsrun.com`)"
-      - "traefik.http.routers.hillsrun-http.middlewares=gzip"
-      - "traefik.http.routers.hillsrun-http.service=hillsrun"
-      # HTTPS router (Let's Encrypt at the origin; Cloudflare proxy in front)
-      - "traefik.http.routers.hillsrun-https.entryPoints=https"
-      - "traefik.http.routers.hillsrun-https.rule=Host(`hillsrun.com`) || Host(`www.hillsrun.com`)"
-      - "traefik.http.routers.hillsrun-https.middlewares=gzip"
-      - "traefik.http.routers.hillsrun-https.tls=true"
-      - "traefik.http.routers.hillsrun-https.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.hillsrun-https.service=hillsrun"
-      - "traefik.http.services.hillsrun.loadbalancer.server.port=3000"
+    # Exposure + TLS are managed by Coolify, NOT hand-written labels: the domain
+    # is set via the app's `docker_compose_domains` (web -> hillsrun.com,www),
+    # and Coolify generates the Traefik routers + handles Let's Encrypt (HTTP-01),
+    # exactly like ladtc. Hand-written labels here would conflict with Coolify's.
+    # api/db/sync get no domain and stay internal. web listens on 3000.
+    expose:
+      - "3000"
     depends_on:
       db:
         condition: service_healthy
