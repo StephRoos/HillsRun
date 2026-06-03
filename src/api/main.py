@@ -101,7 +101,8 @@ app.add_middleware(CacheControlMiddleware)
 
 # CORS: only allow requests from the HillsRun frontend
 _allowed_origins = os.environ.get(
-    "CORS_ALLOWED_ORIGINS", "https://app.hillsrun.com,http://localhost:3000"
+    "CORS_ALLOWED_ORIGINS",
+    "https://hillsrun.com,https://www.hillsrun.com,http://localhost:3000",
 ).split(",")
 app.add_middleware(
     CORSMiddleware,

@@ -641,10 +641,10 @@ class TestCleanupExpiredMfa:
     """Unit tests for the _cleanup_expired_mfa helper."""
 
     def test_cleanup_removes_expired_sessions(self):
-        """_cleanup_expired_mfa removes sessions older than 300 seconds."""
+        """_cleanup_expired_mfa removes sessions older than the 600s TTL."""
         from src.api.routers.auth_garmin import _mfa_sessions, _cleanup_expired_mfa
 
-        old_time = time.time() - 301  # 301 seconds ago → expired
+        old_time = time.time() - 601  # 601 seconds ago → past the 600s TTL
         _mfa_sessions["old-session"] = {
             "created": old_time,
             "email": "old@test.com",
