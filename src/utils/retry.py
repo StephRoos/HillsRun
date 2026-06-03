@@ -86,23 +86,32 @@ def safe_api_call(func: Callable) -> Callable:
             # GarthHTTPError is a dataclass: .error holds the HTTP response object
             response = getattr(e, "error", None) or getattr(e, "response", None)
             status_code = getattr(response, "status_code", None)
+            if not isinstance(status_code, int):
+                status_code = None
 
-            if status_code == 400 or "400" in error_str:
-                msg = "Endpoint not available (400) - Feature may not be enabled"
-            elif status_code == 401 or "401" in error_str:
-                msg = "Authentication required (401) - Please re-authenticate"
-            elif status_code == 403 or "403" in error_str:
-                msg = "Access denied (403) - No permission"
-            elif status_code == 404 or "404" in error_str:
-                msg = "Endpoint not found (404) - Feature may be removed"
-            elif status_code == 429 or "429" in error_str:
-                msg = "Rate limit exceeded (429) - Wait before retrying"
-            elif status_code == 500 or "500" in error_str:
-                msg = "Server error (500) - Garmin servers issue"
-            elif status_code == 503 or "503" in error_str:
-                msg = "Service unavailable (503) - Temporary outage"
-            else:
-                msg = f"HTTP error ({status_code}): {error_str}"
+            # Fall back to parsing the code out of the message only when the
+            # structured status_code is unavailable — and parse e.msg, never
+            # str(e). str(e) embeds repr(self.error), whose stray digits (mock
+            # ids in tests, content-length/timestamps in prod) would otherwise
+            # misclassify the error (e.g. a 401 read as 400).
+            if status_code is None:
+                raw_msg = getattr(e, "msg", "")
+                msg_text = raw_msg if isinstance(raw_msg, str) else ""
+                for code in (400, 401, 403, 404, 429, 500, 503):
+                    if str(code) in msg_text:
+                        status_code = code
+                        break
+
+            messages = {
+                400: "Endpoint not available (400) - Feature may not be enabled",
+                401: "Authentication required (401) - Please re-authenticate",
+                403: "Access denied (403) - No permission",
+                404: "Endpoint not found (404) - Feature may be removed",
+                429: "Rate limit exceeded (429) - Wait before retrying",
+                500: "Server error (500) - Garmin servers issue",
+                503: "Service unavailable (503) - Temporary outage",
+            }
+            msg = messages.get(status_code, f"HTTP error ({status_code}): {error_str}")
 
             logger.warning(f"API call failed: {msg}")
             return False, None, msg
