@@ -4,7 +4,6 @@ const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
 // Set environment variables before importing the module
-const originalEnv = { ...process.env };
 process.env.GARMIN_API_URL = "https://api.garmin.local";
 process.env.GARMIN_API_KEY = "test-key-123";
 

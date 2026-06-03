@@ -112,10 +112,7 @@ describe("useGenerateTrainingPlan", () => {
     });
 
     act(() => {
-      result.current.mutate({
-        race_name: "Trail 50K",
-        race_date: "2025-09-01",
-      } as any);
+      result.current.mutate({ race_target_id: 1 });
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
@@ -132,7 +129,7 @@ describe("useGenerateTrainingPlan", () => {
     });
 
     act(() => {
-      result.current.mutate({ race_name: "Test" } as any);
+      result.current.mutate({ race_target_id: 1 });
     });
 
     await waitFor(() => expect(result.current.isError).toBe(true));
@@ -234,7 +231,7 @@ describe("useUpdateAthleteProfile", () => {
     });
 
     act(() => {
-      result.current.mutate({ vma: 19 } as any);
+      result.current.mutate({ experience_level: "intermediate" });
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
@@ -269,7 +266,7 @@ describe("useCreateRaceTarget", () => {
     });
 
     act(() => {
-      result.current.mutate({ race_name: "OCC", distance_km: 56 } as any);
+      result.current.mutate({ race_name: "OCC", race_date: "2025-08-30", distance_km: 56 });
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));

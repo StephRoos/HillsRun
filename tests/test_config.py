@@ -129,6 +129,30 @@ class TestLoggingConfig:
 class TestConfigFromDict:
     """Tests for Config.from_dict method."""
 
+    @pytest.fixture(autouse=True)
+    def _clear_config_env(self, monkeypatch):
+        """Isolate from_dict tests from leaking environment variables.
+
+        from_dict gives env vars priority over dict values (see
+        test_from_dict_with_env_override). The CI sets POSTGRES_*/LOG_LEVEL,
+        which would otherwise mask the dict/default behaviour these tests
+        exercise. Clearing them keeps the tests hermetic.
+        """
+        for var in (
+            "POSTGRES_HOST",
+            "POSTGRES_PORT",
+            "POSTGRES_DB",
+            "POSTGRES_USER",
+            "POSTGRES_PASSWORD",
+            "POSTGRES_SSL",
+            "GARMIN_TOKENS_DIR",
+            "GARMIN_EMAIL",
+            "GARMIN_PASSWORD",
+            "GARMIN_TOKEN_KEY",
+            "LOG_LEVEL",
+        ):
+            monkeypatch.delenv(var, raising=False)
+
     def test_from_dict_empty(self):
         """Test creating Config from empty dict uses defaults."""
         config = Config.from_dict({})

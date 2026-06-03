@@ -112,9 +112,9 @@ describe("useCreatePlannedWorkout", () => {
     act(() => {
       result.current.mutate({
         title: "Tempo run",
-        scheduled_date: "2024-06-15",
-        workout_type: "running",
-      } as any);
+        planned_date: "2024-06-15",
+        sport_type: "running",
+      });
     });
 
     await waitFor(() => {
@@ -132,7 +132,7 @@ describe("useCreatePlannedWorkout", () => {
     });
 
     act(() => {
-      result.current.mutate({ title: "Run" } as any);
+      result.current.mutate({ title: "Run", planned_date: "2024-06-15", sport_type: "running" });
     });
 
     await waitFor(() => {
@@ -156,7 +156,7 @@ describe("useUpdatePlannedWorkout", () => {
     });
 
     act(() => {
-      result.current.mutate({ id: 1, body: { title: "Long run" } as any });
+      result.current.mutate({ id: 1, body: { title: "Long run" } });
     });
 
     await waitFor(() => {
