@@ -67,24 +67,13 @@ services:
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-https://hillsrun.com}
       NEXT_PUBLIC_BETTER_AUTH_URL: ${NEXT_PUBLIC_BETTER_AUTH_URL:-https://hillsrun.com}
       TZ: ${TZ:-Europe/Paris}
-    labels:
-      # Traefik — Cloudflare Tunnel delivers HTTP to port 80 → Traefik (same as ladtc).
-      - "traefik.enable=true"
-      - "traefik.http.middlewares.gzip.compress=true"
-      # HTTP router (Cloudflare Tunnel → http entrypoint)
-      - "traefik.http.routers.hillsrun-http.entryPoints=http"
-      - "traefik.http.routers.hillsrun-http.rule=Host(`hillsrun.com`) || Host(`www.hillsrun.com`)"
-      - "traefik.http.routers.hillsrun-http.middlewares=gzip"
-      - "traefik.http.routers.hillsrun-http.service=hillsrun"
-      # HTTPS router (direct access / Let's Encrypt)
-      - "traefik.http.routers.hillsrun-https.entryPoints=https"
-      - "traefik.http.routers.hillsrun-https.rule=Host(`hillsrun.com`) || Host(`www.hillsrun.com`)"
-      - "traefik.http.routers.hillsrun-https.middlewares=gzip"
-      - "traefik.http.routers.hillsrun-https.tls=true"
-      - "traefik.http.routers.hillsrun-https.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.hillsrun-https.service=hillsrun"
-      # Service
-      - "traefik.http.services.hillsrun.loadbalancer.server.port=3000"
+    # Routing/TLS is NOT hand-written here. Coolify owns the proxy (Traefik v3):
+    # set the domain `https://hillsrun.com` on THIS service in the Coolify UI and
+    # Coolify auto-generates the Traefik labels + provisions Let's Encrypt
+    # (same mechanism as ladtc). Internal services (api/db/sync) get no domain.
+    # web listens on port 3000 (Coolify detects it from the exposed port).
+    expose:
+      - "3000"
     depends_on:
       db:
         condition: service_healthy

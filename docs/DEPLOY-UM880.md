@@ -111,22 +111,25 @@ ssh um880 "docker exec <db_container> psql -U garmin -d garmin_connect \
 
 ---
 
-## Étape 3 — Exposition via Cloudflare Tunnel
+## Étape 3 — Exposition (Coolify domaine + DNS Cloudflare)
 
-Le UM880 fait déjà tourner un Cloudflare Tunnel (utilisé par ladtc). On ajoute
-HillsRun au **même** tunnel.
+**Pas de Cloudflare Tunnel.** L'exposition réelle (constatée sur ladtc) :
+Cloudflare proxy (orange cloud) → IP publique maison → port-forward routeur 80/443
+→ `coolify-proxy` (Traefik v3) → conteneur. hillsrun.com et ladtc.be sont sur le
+**même compte Cloudflare** (NS `sid`/`kenia.ns.cloudflare.com`).
 
-1. Cloudflare Zero Trust → **Networks → Tunnels** → tunnel UM880 → **Public Hostnames**.
-2. Ajouter :
-   - `hillsrun.com` → `http://<traefik>:80` (même service que ladtc)
-   - `www.hillsrun.com` → idem
-3. DNS Cloudflare : les enregistrements `hillsrun.com` / `www` passent en CNAME proxifié
-   vers le tunnel (Cloudflare le crée automatiquement avec le hostname public).
-4. **Ne pas encore** toucher l'enregistrement Vercel tant que le test n'est pas validé —
-   tester d'abord via l'URL temporaire Coolify ou un hostname de staging.
+1. **Coolify UI** : sur le service `web`, champ **Domains** = `https://hillsrun.com`
+   (+ `https://www.hillsrun.com`). Coolify génère les labels Traefik et provisionne
+   le certificat Let's Encrypt automatiquement. Laisser `api`/`db`/`sync` **sans domaine**.
+2. **Cloudflare DNS** (dashboard, zone hillsrun.com) : pointer `hillsrun.com` (et `www`)
+   sur l'origine maison **exactement comme `ladtc.be`** (enregistrement A/CNAME
+   **proxifié**, orange cloud). SSL/TLS mode **Full** (le cert Let's Encrypt vit à l'origine).
+3. **Ne pas encore** retirer l'enregistrement Vercel : tester d'abord via le domaine
+   temporaire fourni par Coolify (sslip.io) ou en forçant le `/etc/hosts` local vers
+   l'IP du UM880.
 
-> `api.hillsrun.com` n'est **plus exposé** : supprimer son enregistrement DNS et le
-> public hostname du tunnel à la fin (l'API est interne au réseau Docker).
+> `api.hillsrun.com` n'est **plus exposé** : supprimer l'enregistrement DNS (CNAME
+> Railway) à la fin. L'API reste interne au réseau Docker.
 
 ---
 
