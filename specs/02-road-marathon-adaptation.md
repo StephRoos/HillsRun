@@ -120,7 +120,11 @@ trail.
 - **Base / development:** progressive easy long run (EF, HR Z2).
 - **Specific:** long run with a **marathon-pace finish block** (e.g. 30 km with the
   last 10–12 km at MPR) and occasional **fast-finish**.
-- **Taper:** shortened, mostly EF with a few minutes at MPR to stay sharp.
+- **Taper:** **maintain intensity, cut volume**. Evidence (Wang 2023, Bosquet 2007
+  meta-analyses): 8–14 day taper, volume −41 to −60% (our 0.5x factor fits),
+  intensity KEPT. So the taper must **retain reduced-volume quality** — short MPR
+  blocks and/or strides — NOT collapse to EF/SL/REC only. Dropping intensity does
+  not improve performance.
 
 ## 7. Lots (implement in order, test after each)
 
