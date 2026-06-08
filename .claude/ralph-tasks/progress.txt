@@ -128,3 +128,30 @@ Started: 2026-06-08
 - Lot 6 TODO: pure-function acceptance suite (peak 28-35, no COT/DESC, paces) + migration
   sql/11 + RaceTargetCreate fields. week_builder/plan_generator wiring is done.
 ---
+
+## 2026-06-08 - Task #6: Lot 6 DB + API + acceptance tests
+- sql/11_road_marathon.sql: two ALTER TABLE ... ADD COLUMN IF NOT EXISTS
+  (discipline VARCHAR(20) NOT NULL DEFAULT 'trail', target_time_seconds INTEGER).
+  NOT applied to prod (manual step §12). Idempotent.
+- schemas.py: RaceTargetCreate + RaceTargetResponse gained discipline (default
+  "trail") + target_time_seconds (Optional). db_operations.create_race_target
+  INSERT now has 15 params (added discipline, target_time_seconds at $14/$15).
+  NOTE: create endpoint will 500 on prod until sql/11 is applied (columns absent)
+  — intended deploy order is migration-then-code.
+- BUG FOUND + FIXED (Lot 4 oversight surfaced by §8 acceptance): road
+  _road_phase_session_types omitted RMU in ALL phases, so build_week never
+  scheduled the strength session (RMU placement gated on `RMU in phase_types`,
+  week_builder.py:258). Trail includes RMU every phase. Added SessionType.RMU to
+  base/dev/specific/taper road lists -> strength now placed on preferred day.
+- KEY week_builder GOTCHA for acceptance test: strength day must be OUTSIDE
+  available_days (RMU is additive cross-training placed on a non-running day,
+  week_builder.py:263 non_running_days). Profile = run days [2,4,6,7] + strength
+  Wed(3) separate; passing strength=[3] inside available_days makes day 3 a run.
+- tests/test_training/test_road_marathon_acceptance.py: 10 pure-fn tests.
+  Reference numbers (VMA 14.5 perf, target 12600): MPR 299s=4:59, EF 345-365
+  (5:45-6:05), REC 371-394, INT 248, TMP 282, projected target_time 12616,
+  NOT optimistic. Specific-phase road LR peak = 29.5km (in [28,35]); taper 16.9.
+- ruff: prescribed verify is `ruff check src/` ONLY (tests/ has ~50 pre-existing
+  unused-import errors — do NOT run ruff on tests/, it's not in the gate).
+- Baseline now 871 passed / 2 pre-existing failures (CORS env_override + mfa
+  cleanup). +10 tests. Next: Lot 7 seed script + PR finalize (#7).
