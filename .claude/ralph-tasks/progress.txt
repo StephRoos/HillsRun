@@ -280,3 +280,46 @@ Started: 2026-06-08
 - Next: Lot D3 (#10) workout_matcher.py + adherence.py (READ-ONLY reconciliation,
   ACWR informational-only). Spec 03 Lot D3.
 ---
+
+## 2026-06-08 - Task #10: Lot D3 planned-vs-actual reconciliation (READ-ONLY)
+- All read-only; nothing here mutates a plan or activities. Spec 03 Lot D3.
+- NEW src/training/adaptive/workout_matcher.py (PURE): match_workouts(planned, activities,
+  day_tolerance=1) -> list[WorkoutMatch]. Greedy by planned-date order; each activity
+  consumed once; best = min(|day_offset|, distance_diff). sport_category() maps labels to
+  run/bike/swim/strength/other via substring ("run","cycl"/"bik","swim","strength"/"gym"/
+  "muscle"). road_running planned matches Garmin "running"/"trail_running" (same run category);
+  strength never matches a run. _as_date coerces datetime/date/ISO-str; _num floats Decimals.
+- NEW src/training/adaptive/adherence.py (PURE): build_session_adherence(match, planned_row,
+  activity_row|None) -> SessionAdherence (planned vs actual duration/distance/pace/TSS + ratios);
+  week_adherence(sessions, week_number, acwr_informational) -> WeekAdherence (compliance_pct =
+  completed/planned*100, planned_tss, realized_tss = sum actual TSS over COMPLETED only).
+  bucket_weekly_tss(activities, window_end, weeks=4) -> 4 trailing-7d TSS buckets OLDEST-FIRST
+  ([-1]=acute). compute_acwr_informational(weekly) -> {value,acute_tss,chronic_tss,weeks_used,
+  note=ACWR_CONTESTED_NOTE} (acute=last week, chronic=mean); empty -> None. ACWR is
+  INFORMATIONAL ONLY, never gates (spec §0/§3).
+- GOTCHA (pydantic): a BaseModel field named `date` typed `Optional[date]` BREAKS — the
+  `= None` default shadows the `date` type when pydantic re-resolves annotations with the class
+  dict as localns, so the field type collapses to NoneType ("Input should be None"). Renamed the
+  field to `session_date`. RULE: never name a pydantic field the same as its annotation type.
+- queries.py (Lot D3 additions, all async READ-ONLY): fetch_planned_for_plan (LEFT JOIN
+  training_plan_sessions ON s.planned_workout_id=pw.id to get target_tss — planned_workouts has
+  NO target_tss column, only training_plan_sessions does), fetch_activities_in_range (end bumped
+  +1 day for full-day coverage), reconcile_plan(pool, plan_id, user_id, week_number=None) ->
+  serialisable dict | None. Week window = start_date + (week-1)*7 .. +6; whole-plan otherwise.
+  Activity fetch widened +/-1 day for tolerance. Lazy imports of adherence/workout_matcher/
+  db_operations.get_training_plan INSIDE reconcile_plan (keeps pure modules import-light, dodges
+  any circular import at package load).
+- Endpoint GET /api/v1/training-plans/{plan_id}/reconcile?week= in training_plans router
+  (week: Optional[int] Query ge=1). Returns 404 if plan not found/not owned. Imports: Optional,
+  Query, reconcile_plan.
+- TESTS tests/test_training/test_adaptive_reconcile.py: 22 tests (sport_category matrix,
+  matching tolerance exact/+1/+2-missed/category/one-activity-per-planned/nearest-day,
+  build_session_adherence ratios+pace, missed-no-actuals, week compliance 75% + realized TSS,
+  bucket oldest-first + out-of-window drop, ACWR value+note+empty, + 2 mocked-pool orchestrator
+  smokes asserting pool.execute NOT called and missing-plan -> None without any fetch).
+  Mock pool = MagicMock; fetchrow=AsyncMock(plan_row); fetch=AsyncMock(side_effect=[planned,
+  window_acts, acwr_acts]). plan_row needs start_date+end_date as date objects.
+- ruff gate = src/ only. Full suite now 926 passed / 2 pre-existing failures (CORS env_override
+  + mfa cleanup). +22 tests. No migration (D3 read-only). Next: Lot D4 (#11) plan_adjuster.py
+  PROPOSE-ONLY + weekly_reconciliations table + finalize PR.
+---
