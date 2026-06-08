@@ -17,7 +17,7 @@
     {
       "id": 3,
       "description": "Lot 3 — sortie longue route + variantes marathon. Spec section 7 (Lot 3). long_run.py: param discipline (+ marathon_pace), cap absolu 35 km route, allure EF depuis PaceSet, et VARIANTES par phase: longue progressive, longue avec bloc a allure marathon (ex. 30km dont 12 a AM), fast finish en phase specifique. Footings bornes par la FC Z2. Test: pic 28-35 km, jamais > 35, taper reduit, bloc AM present en specifique.",
-      "status": "pending",
+      "status": "in_progress",
       "createdAt": "2026-06-08T00:00:00Z"
     },
     {
