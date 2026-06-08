@@ -71,3 +71,25 @@ Started: 2026-06-08
   ignore. Reliable green signal: `uv run pytest tests/test_training/ -q` (172 passed). +8 new long_run tests.
 ---
 
+## 2026-06-08 - Task #4: Lot 4 full MPR catalog / load / zones
+- load_calculator.py: INTENSITY_FACTORS[SessionType.MPR] = 62 (between SL 55 and TMP 70).
+- hr_zones.py: get_zone_for_session_type MPR -> 3 (docstring updated).
+- session_catalog.py:
+  - get_phase_session_types now SHORT-CIRCUITS at the top when race_flags.is_road_marathon:
+    returns _road_phase_session_types(phase). This deliberately BYPASSES every trail
+    adaptation (incl. the no-flags COT default at dev) so trail paths are untouched -
+    test_no_flags_backward_compatible still green (COT present in trail dev).
+  - _road_phase_session_types: base [EF,SL,REC]; development & specific [EF,SL,MPR,TMP,INT,REC]
+    (NO COT/DESC); taper [EF,SL,TMP,REC] (TMP = kept intensity, cut volume per Wang 2023).
+    MPR strictly in dev+specific (§6: "not base/taper"); taper intensity carried by TMP, not MPR.
+  - MPR templates: marathon-pace block now scales by phase via _mpr_phase_factor
+    {base:0.45, dev:0.60, specific:0.75, taper:0.40} of min duration, bounded so
+    warmup(900s)+cooldown(600s) always fit (max_block_s floor 600). Block label shows minutes.
+- TESTS (tests/test_training/test_session_catalog.py): _road_marathon_flags() helper +
+  test_road_specific_no_cot_or_desc, test_road_development_includes_mpr,
+  test_road_taper_keeps_intensity, test_road_base_aerobic_only.
+- Verify: training subset 176 passed; full suite 860 passed / 2 pre-existing failures
+  (CORS env_override + mfa cleanup) - baseline unchanged.
+- Lot 5 wiring note: week_builder still calls get_phase_session_types WITHOUT road flags
+  today; Lot 5 must pass race_flags through so the road gating actually takes effect in plans.
+---

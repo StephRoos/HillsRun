@@ -24,8 +24,9 @@
     {
       "id": 4,
       "description": "Lot 4 — catalogue MPR complet / charge / zones. Spec sections 6 et 7 (Lot 4). session_catalog.py: completer les templates MPR (dev+specifique, 4 niveaux), exclure COT/DESC pour route dans get_phase_session_types (gate is_road_marathon, ne PAS casser le chemin trail no-flags qui garde COT cf test_session_catalog.py:65), fourchettes de duree route. load_calculator.py: MPR=62. hr_zones.py: MPR->Z3. TAPER (evidence Wang 2023): maintenir l'intensite, couper le volume -> la phase taper route garde de l'intensite reduite (lignes droites / court bloc MPR), PAS uniquement EF/SL/REC. Test: aucune COT/DESC en semaine specifique route, MPR ou TMP/INT presents, taper route conserve une touche d'intensite, tests trail verts.",
-      "status": "in_progress",
-      "createdAt": "2026-06-08T00:00:00Z"
+      "status": "completed",
+      "createdAt": "2026-06-08T00:00:00Z",
+      "completedAt": "2026-06-08T19:49:24Z"
     },
     {
       "id": 5,
