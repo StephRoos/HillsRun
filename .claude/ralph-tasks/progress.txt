@@ -4,5 +4,30 @@ Started: 2026-06-08
 ## Codebase Patterns
 (Add discovered patterns here - Ralph will read these each iteration)
 
+- `classify_race(distance_km, elevation_gain_m, technical_percent=0, altitude_max_m=0, discipline="trail")`
+  in src/training/race_classifier.py. Called once in plan_generator.py:77 (now passes
+  discipline=race.get("discipline") or "trail").
+- `get_session_template((SessionType, ExperienceLevel, PlanPhase))` raises ValueError if a
+  catalog key is missing (session_catalog.py:51) -> any new SessionType MUST get templates in
+  `_build_catalog` for ALL phases/experiences AND an entry in `_get_duration_range` (raises KeyError otherwise).
+- SessionTemplate default sport_type="trail_running"; set sport_type="road_running" explicitly for road.
+- PRE-EXISTING FAILURES (NOT ours, env-dependent, ignore): test_security.py::TestCORS::test_cors_env_override
+  and test_auth_garmin_router.py::TestCleanupExpiredMfa::test_cleanup_removes_expired_sessions.
+  Baseline = 839 passed, 2 failed. Use this baseline to judge "green".
+- Verify cmd: `uv run ruff check src/ && uv run ruff format src/ && uv run pytest tests/ -q`.
+
+---
+
+## 2026-06-08 - Task #1: Lot 1 discipline & classification + MPR stub
+- models.py: RaceCategory.road_marathon; SessionType.MPR; RaceFlags.is_road_marathon (default False);
+  RaceTargetInput.discipline (default "trail") + target_time_seconds (Optional, gt=0).
+- race_classifier.py: classify_race gained discipline param; discipline=="road" short-circuits to
+  RaceFlags(category=road_marathon, is_road_marathon=True) with NO trail flags set.
+- session_catalog.py: minimal MPR templates for all phases/experiences (sport_type road_running, Z3,
+  Intensity.moderate) + MPR _get_duration_range entries. Full templates deferred to Lot 4.
+- plan_generator.py:77: classify_race now receives discipline=race.get("discipline") or "trail".
+- tests: test_road_marathon_brugge (42.195 road -> road_marathon, is_road_marathon, not is_ultra),
+  test_road_marathon_template_available (MPR template fetch works).
+- Gotcha: discipline kept as plain str (not enum) per spec §3 (VARCHAR(20)). DB column lands in Lot 6.
 ---
 
