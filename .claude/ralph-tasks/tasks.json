@@ -73,7 +73,7 @@
     {
       "id": 11,
       "description": "Lot D4 — ajustement hebdo (PROPOSE-ONLY, jamais d'auto-apply). Spec 03 (Lot D4). src/training/adaptive/plan_adjuster.py: a partir de l'adherence D3, PROPOSER des changements aux semaines a venir (seances manquees -> ne pas empiler; AMBER/RED soutenu + faible compliance -> inserer/allonger une semaine de recup; regulierement vert + en avance -> progression legerement plus rapide dans l'heuristique +15%). Recalcul des allures via pace_calculator quand baseline/VO2max bouge significativement. Stocker la proposition dans weekly_reconciliations; endpoint apply optionnel exigeant une action explicite. Tests: proposition generee MAIS lignes du plan inchangees sans apply; anti-thrashing (1 changement structurel max/semaine). Puis finaliser la PR (specs 02 section 10 + 03 section 5).",
-      "status": "pending",
+      "status": "in_progress",
       "createdAt": "2026-06-08T00:00:00Z"
     }
   ],

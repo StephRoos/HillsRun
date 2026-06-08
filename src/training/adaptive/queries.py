@@ -468,3 +468,304 @@ async def reconcile_plan(
         "adherence": week_report.model_dump(mode="json"),
         "matches": [m.model_dump(mode="json") for m in matches],
     }
+
+
+# ---------------------------------------------------------------------------
+# Lot D4 — weekly adjustment (PROPOSE-ONLY). Persisting a *proposal* never
+# mutates the plan; only apply_plan_adjustment (explicit user action) writes to
+# training_plan_weeks / training_plan_sessions.
+# ---------------------------------------------------------------------------
+
+
+async def fetch_recent_verdicts(
+    pool, user_id: int, end_iso: str, *, days: int = 10
+) -> list[str]:
+    """Fetch the trailing daily readiness verdicts ending at ``end_iso``.
+
+    Args:
+        pool: asyncpg connection pool.
+        user_id: Garmin user ID.
+        end_iso: Window end as an ISO date string (inclusive).
+        days: Size of the trailing window.
+
+    Returns:
+        Verdict strings (oldest first), e.g. ``["green", "amber", ...]``.
+    """
+    end = date.fromisoformat(end_iso)
+    rows = await pool.fetch(
+        """
+        SELECT verdict
+        FROM daily_recommendations
+        WHERE user_id = $1 AND date > $2 AND date <= $3
+        ORDER BY date ASC
+        """,
+        user_id,
+        end - timedelta(days=days),
+        end,
+    )
+    return [r["verdict"] for r in rows]
+
+
+def _parse_generation_params(raw: Any) -> dict:
+    """Coerce a possibly JSON-encoded generation_params value to a dict."""
+    if raw is None:
+        return {}
+    if isinstance(raw, str):
+        try:
+            return json.loads(raw)
+        except (ValueError, TypeError):
+            return {}
+    if isinstance(raw, dict):
+        return raw
+    return {}
+
+
+async def fetch_plan_fitness_context(
+    pool, plan_id: int, user_id: int
+) -> Optional[dict]:
+    """Fetch the data needed to decide whether to recompute paces.
+
+    Pulls the plan's stored paces (from ``generation_params``) and the athlete's
+    latest manual VMA, so the caller can compare the two. Read-only.
+
+    Returns:
+        ``{"current_vma_kmh", "new_vma_kmh", "objective", "target_time_seconds",
+        "generation_params"}`` or ``None`` if the plan is absent.
+    """
+    row = await pool.fetchrow(
+        """
+        SELECT p.generation_params, gu.manual_vma
+        FROM training_plans p
+        JOIN garmin_user gu ON gu.user_id = p.user_id
+        WHERE p.id = $1 AND p.user_id = $2
+        """,
+        plan_id,
+        user_id,
+    )
+    if row is None:
+        return None
+    gp = _parse_generation_params(row["generation_params"])
+    paces = gp.get("paces") or {}
+    new_vma = row["manual_vma"]
+    return {
+        "current_vma_kmh": paces.get("vma_kmh"),
+        "new_vma_kmh": float(new_vma) if new_vma is not None else None,
+        "objective": paces.get("objective"),
+        "target_time_seconds": paces.get("target_time_seconds"),
+        "generation_params": gp,
+    }
+
+
+async def insert_weekly_reconciliation(
+    pool, plan_id: int, user_id: int, proposal: Any
+) -> dict:
+    """Persist a propose-only adjustment. Does NOT mutate the plan.
+
+    One live proposal per evaluated week (``UNIQUE(plan_id, from_week)``); a
+    re-run refreshes it and resets it to ``proposed``.
+
+    Returns:
+        The stored ``weekly_reconciliations`` row as a dict.
+    """
+    row = await pool.fetchrow(
+        """
+        INSERT INTO weekly_reconciliations
+            (plan_id, user_id, from_week, target_week, compliance_pct, proposal,
+             status, applied)
+        VALUES ($1, $2, $3, $4, $5, $6, 'proposed', FALSE)
+        ON CONFLICT (plan_id, from_week) DO UPDATE SET
+            target_week = EXCLUDED.target_week,
+            compliance_pct = EXCLUDED.compliance_pct,
+            proposal = EXCLUDED.proposal,
+            status = 'proposed',
+            applied = FALSE,
+            applied_at = NULL,
+            created_at = CURRENT_TIMESTAMP
+        RETURNING *
+        """,
+        plan_id,
+        user_id,
+        proposal.from_week,
+        proposal.target_week,
+        proposal.compliance_pct,
+        json.dumps(proposal.model_dump(mode="json")),
+    )
+    return dict(row)
+
+
+async def propose_plan_adjustment(
+    pool, plan_id: int, user_id: int, *, week_number: int, persist: bool = True
+) -> Optional[dict]:
+    """Generate (and optionally persist) a propose-only weekly adjustment.
+
+    Builds the read-only adherence report for ``week_number``, reads the recent
+    daily verdicts, runs the pure heuristics, and — when VMA has shifted
+    meaningfully — attaches a pace recompute. Persisting the proposal writes only
+    to ``weekly_reconciliations``; the plan rows are never touched here.
+
+    Args:
+        pool: asyncpg connection pool.
+        plan_id: Training plan ID.
+        user_id: Garmin user ID (ownership check).
+        week_number: The evaluated (just-completed) 1-based plan week.
+        persist: When True, store the proposal in ``weekly_reconciliations``.
+
+    Returns:
+        A JSON-serialisable proposal dict, or ``None`` if the plan is absent.
+    """
+    # Imported lazily to keep the pure adjuster import-light and dodge cycles.
+    from .plan_adjuster import (
+        AdjustmentAction,
+        ProposedChange,
+        maybe_recompute_paces,
+        propose_weekly_adjustment,
+    )
+    from .adherence import WeekAdherence
+    from ..models import RaceObjective
+
+    report = await reconcile_plan(pool, plan_id, user_id, week_number=week_number)
+    if report is None:
+        return None
+
+    week_report = WeekAdherence(**report["adherence"])
+    recent_verdicts = await fetch_recent_verdicts(
+        pool, user_id, report["window"]["end"]
+    )
+
+    proposal = propose_weekly_adjustment(
+        week_report, recent_verdicts, from_week=week_number
+    )
+
+    # Pace recompute (non-structural): only when the latest VMA has shifted past
+    # the threshold versus the VMA the plan's paces were built from.
+    context = await fetch_plan_fitness_context(pool, plan_id, user_id)
+    if context is not None:
+        objective = RaceObjective.finish
+        if context.get("objective"):
+            try:
+                objective = RaceObjective(context["objective"])
+            except ValueError:
+                objective = RaceObjective.finish
+        new_paces = maybe_recompute_paces(
+            context.get("current_vma_kmh"),
+            context.get("new_vma_kmh"),
+            objective=objective,
+            target_time_seconds=context.get("target_time_seconds"),
+        )
+        if new_paces is not None:
+            proposal.recomputed_paces = new_paces.model_dump(mode="json")
+            proposal.changes.append(
+                ProposedChange(
+                    action=AdjustmentAction.RECOMPUTE_PACES,
+                    target_week=proposal.target_week,
+                    structural=False,
+                    rationale=(
+                        f"VMA shifted from {context['current_vma_kmh']:.1f} to "
+                        f"{context['new_vma_kmh']:.1f} km/h — refresh target paces."
+                    ),
+                )
+            )
+
+    stored: dict = {}
+    if persist:
+        stored = await insert_weekly_reconciliation(pool, plan_id, user_id, proposal)
+
+    return {
+        "proposal_id": stored.get("id"),
+        "plan_id": plan_id,
+        "from_week": proposal.from_week,
+        "target_week": proposal.target_week,
+        "status": stored.get("status", "proposed"),
+        "auto_apply": False,
+        "proposal": proposal.model_dump(mode="json"),
+    }
+
+
+async def apply_plan_adjustment(pool, proposal_id: int, user_id: int) -> Optional[dict]:
+    """Apply a stored proposal to the plan — the ONLY plan-mutating path (D4).
+
+    Requires an explicit call (no auto-apply). Idempotent: a proposal already
+    ``applied`` is returned unchanged. Structural changes adjust the target
+    week's ``target_tss`` (and recovery flag); a pace recompute refreshes the
+    plan's ``generation_params``.
+
+    Args:
+        pool: asyncpg connection pool.
+        proposal_id: ``weekly_reconciliations`` row ID.
+        user_id: Garmin user ID (ownership check).
+
+    Returns:
+        The updated proposal row as a dict, or ``None`` if not found/owned.
+    """
+    row = await pool.fetchrow(
+        "SELECT * FROM weekly_reconciliations WHERE id = $1 AND user_id = $2",
+        proposal_id,
+        user_id,
+    )
+    if row is None:
+        return None
+    if row["status"] == "applied":
+        return dict(row)
+
+    plan_id = row["plan_id"]
+    proposal = _parse_generation_params(row["proposal"])  # same JSON coercion
+    changes = proposal.get("changes", [])
+
+    for change in changes:
+        action = change.get("action")
+        target_week = change.get("target_week")
+        factor = change.get("tss_factor")
+
+        if action in ("accelerate", "insert_recovery") and target_week and factor:
+            week_row = await pool.fetchrow(
+                """
+                SELECT id, target_tss FROM training_plan_weeks
+                WHERE plan_id = $1 AND week_number = $2
+                """,
+                plan_id,
+                target_week,
+            )
+            if week_row is None:
+                continue
+            current_tss = week_row["target_tss"] or 0
+            new_tss = round(float(current_tss) * factor)
+            if action == "insert_recovery":
+                await pool.execute(
+                    """
+                    UPDATE training_plan_weeks
+                    SET target_tss = $1, is_recovery_week = TRUE
+                    WHERE id = $2
+                    """,
+                    new_tss,
+                    week_row["id"],
+                )
+            else:  # accelerate
+                await pool.execute(
+                    "UPDATE training_plan_weeks SET target_tss = $1 WHERE id = $2",
+                    new_tss,
+                    week_row["id"],
+                )
+
+        elif action == "recompute_paces" and proposal.get("recomputed_paces"):
+            gp_raw = await pool.fetchval(
+                "SELECT generation_params FROM training_plans WHERE id = $1",
+                plan_id,
+            )
+            gp = _parse_generation_params(gp_raw)
+            gp["paces"] = proposal["recomputed_paces"]
+            await pool.execute(
+                "UPDATE training_plans SET generation_params = $1 WHERE id = $2",
+                json.dumps(gp),
+                plan_id,
+            )
+
+    updated = await pool.fetchrow(
+        """
+        UPDATE weekly_reconciliations
+        SET status = 'applied', applied = TRUE, applied_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+        RETURNING *
+        """,
+        proposal_id,
+    )
+    return dict(updated)
