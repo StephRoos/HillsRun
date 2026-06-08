@@ -31,3 +31,22 @@ Started: 2026-06-08
 - Gotcha: discipline kept as plain str (not enum) per spec §3 (VARCHAR(20)). DB column lands in Lot 6.
 ---
 
+## 2026-06-08 - Task #2: Lot 2 pace_calculator + VDOT fallback
+- New src/training/pace_calculator.py (pure functions, no DB). Public API:
+  - `compute_paces(vma_kmh, objective=finish, target_time_seconds=None, pace_source="vma") -> PaceSet`
+  - `compute_paces_from_fitness(vma_kmh, vo2_max=None, objective=..., target_time_seconds=None)`:
+    uses VMA when >0 else estimates vma = vo2_max/3.5 and tags pace_source="vo2max_estimate".
+    Raises ValueError if neither signal. THIS is what plan_generator should call in Lot 5.
+  - `format_pace(sec_per_km) -> "m:ss"`.
+- Models PaceSet{vma_kmh, objective, pct_marathon, pace_source, target_time_seconds,
+  pace_objective_optimistic, zones: dict[code->PaceZone]} and PaceZone (REC/EF ranges,
+  MPR/TMP/INT single; .is_range, .label props). Access via paces.zones["MPR"] or paces.pace_for(code).
+- %VMA: pct_marathon={finish:0.78, midpack:0.80, performance:0.83}; TMP 0.88; INT 1.00;
+  REC (0.63,0.67); EF (0.68,0.72). Verified VMA 14.5 perf -> MPR 4:59 (299s), TMP 4:42, INT 4:08,
+  target_time ~12619s (~3h30). EF/REC sec_per_km_fast = faster bound (lower s/km).
+- optimistic flag: required_sec_per_km (=target_time/42.195) < predicted_MPR_sec * 0.98. 12600 NOT
+  optimistic (matches §2); 10800 (3h00) IS. _MARATHON_KM=42.195.
+- objective stored as RaceObjective enum (not str) on PaceSet — keep that when wiring Lot 5.
+- Baseline now 848 passed / 2 pre-existing failures (CORS env + mfa cleanup). +9 new pace tests.
+---
+
