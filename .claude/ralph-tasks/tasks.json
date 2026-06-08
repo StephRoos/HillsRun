@@ -2,40 +2,46 @@
   "tasks": [
     {
       "id": 1,
-      "description": "Lot 1 — discipline & classification. Lire specs/02-road-marathon-adaptation.md (section 7, Lot 1). models.py: ajouter RaceCategory.road_marathon, RaceFlags.is_road_marathon, RaceTargetInput.discipline (default 'trail'), SessionType.MPR. race_classifier.py: detecter road marathon. Test unitaire (Brugge -> road_marathon, is_road_marathon=True, is_ultra=False).",
+      "description": "Lot 1 — discipline & classification + stub MPR. Lire specs/02-road-marathon-adaptation.md (section 7, Lot 1). models.py: ajouter RaceCategory.road_marathon, RaceFlags.is_road_marathon, RaceTargetInput.discipline (default 'trail'), SessionType.MPR. race_classifier.py: detecter road marathon. IMPORTANT: ajouter AUSSI des templates MPR minimaux dans session_catalog._build_catalog pour eviter ValueError de get_session_template (raise si cle manquante, session_catalog.py:51). Test: Brugge -> road_marathon, is_road_marathon=True, is_ultra=False. Toute la suite reste verte.",
       "status": "pending",
       "createdAt": "2026-06-08T00:00:00Z"
     },
     {
       "id": 2,
-      "description": "Lot 2 — pace_calculator. Spec sections 4 et 7 (Lot 2). Creer src/training/pace_calculator.py: allures derivees de la VMA (EF 0.70, MPR 0.83 si performance, TMP 0.88, INT 1.00) + target_time + warning si objectif trop optimiste. Test: VMA 14.5 + performance -> MPR ~4:59/km (+/-2s), temps cible ~3h30.",
+      "description": "Lot 2 — pace_calculator + fallback VDOT. Spec sections 4 et 7 (Lot 2). Creer src/training/pace_calculator.py: allures derivees de la VMA (EF fourchette 0.68-0.72, REC 0.63-0.67, MPR 0.83 si performance, TMP 0.88, INT 1.00) + target_time + warning si objectif trop optimiste. FALLBACK: si VMA absente (_get_vma renvoie None), deriver les allures depuis VO2max (VDOT). Test: VMA 14.5 + performance -> MPR ~4:59/km (+/-2s), temps ~3h30; fallback VO2max teste.",
       "status": "pending",
       "createdAt": "2026-06-08T00:00:00Z"
     },
     {
       "id": 3,
-      "description": "Lot 3 — sortie longue route. Spec section 7 (Lot 3). long_run.py: param discipline (+ marathon_pace optionnel), cap absolu 35 km pour route, allure EF depuis PaceSet, bloc allure marathon en phase specifique. Test: pic sortie longue entre 28 et 35 km, jamais > 35, taper reduit.",
+      "description": "Lot 3 — sortie longue route + variantes marathon. Spec section 7 (Lot 3). long_run.py: param discipline (+ marathon_pace), cap absolu 35 km route, allure EF depuis PaceSet, et VARIANTES par phase: longue progressive, longue avec bloc a allure marathon (ex. 30km dont 12 a AM), fast finish en phase specifique. Footings bornes par la FC Z2. Test: pic 28-35 km, jamais > 35, taper reduit, bloc AM present en specifique.",
       "status": "pending",
       "createdAt": "2026-06-08T00:00:00Z"
     },
     {
       "id": 4,
-      "description": "Lot 4 — catalogue / charge / zones. Spec sections 6 et 7 (Lot 4). session_catalog.py: templates MPR (dev+specifique), exclure COT/DESC pour route dans get_phase_session_types, fourchettes de duree route. load_calculator.py: MPR=62. hr_zones.py: MPR->Z3. Test: aucune COT/DESC en semaine specifique route, MPR ou TMP/INT presents.",
+      "description": "Lot 4 — catalogue MPR complet / charge / zones. Spec sections 6 et 7 (Lot 4). session_catalog.py: completer les templates MPR (dev+specifique, 4 niveaux), exclure COT/DESC pour route dans get_phase_session_types (gate is_road_marathon, ne PAS casser le chemin trail no-flags qui garde COT cf test_session_catalog.py:65), fourchettes de duree route. load_calculator.py: MPR=62. hr_zones.py: MPR->Z3. Test: aucune COT/DESC en semaine specifique route, MPR ou TMP/INT presents, tests trail verts.",
       "status": "pending",
       "createdAt": "2026-06-08T00:00:00Z"
     },
     {
       "id": 5,
-      "description": "Lot 5 — week_builder + plan_generator. Spec section 7 (Lot 5). week_builder.py: ordre qualite route [TMP,INT,MPR] (skip COT), pas de D+ sur longue route, respecter day_preferences (long_run=7, quality=[4], strength=3, easy fill mar/sam). plan_generator.py: calculer PaceSet (VMA+objectif), passer discipline/allures a long_run+week_builder, sport_type=road_running, injecter hr_zone, stocker allures+warning dans generation_params.",
+      "description": "Lot 5 — week_builder + plan_generator. Spec section 7 (Lot 5). week_builder.py: ordre qualite route [TMP,INT,MPR] (skip COT), pas de D+ sur longue route, respecter day_preferences (long_run=7, quality=[4], strength=3, easy fill mar/sam). plan_generator.py: calculer PaceSet (VMA+objectif, fallback VDOT), passer discipline/allures a long_run+week_builder, sport_type=road_running (dual-write planned_workouts + training_plan_sessions), injecter hr_zone, stocker allures+warning dans generation_params.",
       "status": "pending",
       "createdAt": "2026-06-08T00:00:00Z"
     },
     {
       "id": 6,
-      "description": "Lot 6 — DB + API + test e2e + PR. Spec sections 7 (Lot 6) et 8. Migration sql/11_road_marathon.sql (discipline VARCHAR(20) default 'trail', target_time_seconds INTEGER). RaceTargetCreate accepte discipline+target_time_seconds. Test d'acceptation end-to-end avec le profil section 2 (intermediaire, sub-3h30, VMA 14.5, Brugge 16 semaines): toutes les assertions de la section 8. Puis ouvrir la PR (spec section 10).",
+      "description": "Lot 6 — DB + API + tests + PR. Spec sections 7 (Lot 6) et 8. Migration sql/11_road_marathon.sql (discipline VARCHAR(20) default 'trail', target_time_seconds INTEGER). RaceTargetCreate accepte discipline+target_time_seconds. TESTS: privilegier des assertions au NIVEAU FONCTIONS PURES (pace_calculator, long_run, week_builder) pour pic 28-35, absence COT/DESC, allures; + un smoke e2e via le mock pool existant (cf pattern test_plan_generator.py, AsyncMock). NE PAS appliquer sql/11 sur la prod. Puis ouvrir la PR (spec section 10).",
+      "status": "pending",
+      "createdAt": "2026-06-08T00:00:00Z"
+    },
+    {
+      "id": 7,
+      "description": "Lot 7 — dernier km: seed + generation de MON plan reel. Lire specs/02-road-marathon-adaptation.md sections 2 et 11. Creer un script scripts/seed_marathon_plan.py (uv run) qui: upsert athlete_profile (intermediate, fc_max 188, fc_repos 56, day_preferences {long_run:7,quality:[4],strength:3}), set garmin_user.manual_vma=14.5, cree le race_target Marathon de Brugge (2026-10-12, discipline road, 42.195 km, D+ ~0, objective performance, target_time 12600s), puis appelle generate_plan et EXPORTE le plan genere en Markdown lisible (semaine par semaine, allures, TSS) dans specs/mon-plan-marathon.md. Idempotent. NE PAS commiter de secrets. Test smoke du script.",
       "status": "pending",
       "createdAt": "2026-06-08T00:00:00Z"
     }
   ],
-  "lastId": 6
+  "lastId": 7
 }
