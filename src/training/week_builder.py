@@ -352,7 +352,11 @@ def _get_quality_type_order(
     """
     default_order = [SessionType.TMP, SessionType.INT, SessionType.COT]
 
-    if race_flags and race_flags.high_dplus:
+    if race_flags and race_flags.is_road_marathon:
+        # Road marathon: no hill repeats (COT); marathon pace (MPR) is the
+        # discipline-specific quality work alongside threshold and VO2max.
+        default_order = [SessionType.TMP, SessionType.INT, SessionType.MPR]
+    elif race_flags and race_flags.high_dplus:
         # Prioritize COT for high D+ races
         default_order = [SessionType.COT, SessionType.TMP, SessionType.INT]
     elif race_flags and race_flags.is_ultra:
@@ -428,9 +432,10 @@ def _create_long_run_session(
     """
     template = get_session_template(SessionType.SL, experience, phase)
 
-    # Calculate elevation target for high D+ races
+    # Calculate elevation target for high D+ races.
+    # Road marathons are flat: never add elevation, even if other flags were set.
     target_elevation = None
-    if race_flags and race_flags.high_dplus:
+    if race_flags and race_flags.high_dplus and not race_flags.is_road_marathon:
         target_km = long_run_spec.get("target_km", 0)
         # Use a moderate D+/km ratio for long runs (50 m/km — training, not race pace)
         target_elevation = int(target_km * 50)
