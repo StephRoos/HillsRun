@@ -66,7 +66,7 @@
     {
       "id": 10,
       "description": "Lot D3 — reconciliation planifie vs realise (LECTURE SEULE). Spec 03 (Lot D3). src/training/adaptive/workout_matcher.py (matcher planned_workouts <-> activities, jour +/-1, tolerance type) + adherence.py (compliance hebdo: fait?, reel vs prevu duree/distance/allure/TSS; TSS reel hebdo). ACWR INFORMATIF UNIQUEMENT (champ acwr_informational + note conteste), jamais une regle de decision. Endpoint GET /api/v1/training-plans/{id}/reconcile?week= (rapport lecture seule). Tests: tolerance matching, calcul compliance, agregation TSS reel.",
-      "status": "pending",
+      "status": "in_progress",
       "createdAt": "2026-06-08T00:00:00Z"
     },
     {

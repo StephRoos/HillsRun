@@ -321,3 +321,150 @@ async def explain_daily_readiness(
     if persist:
         await persist_agent_recommendation(pool, user_id, day, rec)
     return rec
+
+
+# ---------------------------------------------------------------------------
+# Lot D3 — planned vs actual reconciliation (READ-ONLY). Nothing here writes.
+# ---------------------------------------------------------------------------
+
+
+async def fetch_planned_for_plan(
+    pool, plan_id: int, start: date, end: date
+) -> list[dict]:
+    """Fetch a plan's planned workouts within ``[start, end]`` (inclusive).
+
+    ``target_tss`` lives on ``training_plan_sessions`` (planned_workouts has no
+    such column), so it is joined in via the dual-write link
+    ``training_plan_sessions.planned_workout_id``.
+    """
+    rows = await pool.fetch(
+        """
+        SELECT pw.id, pw.planned_date, pw.sport_type, pw.session_type, pw.title,
+               pw.planned_duration_seconds AS target_duration_seconds,
+               pw.planned_distance_meters AS target_distance_meters,
+               s.target_tss AS target_tss
+        FROM planned_workouts pw
+        LEFT JOIN training_plan_sessions s ON s.planned_workout_id = pw.id
+        WHERE pw.plan_id = $1
+          AND pw.planned_date >= $2
+          AND pw.planned_date <= $3
+        ORDER BY pw.planned_date ASC, pw.id ASC
+        """,
+        plan_id,
+        start,
+        end,
+    )
+    return [dict(r) for r in rows]
+
+
+async def fetch_activities_in_range(
+    pool, user_id: int, start: date, end: date
+) -> list[dict]:
+    """Fetch a user's running-relevant activities whose start date is in range.
+
+    Range is inclusive; ``end`` is bumped by a day in the query so the whole of
+    the last calendar day is covered regardless of start time.
+    """
+    rows = await pool.fetch(
+        """
+        SELECT activity_id, activity_name, activity_type, sport_type,
+               start_timestamp, duration_seconds, distance_meters,
+               average_pace, training_stress_score
+        FROM activities
+        WHERE user_id = $1
+          AND start_timestamp >= $2
+          AND start_timestamp < $3
+        ORDER BY start_timestamp ASC
+        """,
+        user_id,
+        start,
+        end + timedelta(days=1),
+    )
+    return [dict(r) for r in rows]
+
+
+async def reconcile_plan(
+    pool, plan_id: int, user_id: int, *, week_number: Optional[int] = None
+) -> Optional[dict]:
+    """Build a read-only planned-vs-actual report for a plan (or one week).
+
+    Matches planned workouts to completed activities (+/-1 day tolerance),
+    computes per-session and weekly compliance, realized TSS, and an
+    informational-only ACWR. Never mutates the plan or the activities.
+
+    Args:
+        pool: asyncpg connection pool.
+        plan_id: Training plan ID.
+        user_id: Garmin user ID (ownership check).
+        week_number: When given, scope to that 1-based plan week; else the
+            whole plan window.
+
+    Returns:
+        A JSON-serialisable report dict, or ``None`` if the plan is not found.
+    """
+    # Imported here to keep the pure adherence/matcher modules import-light and
+    # avoid any chance of a circular import at package load time.
+    from .adherence import (
+        bucket_weekly_tss,
+        build_session_adherence,
+        compute_acwr_informational,
+        week_adherence,
+    )
+    from .workout_matcher import match_workouts
+    from ..db_operations import get_training_plan
+
+    plan = await get_training_plan(pool, plan_id, user_id)
+    if plan is None:
+        return None
+
+    start_date: date = plan["start_date"]
+    if week_number is not None:
+        window_start = start_date + timedelta(days=(week_number - 1) * 7)
+        window_end = window_start + timedelta(days=6)
+    else:
+        window_start = start_date
+        window_end = plan["end_date"]
+
+    planned = await fetch_planned_for_plan(pool, plan_id, window_start, window_end)
+    # Widen the activity fetch by the day tolerance on each side.
+    activities = await fetch_activities_in_range(
+        pool,
+        user_id,
+        window_start - timedelta(days=1),
+        window_end + timedelta(days=1),
+    )
+
+    matches = match_workouts(planned, activities)
+    planned_by_id = {p.get("id"): p for p in planned}
+    activity_by_id = {a.get("activity_id"): a for a in activities}
+
+    sessions = [
+        build_session_adherence(
+            m,
+            planned_by_id.get(m.planned_id, {}),
+            activity_by_id.get(m.activity_id) if m.matched else None,
+        )
+        for m in matches
+    ]
+
+    # ACWR (informational only): trailing 4 weeks of activity TSS ending at the
+    # window end. Never feeds a decision — exposed with a contested note.
+    acwr_activities = await fetch_activities_in_range(
+        pool, user_id, window_end - timedelta(days=27), window_end
+    )
+    acwr = compute_acwr_informational(bucket_weekly_tss(acwr_activities, window_end))
+
+    week_report = week_adherence(
+        sessions, week_number=week_number, acwr_informational=acwr
+    )
+
+    return {
+        "plan_id": plan_id,
+        "week_number": week_number,
+        "window": {
+            "start": window_start.isoformat(),
+            "end": window_end.isoformat(),
+        },
+        "adherence": week_report.model_dump(mode="json"),
+        "matches": [m.model_dump(mode="json") for m in matches],
+    }
