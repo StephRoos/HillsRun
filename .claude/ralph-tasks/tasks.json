@@ -45,8 +45,9 @@
     {
       "id": 7,
       "description": "Lot 7 — dernier km: seed + generation de MON plan reel. Lire specs/02-road-marathon-adaptation.md sections 2 et 11. Creer un script scripts/seed_marathon_plan.py (uv run) qui: upsert athlete_profile (intermediate, fc_max 188, fc_repos 56, day_preferences {long_run:7,quality:[4],strength:3}), set garmin_user.manual_vma=14.5, cree le race_target Marathon de Brugge (2026-10-12, discipline road, 42.195 km, D+ ~0, objective performance, target_time 12600s), puis appelle generate_plan et EXPORTE le plan genere en Markdown lisible (semaine par semaine, allures, TSS) dans specs/mon-plan-marathon.md. Idempotent. NE PAS commiter de secrets. Test smoke du script.",
-      "status": "in_progress",
-      "createdAt": "2026-06-08T00:00:00Z"
+      "status": "completed",
+      "createdAt": "2026-06-08T00:00:00Z",
+      "completedAt": "2026-06-08T20:07:10Z"
     },
     {
       "id": 8,

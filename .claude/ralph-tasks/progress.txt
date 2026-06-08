@@ -155,3 +155,36 @@ Started: 2026-06-08
   unused-import errors — do NOT run ruff on tests/, it's not in the gate).
 - Baseline now 871 passed / 2 pre-existing failures (CORS env_override + mfa
   cleanup). +10 tests. Next: Lot 7 seed script + PR finalize (#7).
+
+---
+
+## 2026-06-08 - Task #7: Lot 7 seed script + markdown export
+- New scripts/seed_marathon_plan.py (run via `uv run python scripts/...`). Idempotent:
+  upsert_athlete_profile (intermediate, fc 188/56, 4 days, has_gym_access False,
+  day_preferences {long_run:7,quality:[4],strength:3}); set garmin_user.manual_vma=14.5;
+  find_or_create_race (Brugge 2026-10-12, road, 42.195km, performance, target 12600s) —
+  reused by race_name+race_date so re-runs don't duplicate; delete_existing_plans for that
+  race_target_id BEFORE generate_plan (so one plan, not N); generate_plan; read back via
+  db_ops.get_training_plan/get_plan_weeks/get_plan_sessions_for_week; render markdown ->
+  specs/mon-plan-marathon.md.
+- Pool built exactly like the API: copied _db_config_from_env (POSTGRES_* env) + Database
+  from src.database (connect/disconnect). sys.path.insert pattern mirrors
+  scripts/migrate_tokens_to_db.py (scripts/ is NOT an importable package — wheel packages=["src"]).
+- render_plan_markdown is a PURE function (plan, race, paces, weeks, sessions_by_week) -> str.
+  Easy to test without DB. Pace column maps session_type->zone via _SESSION_PACE_CODE
+  (SL->EF, RMU/REST->"—"). Uses paces.pace_for(code).label.
+- GOTCHA: generation_params comes back from asyncpg as a JSON **string** (no JSONB codec in
+  src/database.py; cf training_plans router json.loads at routers/training_plans.py:168).
+  _parse_paces handles both str and dict, then PaceSet(**paces) reconstructs (objective enum +
+  zones dict coerced by pydantic).
+- user_id resolution: --user-id > SEED_GARMIN_USER_ID env > sole garmin_user row, else raises
+  (legacy user 67 + others may coexist; don't guess).
+- DID NOT run the script against a DB here (no creds; spec §11 = Stephane runs it / reviews
+  specs/mon-plan-marathon.md on waking). So mon-plan-marathon.md is NOT committed yet.
+- TESTS tests/test_training/test_seed_marathon_plan.py: loads the script by path via
+  importlib (not a package). 3 pure tests (render structure / pace label / fmt helpers) +
+  1 mocked-pool e2e smoke (patch db_ops fns + generate_plan, assert markdown file written).
+- ruff gate is src/ + the script file only (NOT tests/). Caught F541 (f-string w/o placeholder)
+  on the static blockquote — dropped the f prefix.
+- Baseline now 875 passed / 2 pre-existing failures. +4 tests. Next: Lot D1 (#8) adaptive coach.
+---
