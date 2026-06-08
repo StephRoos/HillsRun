@@ -119,7 +119,7 @@ def get_zone_for_session_type(session_type: SessionType) -> int:
     Mapping:
         REST, REC → Z1
         EF, SL, DESC, RMU → Z2
-        TMP, COT → Z3
+        TMP, COT, MPR → Z3
         INT → Z4
 
     Args:
@@ -137,6 +137,7 @@ def get_zone_for_session_type(session_type: SessionType) -> int:
         SessionType.RMU: 2,
         SessionType.TMP: 3,
         SessionType.COT: 3,
+        SessionType.MPR: 3,
         SessionType.INT: 4,
     }
 

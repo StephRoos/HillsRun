@@ -76,6 +76,13 @@ def get_phase_session_types(
     Returns:
         List of recommended SessionType values for this phase and level
     """
+    # --- Road marathon short-circuit ---
+    # Road plans drop trail-specific work (COT hill repeats, DESC downhill) and
+    # introduce MPR (marathon pace). This bypasses every trail adaptation below so
+    # trail behaviour (incl. the no-flags COT default) is left untouched.
+    if race_flags and race_flags.is_road_marathon:
+        return _road_phase_session_types(phase)
+
     base_sessions = {
         PlanPhase.base: [
             SessionType.EF,
@@ -164,6 +171,52 @@ def get_phase_session_types(
             recommendations.insert(1, SessionType.TMP)
 
     return recommendations
+
+
+def _road_phase_session_types(phase: PlanPhase) -> list[SessionType]:
+    """Recommended session types for a road marathon plan by phase.
+
+    No COT (hill repeats) or DESC (downhill) — irrelevant on flat road. MPR
+    (marathon pace) is introduced in development + specific (§6). Taper keeps a
+    touch of intensity (TMP) while volume is cut, never collapsing to easy-only
+    (Wang 2023: maintain intensity, reduce volume).
+
+    Args:
+        phase: Training periodization phase.
+
+    Returns:
+        List of recommended SessionType values for the road phase.
+    """
+    road_sessions = {
+        PlanPhase.base: [
+            SessionType.EF,
+            SessionType.SL,
+            SessionType.REC,
+        ],
+        PlanPhase.development: [
+            SessionType.EF,
+            SessionType.SL,
+            SessionType.MPR,
+            SessionType.TMP,
+            SessionType.INT,
+            SessionType.REC,
+        ],
+        PlanPhase.specific: [
+            SessionType.EF,
+            SessionType.SL,
+            SessionType.MPR,
+            SessionType.TMP,
+            SessionType.INT,
+            SessionType.REC,
+        ],
+        PlanPhase.taper: [
+            SessionType.EF,
+            SessionType.SL,
+            SessionType.TMP,
+            SessionType.REC,
+        ],
+    }
+    return road_sessions[phase].copy()
 
 
 def _build_catalog() -> dict:
@@ -457,12 +510,26 @@ def _build_catalog() -> dict:
             )
 
     # MPR - Marathon Pace Run (road)
-    # Minimal stub templates so get_session_template never raises for MPR;
-    # phase-specific block sizing is refined in Lot 4.
+    # Block: warm-up Z2 → main block at marathon pace (grows by phase) → cool-down Z2.
+    # Standalone MPR is recommended in development + specific only (§6); templates
+    # exist for every phase so get_session_template never raises.
+    _MPR_WARMUP_S = 900
+    _MPR_COOLDOWN_S = 600
+    # Fraction of the min session duration spent at marathon pace, by phase.
+    _mpr_phase_factor = {
+        PlanPhase.base: 0.45,
+        PlanPhase.development: 0.60,
+        PlanPhase.specific: 0.75,
+        PlanPhase.taper: 0.40,
+    }
     for phase in PlanPhase:
         for experience in ExperienceLevel:
             duration_range = _get_duration_range(SessionType.MPR, experience)
-            mpr_duration = int((duration_range[0] - 25) * 60)
+            total_min_s = duration_range[0] * 60
+            # Marathon-pace block scales with phase, bounded so warm-up + cool-down fit.
+            max_block_s = max(600, total_min_s - _MPR_WARMUP_S - _MPR_COOLDOWN_S)
+            mpr_block_s = min(max_block_s, int(total_min_s * _mpr_phase_factor[phase]))
+            block_min = mpr_block_s // 60
             catalog[(SessionType.MPR, experience, phase)] = SessionTemplate(
                 session_type=SessionType.MPR,
                 title="Allure marathon spécifique",
@@ -474,19 +541,19 @@ def _build_catalog() -> dict:
                 blocks=[
                     WorkoutBlock(
                         name="Warmup",
-                        duration_seconds=900,
+                        duration_seconds=_MPR_WARMUP_S,
                         hr_zone=2,
                         description="Easy Z2 warmup",
                     ),
                     WorkoutBlock(
                         name="Marathon Pace",
-                        duration_seconds=mpr_duration,
+                        duration_seconds=mpr_block_s,
                         hr_zone=3,
-                        description="Steady block at marathon pace Z3",
+                        description=f"{block_min}min steady block at marathon pace Z3",
                     ),
                     WorkoutBlock(
                         name="Cooldown",
-                        duration_seconds=600,
+                        duration_seconds=_MPR_COOLDOWN_S,
                         hr_zone=2,
                         description="Easy Z2 cooldown",
                     ),

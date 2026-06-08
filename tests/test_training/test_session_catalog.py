@@ -17,6 +17,10 @@ def _high_altitude_flags():
     return RaceFlags(category=RaceCategory.ultra, high_altitude=True)
 
 
+def _road_marathon_flags():
+    return RaceFlags(category=RaceCategory.road_marathon, is_road_marathon=True)
+
+
 def test_base_phase_no_flags():
     """Base phase without flags should not include COT for beginners."""
     types = get_phase_session_types(PlanPhase.base, ExperienceLevel.beginner)
@@ -63,3 +67,47 @@ def test_no_flags_backward_compatible():
     assert SessionType.TMP in types_no_flags
     assert SessionType.INT in types_no_flags
     assert SessionType.COT in types_no_flags
+
+
+# --- Road marathon adaptations ---
+
+def test_road_specific_no_cot_or_desc():
+    """Road specific phase drops trail-only COT/DESC and includes MPR."""
+    types = get_phase_session_types(
+        PlanPhase.specific, ExperienceLevel.intermediate, _road_marathon_flags()
+    )
+    assert SessionType.COT not in types
+    assert SessionType.DESC not in types
+    assert SessionType.MPR in types
+
+
+def test_road_development_includes_mpr():
+    """Road development phase introduces MPR (marathon pace)."""
+    types = get_phase_session_types(
+        PlanPhase.development, ExperienceLevel.intermediate, _road_marathon_flags()
+    )
+    assert SessionType.MPR in types
+    assert SessionType.COT not in types
+
+
+def test_road_taper_keeps_intensity():
+    """Road taper retains a touch of intensity (cut volume, keep quality)."""
+    types = get_phase_session_types(
+        PlanPhase.taper, ExperienceLevel.intermediate, _road_marathon_flags()
+    )
+    intensity_present = any(
+        s in types for s in (SessionType.MPR, SessionType.TMP, SessionType.INT)
+    )
+    assert intensity_present
+    assert SessionType.COT not in types
+    assert SessionType.DESC not in types
+
+
+def test_road_base_aerobic_only():
+    """Road base phase stays aerobic — no MPR, no COT/DESC."""
+    types = get_phase_session_types(
+        PlanPhase.base, ExperienceLevel.intermediate, _road_marathon_flags()
+    )
+    assert SessionType.COT not in types
+    assert SessionType.DESC not in types
+    assert SessionType.MPR not in types
