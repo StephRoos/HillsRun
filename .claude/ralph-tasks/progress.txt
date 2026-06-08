@@ -188,3 +188,39 @@ Started: 2026-06-08
   on the static blockquote — dropped the f prefix.
 - Baseline now 875 passed / 2 pre-existing failures. +4 tests. Next: Lot D1 (#8) adaptive coach.
 ---
+
+## 2026-06-08 - Task #8: Lot D1 HRV-baseline daily readiness (spec 03, NOT spec 02)
+- NEW SPEC for chantier D: specs/03-adaptive-coach.md (read §1-3). Non-destructive: nothing
+  here mutates a plan. Core signal = morning HRV vs individual baseline (ONLY validated method).
+- New package src/training/adaptive/ (__init__.py, readiness.py, queries.py).
+  - readiness.py = PURE functions/models (no DB, fully unit-tested):
+    * Verdict(str,Enum): green/amber/red/insufficient_baseline.
+    * build_hrv_baseline(values, min_points=28) -> HrvBaseline|None. x=ln(rMSSD), SAMPLE sd (n-1).
+      Drops None/<=0 BEFORE the >=28 count. Returns None if insufficient -> caller falls back.
+    * HrvBaseline props: lower_ln/upper_ln = mean -/+ 0.5*sd; red_threshold_ln = mean - 1.0*sd;
+      low/high = exp() back to raw ms.
+    * daily_verdict(today_hrv, baseline, *, secondary=None, prev_day_below_red=False).
+      GREEN if ln(today)>=lower_ln; AMBER if <lower_ln; RED only if <red_threshold AND
+      prev_day_below_red (2-day hysteresis — a single deep dip is AMBER, not RED).
+      Secondary nudge: ONLY when borderline GREEN (today_ln<mean_ln, i.e. lower half of band)
+      AND >=1 active flag -> AMBER. Never overrides RED, never downgrades a comfortable GREEN.
+    * SecondaryModifiers.active_flags(): sleep<50, resting_hr>resting_baseline+5, TR<30.
+  - queries.py = async DB (asyncpg pool.fetch/fetchval/fetchrow directly, no acquire needed).
+    HRV value column is hrv_data.last_night_avg (overnight rMSSD avg). resting HR from
+    daily_summary.resting_heart_rate; sleep_data.sleep_score; training_readiness.score.
+    evaluate_daily_readiness(pool,user_id,day,persist=True) ties fetch->pure->upsert.
+    fetchval call ORDER (matters for mock side_effect): today HRV, sleep, resting,
+    resting_baseline, TR, [yesterday HRV only if baseline not None].
+- Migration sql/12_daily_recommendations.sql (UNIQUE(user_id,date), suggested_modification JSONB,
+  accepted bool default false). NOT applied to prod (spec §6, manual).
+- Endpoint GET /api/v1/training/daily-readiness?date= in NEW router src/api/routers/training.py
+  (prefix /api/v1/training, get_api_key dep). Registered in main.py import+include_router.
+  Returns dict (date + verdict fields); does NOT mutate plan.
+- TESTS tests/test_training/test_adaptive_readiness.py: 15 tests (band g/a/r, insufficient
+  fallback, 2-day hysteresis, single-dip-in-band stays GREEN, secondary nudge/no-nudge/never-
+  override-RED, + 2 mocked-pool orchestrator smokes). Derive thresholds FROM the built baseline
+  (don't hardcode ms) for robustness.
+- ruff gate = src/ only. Full suite now 890 passed / 2 pre-existing failures. +15 tests.
+- Next: Lot D2 (#9) readiness_agent.py — Claude API (Haiku 4.5), anchored on D1 verdict.
+  NOTE: when wiring the LLM, read the claude-api skill first (model ids/SDK).
+---
