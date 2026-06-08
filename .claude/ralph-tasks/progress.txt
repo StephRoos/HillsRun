@@ -50,3 +50,24 @@ Started: 2026-06-08
 - Baseline now 848 passed / 2 pre-existing failures (CORS env + mfa cleanup). +9 new pace tests.
 ---
 
+## 2026-06-08 - Task #3: Lot 3 long_run road variants
+- long_run.py: calculate_long_run gained `discipline="trail"` (default) + `pace_set: Optional[PaceSet]=None`
+  keyword params. Trail path UNCHANGED (same dict keys, 80km cap). Road path branches to
+  new `_build_road_long_run`. PaceSet imported under TYPE_CHECKING only (no runtime import for
+  trail callers; no circular import since pace_calculator doesn't import long_run).
+- Road specifics: absolute cap 35km (_ROAD_ABSOLUTE_CAP_KM) vs trail 80km. Phase % caps reused
+  (base30/dev50/specific70/taper40). For Brugge 42.195 + intermediate(start 15km, 12%/wk), specific
+  cap = 70% = 29.5km -> peak lands in [28,35]. Verified.
+- Road variants by phase: base/dev -> "progressive_easy" (no MP block); specific -> "marathon_pace_finish"
+  with mp_block = min(12, target*0.4) km at MPR, fast_finish on EVEN weeks (variant becomes "fast_finish");
+  taper -> "taper_quality" KEEPS a short mp_block = min(6, target*0.3) (Wang 2023: cut volume, keep
+  intensity); recovery week -> "recovery_easy" (no block). Road dict adds keys: variant,
+  marathon_pace_block_km, fast_finish, hr_zone="Z2", easy_pace, marathon_pace (labels from pace_set or None).
+- Duration: easy_km at EF.sec_per_km_slow + mp_block at MPR.sec_per_km_fast; fallback 6:00/km when no pace_set.
+- Wiring into plan_generator/week_builder is Lot 5 — NOT done here (long_run still called trail-default there).
+- TEST FLAKINESS WARNING: the garth-layer tests (test_garmin_client TestSafeApiCallDecorator,
+  test_retry TestSafeApiCallGarthHTTPError) FAIL NON-DETERMINISTICALLY in the full-suite run (different
+  subset each run) but PASS in isolation. Confirmed present on a clean `git stash` tree too -> NOT ours,
+  ignore. Reliable green signal: `uv run pytest tests/test_training/ -q` (172 passed). +8 new long_run tests.
+---
+
