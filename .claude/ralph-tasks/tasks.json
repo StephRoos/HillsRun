@@ -59,7 +59,7 @@
     {
       "id": 9,
       "description": "Lot D2 — couche agent IA (NON destructif). Spec 03 (Lot D2). src/training/adaptive/readiness_agent.py: a partir des signaux + seance du jour + contexte 3 derniers jours, produire une recommandation STRUCTUREE (verdict, modification, justification courte) via l'API Claude (SDK anthropic, cle cote serveur, modele Haiku 4.5 par defaut). Le verdict regle de D1 est l'ancre; l'agent explique/affine mais ne contredit JAMAIS un RED. Persister la justification. Tests: mocker l'appel LLM, valider le schema de sortie + qu'un RED ne peut pas devenir GREEN.",
-      "status": "pending",
+      "status": "in_progress",
       "createdAt": "2026-06-08T00:00:00Z"
     },
     {

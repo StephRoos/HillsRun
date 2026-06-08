@@ -13,7 +13,10 @@ from fastapi import APIRouter, Depends, Query
 
 from ..auth import get_api_key
 from ..dependencies import get_db, get_user_id
-from ...training.adaptive.queries import evaluate_daily_readiness
+from ...training.adaptive.queries import (
+    evaluate_daily_readiness,
+    explain_daily_readiness,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +32,10 @@ async def get_daily_readiness(
     date: Optional[date_type] = Query(
         default=None, description="Day to evaluate (default: today)"
     ),
+    explain: bool = Query(
+        default=False,
+        description="Add a Claude-generated natural-language rationale (Lot D2)",
+    ),
     db=Depends(get_db),
     user_id: int = Depends(get_user_id),
 ):
@@ -37,10 +44,14 @@ async def get_daily_readiness(
     The verdict is GREEN (proceed), AMBER (ease the session), RED (rest /
     active recovery) or ``insufficient_baseline`` when fewer than 28 daily HRV
     points exist. The suggested modification is advisory only.
+
+    With ``explain=true``, an AI reasoning layer (Lot D2) adds a short
+    athlete-facing rationale under ``ai``. The rule verdict stays authoritative:
+    the agent can escalate caution but never relaxes it (a RED stays RED).
     """
     day = date or date_type.today()
     result = await evaluate_daily_readiness(db.pool, user_id, day)
-    return {
+    payload = {
         "date": day.isoformat(),
         "verdict": result.verdict.value,
         "reason": result.reason,
@@ -49,3 +60,7 @@ async def get_daily_readiness(
         "baseline_low": result.baseline_low,
         "baseline_high": result.baseline_high,
     }
+    if explain:
+        rec = await explain_daily_readiness(db.pool, user_id, day, result)
+        payload["ai"] = rec.model_dump(mode="json")
+    return payload
