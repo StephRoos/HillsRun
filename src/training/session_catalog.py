@@ -179,7 +179,9 @@ def _road_phase_session_types(phase: PlanPhase) -> list[SessionType]:
     No COT (hill repeats) or DESC (downhill) — irrelevant on flat road. MPR
     (marathon pace) is introduced in development + specific (§6). Taper keeps a
     touch of intensity (TMP) while volume is cut, never collapsing to easy-only
-    (Wang 2023: maintain intensity, reduce volume).
+    (Wang 2023: maintain intensity, reduce volume). RMU (bodyweight strength) is
+    discipline-agnostic and stays in every phase, mirroring the trail path so
+    road athletes keep their strength session (spec §2: 4 runs + 1 strength).
 
     Args:
         phase: Training periodization phase.
@@ -192,6 +194,7 @@ def _road_phase_session_types(phase: PlanPhase) -> list[SessionType]:
             SessionType.EF,
             SessionType.SL,
             SessionType.REC,
+            SessionType.RMU,
         ],
         PlanPhase.development: [
             SessionType.EF,
@@ -200,6 +203,7 @@ def _road_phase_session_types(phase: PlanPhase) -> list[SessionType]:
             SessionType.TMP,
             SessionType.INT,
             SessionType.REC,
+            SessionType.RMU,
         ],
         PlanPhase.specific: [
             SessionType.EF,
@@ -208,12 +212,14 @@ def _road_phase_session_types(phase: PlanPhase) -> list[SessionType]:
             SessionType.TMP,
             SessionType.INT,
             SessionType.REC,
+            SessionType.RMU,
         ],
         PlanPhase.taper: [
             SessionType.EF,
             SessionType.SL,
             SessionType.TMP,
             SessionType.REC,
+            SessionType.RMU,
         ],
     }
     return road_sessions[phase].copy()

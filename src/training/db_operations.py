@@ -108,9 +108,10 @@ async def create_race_target(
         INSERT INTO race_targets (
             user_id, race_name, race_date, distance_km,
             elevation_gain_m, elevation_loss_m, altitude_min_m, altitude_max_m,
-            technical_percent, cutoff_hours, itra_points, objective, elevation_profile
+            technical_percent, cutoff_hours, itra_points, objective, elevation_profile,
+            discipline, target_time_seconds
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
         RETURNING *
     """
     row = await pool.fetchrow(
@@ -130,6 +131,8 @@ async def create_race_target(
         json.dumps(data["elevation_profile"])
         if data.get("elevation_profile")
         else None,
+        data.get("discipline", "trail"),
+        data.get("target_time_seconds"),
     )
     return dict(row)
 

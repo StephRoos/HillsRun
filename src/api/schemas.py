@@ -559,6 +559,8 @@ class RaceTargetCreate(BaseModel):
     itra_points: Optional[int] = None
     objective: str = "finish"
     elevation_profile: Optional[dict] = None
+    discipline: str = "trail"  # 'trail' | 'road'
+    target_time_seconds: Optional[int] = None
 
 
 class RaceTargetResponse(BaseModel):
@@ -578,6 +580,8 @@ class RaceTargetResponse(BaseModel):
     itra_points: Optional[int] = None
     objective: str
     elevation_profile: Optional[dict] = None
+    discipline: str = "trail"
+    target_time_seconds: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
