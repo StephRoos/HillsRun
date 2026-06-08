@@ -31,8 +31,9 @@
     {
       "id": 5,
       "description": "Lot 5 — week_builder + plan_generator. Spec section 7 (Lot 5). week_builder.py: ordre qualite route [TMP,INT,MPR] (skip COT), pas de D+ sur longue route, respecter day_preferences (long_run=7, quality=[4], strength=3, easy fill mar/sam). plan_generator.py: calculer PaceSet (VMA+objectif, fallback VDOT), passer discipline/allures a long_run+week_builder, sport_type=road_running (dual-write planned_workouts + training_plan_sessions), injecter hr_zone, stocker allures+warning dans generation_params.",
-      "status": "in_progress",
-      "createdAt": "2026-06-08T00:00:00Z"
+      "status": "completed",
+      "createdAt": "2026-06-08T00:00:00Z",
+      "completedAt": "2026-06-08T19:53:21Z"
     },
     {
       "id": 6,

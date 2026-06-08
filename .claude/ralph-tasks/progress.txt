@@ -93,3 +93,38 @@ Started: 2026-06-08
 - Lot 5 wiring note: week_builder still calls get_phase_session_types WITHOUT road flags
   today; Lot 5 must pass race_flags through so the road gating actually takes effect in plans.
 ---
+
+## 2026-06-08 - Task #5: Lot 5 week_builder + plan_generator road wiring
+- week_builder.py:
+  - _get_quality_type_order: new FIRST branch `if race_flags.is_road_marathon ->
+    [TMP, INT, MPR]` (skip COT). Filtered by phase_types, so base road (no
+    quality types) places none, taper road places only TMP. For intermediate
+    (max_quality=1) the placed quality is TMP; marathon-pace work for intermediate
+    arrives via the long-run MP-finish block, not a standalone MPR — expected per §6.
+  - _create_long_run_session: elevation guard now `high_dplus and not is_road_marathon`
+    (redundant since road sets no high_dplus, but explicit per spec "no D+ on road LR").
+- plan_generator.py:
+  - import compute_paces_from_fitness. Step 5b: `discipline = race.get("discipline")
+    or "trail"`; compute `pace_set` ONLY when discipline=="road" via
+    compute_paces_from_fitness(vma_kmh=fitness.vma_kmh, vo2_max=fitness.vo2_max, ...).
+    Trail keeps pace_set=None (unchanged single-pace path). NOTE: road plan REQUIRES
+    a pace anchor — compute_paces_from_fitness raises ValueError if neither VMA nor
+    VO2max; acceptable (road needs VMA, seed sets manual_vma).
+  - calculate_long_run now gets discipline=discipline, pace_set=pace_set.
+  - sport_type override AFTER build_week: `if discipline=="road": s.sport_type=
+    "road_running" for sessions where sport_type=="trail_running"`. Leaves MPR
+    (already road_running) and RMU (strength_training) untouched. THE place §3 wants
+    the dual-write rows tagged (planned_workouts + training_plan_sessions read s.sport_type).
+  - generation_params now stores `discipline` + `paces` (pace_set.model_dump(mode="json")
+    — mode="json" REQUIRED: PaceSet.objective is a RaceObjective enum and plain
+    model_dump() leaves an enum that json.dumps rejects).
+- fitness exposes `vma_kmh` and `vo2_max` on UserFitnessData (used via getattr for safety).
+- TEST: test_generate_plan_road_marathon in test_plan_generator.py — reuses mock_pool,
+  asserts race_category==road_marathon, planned_workouts inserts contain road_running &
+  NO trail_running, generation_params has discipline=road + paces.zones["MPR"]. Inspect
+  via conn.fetchrow.call_args_list filtered by SQL substring; planned_workouts sport_type
+  = call.args[3], plan generation_params = call.args[9].
+- Baseline now 861 passed / 2 pre-existing failures (CORS env_override + mfa cleanup). +1 test.
+- Lot 6 TODO: pure-function acceptance suite (peak 28-35, no COT/DESC, paces) + migration
+  sql/11 + RaceTargetCreate fields. week_builder/plan_generator wiring is done.
+---
