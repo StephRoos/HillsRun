@@ -224,3 +224,59 @@ Started: 2026-06-08
 - Next: Lot D2 (#9) readiness_agent.py — Claude API (Haiku 4.5), anchored on D1 verdict.
   NOTE: when wiring the LLM, read the claude-api skill first (model ids/SDK).
 ---
+
+## 2026-06-08 - Task #9: Lot D2 AI reasoning layer (Claude API, anchored on D1)
+- Added dep `anthropic>=0.40.0` to pyproject [project].dependencies; `uv sync`
+  pulled anthropic==0.107.1 (+ distro, docstring-parser, jiter, sniffio). uv run
+  auto-syncs so tests see it.
+- NEW src/training/adaptive/readiness_agent.py (the LLM layer; LLM call isolated):
+  * AgentRecommendation(BaseModel): verdict, headline, rationale, adjustment,
+    suggested_modification, model, anchored.
+  * DEFAULT_MODEL = "claude-haiku-4-5" (spec 03 §3 says Haiku for cost; Sonnet
+    only if needed). Haiku does NOT take effort/thinking knobs — do NOT send them
+    (they 400 on Haiku). Plain messages.create.
+  * THE INVARIANT (test target): `_reconcile_verdict(anchor, proposed)` clamps so
+    the agent can MATCH or ESCALATE caution but NEVER relax. Severity GREEN<AMBER<RED.
+    RED anchor -> always RED (anchored=True). insufficient_baseline anchor ->
+    always insufficient (and SKIPS the LLM call entirely, model="").
+  * `_call_llm(client, ...)` = the single network seam. Uses
+    output_config={"format":{"type":"json_schema","schema":_OUTPUT_SCHEMA}} then
+    `next(b.text for b in resp.content if b.type=="text")` + json.loads. Tests
+    patch readiness_agent._call_llm (the clean "mock the LLM" point). _OUTPUT_SCHEMA
+    enum is only green/amber/red (no insufficient — agent only runs with a baseline).
+  * Lazy `import anthropic` inside build_agent_recommendation only when client is
+    None (so module import + all tests work without a key).
+  * Output rationale is FRENCH (athlete-facing coaching = "French for exchanges"),
+    neutral tone per Anthemion charte; D1 `reason` strings stay English. Mixed but
+    intentional (rule text vs coaching message).
+  * GOTCHA (py3.11): nested f-string reusing the same quote char is a SyntaxError
+    on 3.11 (3.12-only). ruff `invalid-syntax` flagged it. Rewrote the recent-context
+    f-string as an explicit loop. Repo runs 3.11 (requires-python>=3.11) even though
+    .venv showed 3.12 — ruff still targets 3.11, so AVOID nested same-quote f-strings.
+- queries.py (Lot D2 additions, all async, non-destructive):
+  * fetch_planned_session (planned_workouts for the day, first match),
+    fetch_recent_context (prior 3 daily_recommendations rows, oldest first),
+    persist_agent_recommendation (UPDATE ai_* columns only — NEVER touches the
+    authoritative `verdict` column written by D1),
+    explain_daily_readiness (orchestrator: fetch context -> run agent via
+    asyncio.to_thread (SDK is sync; don't block the loop, ADR-007 spirit) ->
+    persist). Pass client= to inject a mock; model= optional override.
+- sql/13_ai_rationale.sql: ALTER TABLE daily_recommendations ADD COLUMN IF NOT
+  EXISTS ai_rationale TEXT, ai_recommendation JSONB, ai_model VARCHAR(40),
+  ai_generated_at TIMESTAMPTZ. NOT applied to prod (spec §6 manual). Idempotent.
+- Endpoint: extended GET /api/v1/training/daily-readiness with `?explain=true`
+  (bool Query). When true, runs explain_daily_readiness and adds `ai` =
+  rec.model_dump(mode="json") to the payload. Default path (explain=false) makes
+  NO LLM call — zero cost/latency regression for D1 callers.
+- TESTS tests/test_training/test_adaptive_readiness_agent.py: 14 tests. Parametrized
+  _reconcile_verdict matrix (incl. RED+green->RED), build_* (red-can't-become-green,
+  escalate, schema shape, insufficient-skips-llm asserting _call_llm NOT called),
+  _call_llm content parsing (fake SimpleNamespace response), + 2 mocked-pool
+  orchestrator smokes (persist asserts UPDATE has ai_rationale & no "SET verdict";
+  persist=False asserts only 1 fetchrow). Mock pool = MagicMock with
+  fetchrow/fetch = AsyncMock(side_effect=[...]).
+- Verify gate = ruff check src/ + ruff format src/ + pytest tests/. Full suite now
+  904 passed / 2 pre-existing failures (CORS env_override + mfa cleanup). +14 tests.
+- Next: Lot D3 (#10) workout_matcher.py + adherence.py (READ-ONLY reconciliation,
+  ACWR informational-only). Spec 03 Lot D3.
+---
