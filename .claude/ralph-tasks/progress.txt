@@ -323,3 +323,56 @@ Started: 2026-06-08
   + mfa cleanup). +22 tests. No migration (D3 read-only). Next: Lot D4 (#11) plan_adjuster.py
   PROPOSE-ONLY + weekly_reconciliations table + finalize PR.
 ---
+
+## 2026-06-08 - Task #11: Lot D4 propose-only weekly plan adjuster (spec 03)
+- NEW src/training/adaptive/plan_adjuster.py (PURE, no DB). propose_weekly_adjustment(
+  week_report: WeekAdherence, recent_verdicts: list[str], *, from_week, target_week=None)
+  -> WeeklyAdjustmentProposal. Heuristics:
+  * sustained fatigue (red>=2 OR amber+red>=3 in recent verdicts) AND compliance<60%
+    -> INSERT_RECOVERY (structural, tss_factor 0.6).
+  * compliance>=90% AND ahead (realized_tss>=planned_tss) AND not sustained
+    -> ACCELERATE (structural, tss_factor 1.15, evidence_label="heuristic (not evidence-based)").
+  * missed sessions AND no structural -> MAINTAIN ("do not pile up", non-structural).
+  * else -> MAINTAIN "on track".
+  ANTI-THRASHING: _cap_structural_changes keeps <=1 structural (mutually exclusive by
+  construction, but enforced as a safety net). target_week defaults from_week+1.
+- should_recompute_paces(cur,new,threshold=0.03) + maybe_recompute_paces(...) -> PaceSet|None
+  (relative VMA shift >3% -> compute_paces). Pace recompute is NON-structural.
+- AdjustmentAction enum (maintain/insert_recovery/accelerate/recompute_paces),
+  ProposedChange{action,target_week,structural,tss_factor,rationale,evidence_label,details},
+  WeeklyAdjustmentProposal{plan_id,from_week,target_week,compliance_pct,summary,changes,
+  recomputed_paces,auto_apply=False(always)} + .structural_change_count prop.
+- queries.py Lot D4 (DB):
+  * fetch_recent_verdicts(pool,user_id,end_iso,days=10) — reads daily_recommendations.verdict.
+    GOTCHA: mock fetch must return DICT rows [{"verdict":"green"}], not bare strings.
+  * fetch_plan_fitness_context — JOIN training_plans.generation_params + garmin_user.manual_vma;
+    _parse_generation_params handles JSON-string-or-dict (asyncpg gives str, no JSONB codec).
+    Returns current_vma_kmh (from paces dict), new_vma_kmh (manual_vma), objective, target_time.
+  * insert_weekly_reconciliation — fetchrow INSERT ... ON CONFLICT(plan_id,from_week) DO UPDATE
+    RETURNING * (resets to status='proposed', applied=FALSE). Persisting a PROPOSAL is NOT a
+    plan mutation -> propose path NEVER calls pool.execute (that is the read-only proof in tests).
+  * propose_plan_adjustment(pool,plan_id,user_id,*,week_number,persist=True) — orchestrator:
+    reuses reconcile_plan (1 fetchrow plan + 3 fetch), fetch_recent_verdicts (1 fetch),
+    fetch_plan_fitness_context (1 fetchrow), optional pace recompute, insert proposal (1 fetchrow).
+    Mock ordering: fetchrow=[plan_row, fitness_row, proposal_row]; fetch=[planned, window_acts,
+    acwr_acts, verdict_rows]. Returns None if plan absent. RaceObjective() coercion guarded.
+  * apply_plan_adjustment(pool,proposal_id,user_id) — THE ONLY plan-mutating path (explicit).
+    Loads weekly_reconciliations row; idempotent (status=='applied' -> return unchanged, no
+    execute); for each structural change UPDATE training_plan_weeks target_tss (accelerate) or
+    target_tss+is_recovery_week (insert_recovery) via pool.execute; recompute_paces UPDATEs
+    training_plans.generation_params. Marks status='applied'. Mock: fetchrow=[stored, week_row,
+    applied_row]; assert pool.execute.assert_awaited_once and args == (sql, round(300*1.15)=345, 40).
+- Migration sql/14_weekly_reconciliations.sql (plan_id, user_id, from_week, target_week,
+  compliance_pct, proposal JSONB, status, applied, UNIQUE(plan_id,from_week)). NOT applied to prod.
+- Endpoints (training_plans router): POST /{plan_id}/propose-adjustment?week= (201, propose-only)
+  + POST /{plan_id}/adjustments/{proposal_id}/apply (explicit apply). Both 404 on missing.
+- TESTS tests/test_training/test_adaptive_plan_adjuster.py: 14 tests (heuristics, anti-thrashing
+  cap, pace gating, propose-only smoke asserting pool.execute NOT called, apply-mutates smoke,
+  already-applied no-op, missing-proposal None).
+- Verify gate = ruff check src/ + ruff format src/ + pytest tests/. Full suite now 940 passed /
+  2 pre-existing failures (CORS env_override + mfa cleanup). +14 tests. app imports OK.
+- This is the LAST task in the queue (#11). All Lots 1-7 (spec 02) + D1-D4 (spec 03) complete.
+  PR finalization (spec 02 §10 + spec 03 §5) is the remaining human step — branch
+  feat/road-marathon-engine is ready; PR body must state HRV-baseline core, ACWR
+  informational/contested, Garmin TR secondary, and NO plan mutation without explicit apply.
+---
