@@ -79,6 +79,7 @@ async def generate_plan(
         elevation_gain_m=race.get("elevation_gain_m", 0) or 0,
         technical_percent=race.get("technical_percent", 0) or 0,
         altitude_max_m=race.get("altitude_max_m", 0) or 0,
+        discipline=race.get("discipline") or "trail",
     )
 
     # Step 5: Calculate HR zones

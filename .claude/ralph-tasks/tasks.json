@@ -3,7 +3,7 @@
     {
       "id": 1,
       "description": "Lot 1 — discipline & classification + stub MPR. Lire specs/02-road-marathon-adaptation.md (section 7, Lot 1). models.py: ajouter RaceCategory.road_marathon, RaceFlags.is_road_marathon, RaceTargetInput.discipline (default 'trail'), SessionType.MPR. race_classifier.py: detecter road marathon. IMPORTANT: ajouter AUSSI des templates MPR minimaux dans session_catalog._build_catalog pour eviter ValueError de get_session_template (raise si cle manquante, session_catalog.py:51). Test: Brugge -> road_marathon, is_road_marathon=True, is_ultra=False. Toute la suite reste verte.",
-      "status": "pending",
+      "status": "in_progress",
       "createdAt": "2026-06-08T00:00:00Z"
     },
     {

@@ -456,6 +456,43 @@ def _build_catalog() -> dict:
                 ],
             )
 
+    # MPR - Marathon Pace Run (road)
+    # Minimal stub templates so get_session_template never raises for MPR;
+    # phase-specific block sizing is refined in Lot 4.
+    for phase in PlanPhase:
+        for experience in ExperienceLevel:
+            duration_range = _get_duration_range(SessionType.MPR, experience)
+            mpr_duration = int((duration_range[0] - 25) * 60)
+            catalog[(SessionType.MPR, experience, phase)] = SessionTemplate(
+                session_type=SessionType.MPR,
+                title="Allure marathon spécifique",
+                description="Sustained block at marathon goal pace to lock in race rhythm",
+                sport_type="road_running",
+                intensity=Intensity.moderate,
+                hr_zone_primary=3,
+                duration_range_minutes=duration_range,
+                blocks=[
+                    WorkoutBlock(
+                        name="Warmup",
+                        duration_seconds=900,
+                        hr_zone=2,
+                        description="Easy Z2 warmup",
+                    ),
+                    WorkoutBlock(
+                        name="Marathon Pace",
+                        duration_seconds=mpr_duration,
+                        hr_zone=3,
+                        description="Steady block at marathon pace Z3",
+                    ),
+                    WorkoutBlock(
+                        name="Cooldown",
+                        duration_seconds=600,
+                        hr_zone=2,
+                        description="Easy Z2 cooldown",
+                    ),
+                ],
+            )
+
     # REST - Rest day
     for phase in PlanPhase:
         for experience in ExperienceLevel:
@@ -522,6 +559,12 @@ def _get_duration_range(
             ExperienceLevel.intermediate: (30, 45),
             ExperienceLevel.advanced: (30, 45),
             ExperienceLevel.expert: (30, 45),
+        },
+        SessionType.MPR: {
+            ExperienceLevel.beginner: (45, 60),
+            ExperienceLevel.intermediate: (50, 75),
+            ExperienceLevel.advanced: (60, 90),
+            ExperienceLevel.expert: (70, 100),
         },
         SessionType.REC: {
             ExperienceLevel.beginner: (20, 30),
