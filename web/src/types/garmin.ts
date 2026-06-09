@@ -307,6 +307,8 @@ export interface RaceTarget {
   cutoff_hours: number | null;
   itra_points: number | null;
   objective: string;
+  discipline: string;
+  target_time_seconds: number | null;
   elevation_profile: Record<string, unknown> | null;
   created_at: string | null;
   updated_at: string | null;
@@ -324,6 +326,11 @@ export interface RaceTargetCreate {
   cutoff_hours?: number;
   itra_points?: number;
   objective?: string;
+  // 'trail' (default) | 'road'. Road enables the marathon engine
+  // (VMA-derived paces, marathon-pace finish blocks, 35 km cap).
+  discipline?: string;
+  // Goal finish time in seconds (e.g. 12600 = 3h30); used by the road engine.
+  target_time_seconds?: number | null;
 }
 
 export interface GeneratePlanRequest {
