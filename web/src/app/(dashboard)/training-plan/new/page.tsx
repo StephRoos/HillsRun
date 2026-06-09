@@ -34,6 +34,13 @@ const DAY_LABELS: Record<number, string> = {
   1: "Mon", 2: "Tue", 3: "Wed", 4: "Thu", 5: "Fri", 6: "Sat", 7: "Sun",
 };
 
+/** Parse a "h:mm:ss" or "h:mm" goal time into seconds; null if malformed. */
+function parseHmsToSeconds(value: string): number | null {
+  const m = value.trim().match(/^(\d{1,2}):([0-5]?\d)(?::([0-5]?\d))?$/);
+  if (!m) return null;
+  return Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3] ?? 0);
+}
+
 export default function NewTrainingPlanPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
@@ -55,7 +62,10 @@ export default function NewTrainingPlanPage() {
     distance_km: 0,
     elevation_gain_m: 0,
     objective: "finish",
+    discipline: "trail",
   });
+  // Goal finish time as "h:mm:ss" (road only); parsed to seconds on submit.
+  const [targetTime, setTargetTime] = useState("");
   const [selectedRaceId, setSelectedRaceId] = useState<number | null>(null);
 
   const [planName, setPlanName] = useState("");
@@ -86,7 +96,12 @@ export default function NewTrainingPlanPage() {
   }
 
   async function handleCreateRace() {
-    const result = await createRace.mutateAsync(raceForm);
+    // Road marathons drive the VMA-based engine; attach the goal time (seconds).
+    const body: RaceTargetCreate =
+      raceForm.discipline === "road"
+        ? { ...raceForm, target_time_seconds: parseHmsToSeconds(targetTime) }
+        : raceForm;
+    const result = await createRace.mutateAsync(body);
     setSelectedRaceId(result.id);
     setStep(2);
   }
@@ -313,14 +328,19 @@ export default function NewTrainingPlanPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Elevation Gain (m)</Label>
-                  <Input
-                    type="number"
-                    value={raceForm.elevation_gain_m || ""}
-                    onChange={(e) =>
-                      setRaceForm({ ...raceForm, elevation_gain_m: Number(e.target.value) })
-                    }
-                  />
+                  <Label>Discipline</Label>
+                  <Select
+                    value={raceForm.discipline}
+                    onValueChange={(v) => setRaceForm({ ...raceForm, discipline: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="trail">Trail</SelectItem>
+                      <SelectItem value="road">Road (marathon)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Objective</Label>
@@ -335,6 +355,32 @@ export default function NewTrainingPlanPage() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {raceForm.discipline === "road" ? (
+                  <div className="space-y-2">
+                    <Label>Target time (h:mm:ss)</Label>
+                    <Input
+                      value={targetTime}
+                      onChange={(e) => setTargetTime(e.target.value)}
+                      placeholder="3:30:00"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Drives marathon paces (VMA-based). Leave empty to skip.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label>Elevation Gain (m)</Label>
+                    <Input
+                      type="number"
+                      value={raceForm.elevation_gain_m || ""}
+                      onChange={(e) =>
+                        setRaceForm({ ...raceForm, elevation_gain_m: Number(e.target.value) })
+                      }
+                    />
+                  </div>
+                )}
               </div>
               <Button
                 onClick={handleCreateRace}
