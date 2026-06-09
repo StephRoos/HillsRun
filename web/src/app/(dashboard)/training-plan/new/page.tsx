@@ -18,7 +18,7 @@ import {
   useFitnessSnapshot,
 } from "@/hooks/use-training-plans";
 import { DayPreferencePicker } from "@/components/training-plan/day-preference-picker";
-import type { AthleteProfileCreate, DayPreferences, RaceTargetCreate } from "@/types/garmin";
+import type { AthleteProfileCreate, DayPreferences, RaceTarget, RaceTargetCreate } from "@/types/garmin";
 
 const STEPS = ["Profile", "Race", "Preferences", "Generate"];
 
@@ -39,6 +39,14 @@ function parseHmsToSeconds(value: string): number | null {
   const m = value.trim().match(/^(\d{1,2}):([0-5]?\d)(?::([0-5]?\d))?$/);
   if (!m) return null;
   return Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3] ?? 0);
+}
+
+/** Format a duration in seconds back to "h:mm:ss" for display. */
+function formatSecondsToHms(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
 export default function NewTrainingPlanPage() {
@@ -66,7 +74,9 @@ export default function NewTrainingPlanPage() {
   });
   // Goal finish time as "h:mm:ss" (road only); parsed to seconds on submit.
   const [targetTime, setTargetTime] = useState("");
-  const [selectedRaceId, setSelectedRaceId] = useState<number | null>(null);
+  // Full canonical race (created or existing) — drives the review summary.
+  const [selectedRace, setSelectedRace] = useState<RaceTarget | null>(null);
+  const selectedRaceId = selectedRace?.id ?? null;
 
   const [planName, setPlanName] = useState("");
   const [totalWeeks, setTotalWeeks] = useState<number | undefined>();
@@ -95,6 +105,12 @@ export default function NewTrainingPlanPage() {
     setStep(1);
   }
 
+  // Road + a non-empty but unparseable goal time → block submit with feedback.
+  const targetTimeInvalid =
+    raceForm.discipline === "road" &&
+    targetTime.trim() !== "" &&
+    parseHmsToSeconds(targetTime) === null;
+
   async function handleCreateRace() {
     // Road marathons drive the VMA-based engine; attach the goal time (seconds).
     const body: RaceTargetCreate =
@@ -102,12 +118,12 @@ export default function NewTrainingPlanPage() {
         ? { ...raceForm, target_time_seconds: parseHmsToSeconds(targetTime) }
         : raceForm;
     const result = await createRace.mutateAsync(body);
-    setSelectedRaceId(result.id);
+    setSelectedRace(result);
     setStep(2);
   }
 
-  function handleSelectExistingRace(raceId: number) {
-    setSelectedRaceId(raceId);
+  function handleSelectExistingRace(race: RaceTarget) {
+    setSelectedRace(race);
     setStep(2);
   }
 
@@ -276,12 +292,16 @@ export default function NewTrainingPlanPage() {
                   <div
                     key={race.id}
                     className="flex items-center justify-between p-3 rounded-md border cursor-pointer hover:bg-accent/30"
-                    onClick={() => handleSelectExistingRace(race.id)}
+                    onClick={() => handleSelectExistingRace(race)}
                   >
                     <div>
                       <p className="font-medium">{race.race_name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {race.distance_km}km · {race.elevation_gain_m}m D+ · {race.race_date}
+                        {race.distance_km}km ·{" "}
+                        {race.discipline === "road"
+                          ? `Road${race.target_time_seconds ? ` · ${formatSecondsToHms(race.target_time_seconds)}` : ""}`
+                          : `${race.elevation_gain_m}m D+`}{" "}
+                        · {race.race_date}
                       </p>
                     </div>
                     <ArrowRight className="h-4 w-4 text-muted-foreground" />
@@ -364,10 +384,17 @@ export default function NewTrainingPlanPage() {
                       value={targetTime}
                       onChange={(e) => setTargetTime(e.target.value)}
                       placeholder="3:30:00"
+                      aria-invalid={targetTimeInvalid}
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Drives marathon paces (VMA-based). Leave empty to skip.
-                    </p>
+                    {targetTimeInvalid ? (
+                      <p className="text-xs text-destructive">
+                        Use the format h:mm:ss (e.g. 3:30:00).
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Drives marathon paces (VMA-based). Leave empty to skip.
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -384,7 +411,7 @@ export default function NewTrainingPlanPage() {
               </div>
               <Button
                 onClick={handleCreateRace}
-                disabled={createRace.isPending || !raceForm.race_name || !raceForm.race_date || !raceForm.distance_km}
+                disabled={createRace.isPending || !raceForm.race_name || !raceForm.race_date || !raceForm.distance_km || targetTimeInvalid}
                 className="w-full"
               >
                 {createRace.isPending ? (
@@ -517,9 +544,36 @@ export default function NewTrainingPlanPage() {
                   Duration: <span className="font-medium">{totalWeeks} weeks</span>
                 </div>
               )}
-              <div>
-                Race ID: <span className="font-medium">{selectedRaceId}</span>
-              </div>
+              {selectedRace && (
+                <>
+                  <div>
+                    Race: <span className="font-medium">{selectedRace.race_name}</span>
+                  </div>
+                  <div>
+                    Discipline:{" "}
+                    <span className="font-medium capitalize">{selectedRace.discipline}</span> ·{" "}
+                    {selectedRace.distance_km}km
+                  </div>
+                  <div>
+                    Objective:{" "}
+                    <span className="font-medium capitalize">{selectedRace.objective}</span>
+                  </div>
+                  {selectedRace.discipline === "road" ? (
+                    <div>
+                      Target time:{" "}
+                      <span className="font-medium">
+                        {selectedRace.target_time_seconds
+                          ? formatSecondsToHms(selectedRace.target_time_seconds)
+                          : "—"}
+                      </span>
+                    </div>
+                  ) : (
+                    <div>
+                      Elevation: <span className="font-medium">{selectedRace.elevation_gain_m}m D+</span>
+                    </div>
+                  )}
+                </>
+              )}
               {(() => {
                 const prefs = useDayOverride ? dayPrefsOverride : profileForm.day_preferences;
                 if (!prefs || (!prefs.long_run && !prefs.quality?.length && !prefs.strength && !prefs.easy_run?.length)) return null;
