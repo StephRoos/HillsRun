@@ -10,6 +10,10 @@ hébergement unique self-hosted sur le Minisforum UM880 Pro, via Coolify.
 
 Compose de référence : [`docker-compose.coolify.yml`](../docker-compose.coolify.yml).
 
+> **Auto-deploy** : câblé via la **GitHub App Coolify `hillsrun-coolify`** (App ID 4006693)
+> installée sur `StephRoos/HillsRun`. Tout push sur `main` déclenche un rebuild.
+> (Avant juin 2026 il n'y avait aucun webhook → déploiement manuel requis.)
+
 > Principe : **zéro coupure**. On déploie sur UM880 en parallèle de la prod actuelle,
 > on teste, puis on bascule le DNS. Rollback = repointer le DNS sur Vercel/Railway.
 > On ne supprime Vercel/Railway/Neon qu'à la toute fin.
