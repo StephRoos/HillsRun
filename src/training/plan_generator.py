@@ -16,6 +16,7 @@ from .fitness_snapshot import build_fitness_snapshot
 from .hr_zones import calculate_hr_zones
 from .load_calculator import calculate_session_tss, validate_weekly_progression
 from .long_run import calculate_long_run
+from .pace_calculator import compute_paces_from_fitness
 from .periodization import build_periodization
 from .race_classifier import classify_race
 from .week_builder import build_week
@@ -79,6 +80,7 @@ async def generate_plan(
         elevation_gain_m=race.get("elevation_gain_m", 0) or 0,
         technical_percent=race.get("technical_percent", 0) or 0,
         altitude_max_m=race.get("altitude_max_m", 0) or 0,
+        discipline=race.get("discipline") or "trail",
     )
 
     # Step 5: Calculate HR zones
@@ -99,6 +101,18 @@ async def generate_plan(
     # Extract race objective
     objective_str = race.get("objective", "finish")
     objective = RaceObjective(objective_str) if objective_str else RaceObjective.finish
+
+    # Step 5b: For road marathons, derive VMA-based training paces (VDOT fallback
+    # from VO2max when VMA is absent). Trail plans keep their single-pace model.
+    discipline = race.get("discipline") or "trail"
+    pace_set = None
+    if discipline == "road":
+        pace_set = compute_paces_from_fitness(
+            vma_kmh=getattr(fitness, "vma_kmh", None),
+            vo2_max=getattr(fitness, "vo2_max", None),
+            objective=objective,
+            target_time_seconds=race.get("target_time_seconds"),
+        )
 
     # Step 6: Determine plan duration and dates
     race_date = race["race_date"]
@@ -152,6 +166,8 @@ async def generate_plan(
                         "day_preferences": day_prefs.model_dump()
                         if day_prefs
                         else None,
+                        "discipline": discipline,
+                        "paces": pace_set.model_dump(mode="json") if pace_set else None,
                     }
                 ),
                 coach_id,
@@ -172,6 +188,8 @@ async def generate_plan(
                     experience=experience,
                     race_distance_km=race_distance_km,
                     current_long_run_km=current_long_run_km,
+                    discipline=discipline,
+                    pace_set=pace_set,
                 )
 
                 # Build week sessions (preferences are best-effort, constraints win)
@@ -186,6 +204,13 @@ async def generate_plan(
                     objective=objective,
                     day_preferences=day_prefs,
                 )
+
+                # For road marathons, tag running sessions as road_running on both
+                # dual-write rows (strength sessions keep their own sport_type).
+                if discipline == "road":
+                    for s in sessions:
+                        if s.sport_type == "trail_running":
+                            s.sport_type = "road_running"
 
                 # Inject personalized HR zones into sessions
                 if hr_zones:

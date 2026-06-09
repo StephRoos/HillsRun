@@ -1,0 +1,378 @@
+# Ralph Tasks Progress Log
+Started: 2026-06-08
+
+## Codebase Patterns
+(Add discovered patterns here - Ralph will read these each iteration)
+
+- `classify_race(distance_km, elevation_gain_m, technical_percent=0, altitude_max_m=0, discipline="trail")`
+  in src/training/race_classifier.py. Called once in plan_generator.py:77 (now passes
+  discipline=race.get("discipline") or "trail").
+- `get_session_template((SessionType, ExperienceLevel, PlanPhase))` raises ValueError if a
+  catalog key is missing (session_catalog.py:51) -> any new SessionType MUST get templates in
+  `_build_catalog` for ALL phases/experiences AND an entry in `_get_duration_range` (raises KeyError otherwise).
+- SessionTemplate default sport_type="trail_running"; set sport_type="road_running" explicitly for road.
+- PRE-EXISTING FAILURES (NOT ours, env-dependent, ignore): test_security.py::TestCORS::test_cors_env_override
+  and test_auth_garmin_router.py::TestCleanupExpiredMfa::test_cleanup_removes_expired_sessions.
+  Baseline = 839 passed, 2 failed. Use this baseline to judge "green".
+- Verify cmd: `uv run ruff check src/ && uv run ruff format src/ && uv run pytest tests/ -q`.
+
+---
+
+## 2026-06-08 - Task #1: Lot 1 discipline & classification + MPR stub
+- models.py: RaceCategory.road_marathon; SessionType.MPR; RaceFlags.is_road_marathon (default False);
+  RaceTargetInput.discipline (default "trail") + target_time_seconds (Optional, gt=0).
+- race_classifier.py: classify_race gained discipline param; discipline=="road" short-circuits to
+  RaceFlags(category=road_marathon, is_road_marathon=True) with NO trail flags set.
+- session_catalog.py: minimal MPR templates for all phases/experiences (sport_type road_running, Z3,
+  Intensity.moderate) + MPR _get_duration_range entries. Full templates deferred to Lot 4.
+- plan_generator.py:77: classify_race now receives discipline=race.get("discipline") or "trail".
+- tests: test_road_marathon_brugge (42.195 road -> road_marathon, is_road_marathon, not is_ultra),
+  test_road_marathon_template_available (MPR template fetch works).
+- Gotcha: discipline kept as plain str (not enum) per spec §3 (VARCHAR(20)). DB column lands in Lot 6.
+---
+
+## 2026-06-08 - Task #2: Lot 2 pace_calculator + VDOT fallback
+- New src/training/pace_calculator.py (pure functions, no DB). Public API:
+  - `compute_paces(vma_kmh, objective=finish, target_time_seconds=None, pace_source="vma") -> PaceSet`
+  - `compute_paces_from_fitness(vma_kmh, vo2_max=None, objective=..., target_time_seconds=None)`:
+    uses VMA when >0 else estimates vma = vo2_max/3.5 and tags pace_source="vo2max_estimate".
+    Raises ValueError if neither signal. THIS is what plan_generator should call in Lot 5.
+  - `format_pace(sec_per_km) -> "m:ss"`.
+- Models PaceSet{vma_kmh, objective, pct_marathon, pace_source, target_time_seconds,
+  pace_objective_optimistic, zones: dict[code->PaceZone]} and PaceZone (REC/EF ranges,
+  MPR/TMP/INT single; .is_range, .label props). Access via paces.zones["MPR"] or paces.pace_for(code).
+- %VMA: pct_marathon={finish:0.78, midpack:0.80, performance:0.83}; TMP 0.88; INT 1.00;
+  REC (0.63,0.67); EF (0.68,0.72). Verified VMA 14.5 perf -> MPR 4:59 (299s), TMP 4:42, INT 4:08,
+  target_time ~12619s (~3h30). EF/REC sec_per_km_fast = faster bound (lower s/km).
+- optimistic flag: required_sec_per_km (=target_time/42.195) < predicted_MPR_sec * 0.98. 12600 NOT
+  optimistic (matches §2); 10800 (3h00) IS. _MARATHON_KM=42.195.
+- objective stored as RaceObjective enum (not str) on PaceSet — keep that when wiring Lot 5.
+- Baseline now 848 passed / 2 pre-existing failures (CORS env + mfa cleanup). +9 new pace tests.
+---
+
+## 2026-06-08 - Task #3: Lot 3 long_run road variants
+- long_run.py: calculate_long_run gained `discipline="trail"` (default) + `pace_set: Optional[PaceSet]=None`
+  keyword params. Trail path UNCHANGED (same dict keys, 80km cap). Road path branches to
+  new `_build_road_long_run`. PaceSet imported under TYPE_CHECKING only (no runtime import for
+  trail callers; no circular import since pace_calculator doesn't import long_run).
+- Road specifics: absolute cap 35km (_ROAD_ABSOLUTE_CAP_KM) vs trail 80km. Phase % caps reused
+  (base30/dev50/specific70/taper40). For Brugge 42.195 + intermediate(start 15km, 12%/wk), specific
+  cap = 70% = 29.5km -> peak lands in [28,35]. Verified.
+- Road variants by phase: base/dev -> "progressive_easy" (no MP block); specific -> "marathon_pace_finish"
+  with mp_block = min(12, target*0.4) km at MPR, fast_finish on EVEN weeks (variant becomes "fast_finish");
+  taper -> "taper_quality" KEEPS a short mp_block = min(6, target*0.3) (Wang 2023: cut volume, keep
+  intensity); recovery week -> "recovery_easy" (no block). Road dict adds keys: variant,
+  marathon_pace_block_km, fast_finish, hr_zone="Z2", easy_pace, marathon_pace (labels from pace_set or None).
+- Duration: easy_km at EF.sec_per_km_slow + mp_block at MPR.sec_per_km_fast; fallback 6:00/km when no pace_set.
+- Wiring into plan_generator/week_builder is Lot 5 — NOT done here (long_run still called trail-default there).
+- TEST FLAKINESS WARNING: the garth-layer tests (test_garmin_client TestSafeApiCallDecorator,
+  test_retry TestSafeApiCallGarthHTTPError) FAIL NON-DETERMINISTICALLY in the full-suite run (different
+  subset each run) but PASS in isolation. Confirmed present on a clean `git stash` tree too -> NOT ours,
+  ignore. Reliable green signal: `uv run pytest tests/test_training/ -q` (172 passed). +8 new long_run tests.
+---
+
+## 2026-06-08 - Task #4: Lot 4 full MPR catalog / load / zones
+- load_calculator.py: INTENSITY_FACTORS[SessionType.MPR] = 62 (between SL 55 and TMP 70).
+- hr_zones.py: get_zone_for_session_type MPR -> 3 (docstring updated).
+- session_catalog.py:
+  - get_phase_session_types now SHORT-CIRCUITS at the top when race_flags.is_road_marathon:
+    returns _road_phase_session_types(phase). This deliberately BYPASSES every trail
+    adaptation (incl. the no-flags COT default at dev) so trail paths are untouched -
+    test_no_flags_backward_compatible still green (COT present in trail dev).
+  - _road_phase_session_types: base [EF,SL,REC]; development & specific [EF,SL,MPR,TMP,INT,REC]
+    (NO COT/DESC); taper [EF,SL,TMP,REC] (TMP = kept intensity, cut volume per Wang 2023).
+    MPR strictly in dev+specific (§6: "not base/taper"); taper intensity carried by TMP, not MPR.
+  - MPR templates: marathon-pace block now scales by phase via _mpr_phase_factor
+    {base:0.45, dev:0.60, specific:0.75, taper:0.40} of min duration, bounded so
+    warmup(900s)+cooldown(600s) always fit (max_block_s floor 600). Block label shows minutes.
+- TESTS (tests/test_training/test_session_catalog.py): _road_marathon_flags() helper +
+  test_road_specific_no_cot_or_desc, test_road_development_includes_mpr,
+  test_road_taper_keeps_intensity, test_road_base_aerobic_only.
+- Verify: training subset 176 passed; full suite 860 passed / 2 pre-existing failures
+  (CORS env_override + mfa cleanup) - baseline unchanged.
+- Lot 5 wiring note: week_builder still calls get_phase_session_types WITHOUT road flags
+  today; Lot 5 must pass race_flags through so the road gating actually takes effect in plans.
+---
+
+## 2026-06-08 - Task #5: Lot 5 week_builder + plan_generator road wiring
+- week_builder.py:
+  - _get_quality_type_order: new FIRST branch `if race_flags.is_road_marathon ->
+    [TMP, INT, MPR]` (skip COT). Filtered by phase_types, so base road (no
+    quality types) places none, taper road places only TMP. For intermediate
+    (max_quality=1) the placed quality is TMP; marathon-pace work for intermediate
+    arrives via the long-run MP-finish block, not a standalone MPR — expected per §6.
+  - _create_long_run_session: elevation guard now `high_dplus and not is_road_marathon`
+    (redundant since road sets no high_dplus, but explicit per spec "no D+ on road LR").
+- plan_generator.py:
+  - import compute_paces_from_fitness. Step 5b: `discipline = race.get("discipline")
+    or "trail"`; compute `pace_set` ONLY when discipline=="road" via
+    compute_paces_from_fitness(vma_kmh=fitness.vma_kmh, vo2_max=fitness.vo2_max, ...).
+    Trail keeps pace_set=None (unchanged single-pace path). NOTE: road plan REQUIRES
+    a pace anchor — compute_paces_from_fitness raises ValueError if neither VMA nor
+    VO2max; acceptable (road needs VMA, seed sets manual_vma).
+  - calculate_long_run now gets discipline=discipline, pace_set=pace_set.
+  - sport_type override AFTER build_week: `if discipline=="road": s.sport_type=
+    "road_running" for sessions where sport_type=="trail_running"`. Leaves MPR
+    (already road_running) and RMU (strength_training) untouched. THE place §3 wants
+    the dual-write rows tagged (planned_workouts + training_plan_sessions read s.sport_type).
+  - generation_params now stores `discipline` + `paces` (pace_set.model_dump(mode="json")
+    — mode="json" REQUIRED: PaceSet.objective is a RaceObjective enum and plain
+    model_dump() leaves an enum that json.dumps rejects).
+- fitness exposes `vma_kmh` and `vo2_max` on UserFitnessData (used via getattr for safety).
+- TEST: test_generate_plan_road_marathon in test_plan_generator.py — reuses mock_pool,
+  asserts race_category==road_marathon, planned_workouts inserts contain road_running &
+  NO trail_running, generation_params has discipline=road + paces.zones["MPR"]. Inspect
+  via conn.fetchrow.call_args_list filtered by SQL substring; planned_workouts sport_type
+  = call.args[3], plan generation_params = call.args[9].
+- Baseline now 861 passed / 2 pre-existing failures (CORS env_override + mfa cleanup). +1 test.
+- Lot 6 TODO: pure-function acceptance suite (peak 28-35, no COT/DESC, paces) + migration
+  sql/11 + RaceTargetCreate fields. week_builder/plan_generator wiring is done.
+---
+
+## 2026-06-08 - Task #6: Lot 6 DB + API + acceptance tests
+- sql/11_road_marathon.sql: two ALTER TABLE ... ADD COLUMN IF NOT EXISTS
+  (discipline VARCHAR(20) NOT NULL DEFAULT 'trail', target_time_seconds INTEGER).
+  NOT applied to prod (manual step §12). Idempotent.
+- schemas.py: RaceTargetCreate + RaceTargetResponse gained discipline (default
+  "trail") + target_time_seconds (Optional). db_operations.create_race_target
+  INSERT now has 15 params (added discipline, target_time_seconds at $14/$15).
+  NOTE: create endpoint will 500 on prod until sql/11 is applied (columns absent)
+  — intended deploy order is migration-then-code.
+- BUG FOUND + FIXED (Lot 4 oversight surfaced by §8 acceptance): road
+  _road_phase_session_types omitted RMU in ALL phases, so build_week never
+  scheduled the strength session (RMU placement gated on `RMU in phase_types`,
+  week_builder.py:258). Trail includes RMU every phase. Added SessionType.RMU to
+  base/dev/specific/taper road lists -> strength now placed on preferred day.
+- KEY week_builder GOTCHA for acceptance test: strength day must be OUTSIDE
+  available_days (RMU is additive cross-training placed on a non-running day,
+  week_builder.py:263 non_running_days). Profile = run days [2,4,6,7] + strength
+  Wed(3) separate; passing strength=[3] inside available_days makes day 3 a run.
+- tests/test_training/test_road_marathon_acceptance.py: 10 pure-fn tests.
+  Reference numbers (VMA 14.5 perf, target 12600): MPR 299s=4:59, EF 345-365
+  (5:45-6:05), REC 371-394, INT 248, TMP 282, projected target_time 12616,
+  NOT optimistic. Specific-phase road LR peak = 29.5km (in [28,35]); taper 16.9.
+- ruff: prescribed verify is `ruff check src/` ONLY (tests/ has ~50 pre-existing
+  unused-import errors — do NOT run ruff on tests/, it's not in the gate).
+- Baseline now 871 passed / 2 pre-existing failures (CORS env_override + mfa
+  cleanup). +10 tests. Next: Lot 7 seed script + PR finalize (#7).
+
+---
+
+## 2026-06-08 - Task #7: Lot 7 seed script + markdown export
+- New scripts/seed_marathon_plan.py (run via `uv run python scripts/...`). Idempotent:
+  upsert_athlete_profile (intermediate, fc 188/56, 4 days, has_gym_access False,
+  day_preferences {long_run:7,quality:[4],strength:3}); set garmin_user.manual_vma=14.5;
+  find_or_create_race (Brugge 2026-10-12, road, 42.195km, performance, target 12600s) —
+  reused by race_name+race_date so re-runs don't duplicate; delete_existing_plans for that
+  race_target_id BEFORE generate_plan (so one plan, not N); generate_plan; read back via
+  db_ops.get_training_plan/get_plan_weeks/get_plan_sessions_for_week; render markdown ->
+  specs/mon-plan-marathon.md.
+- Pool built exactly like the API: copied _db_config_from_env (POSTGRES_* env) + Database
+  from src.database (connect/disconnect). sys.path.insert pattern mirrors
+  scripts/migrate_tokens_to_db.py (scripts/ is NOT an importable package — wheel packages=["src"]).
+- render_plan_markdown is a PURE function (plan, race, paces, weeks, sessions_by_week) -> str.
+  Easy to test without DB. Pace column maps session_type->zone via _SESSION_PACE_CODE
+  (SL->EF, RMU/REST->"—"). Uses paces.pace_for(code).label.
+- GOTCHA: generation_params comes back from asyncpg as a JSON **string** (no JSONB codec in
+  src/database.py; cf training_plans router json.loads at routers/training_plans.py:168).
+  _parse_paces handles both str and dict, then PaceSet(**paces) reconstructs (objective enum +
+  zones dict coerced by pydantic).
+- user_id resolution: --user-id > SEED_GARMIN_USER_ID env > sole garmin_user row, else raises
+  (legacy user 67 + others may coexist; don't guess).
+- DID NOT run the script against a DB here (no creds; spec §11 = Stephane runs it / reviews
+  specs/mon-plan-marathon.md on waking). So mon-plan-marathon.md is NOT committed yet.
+- TESTS tests/test_training/test_seed_marathon_plan.py: loads the script by path via
+  importlib (not a package). 3 pure tests (render structure / pace label / fmt helpers) +
+  1 mocked-pool e2e smoke (patch db_ops fns + generate_plan, assert markdown file written).
+- ruff gate is src/ + the script file only (NOT tests/). Caught F541 (f-string w/o placeholder)
+  on the static blockquote — dropped the f prefix.
+- Baseline now 875 passed / 2 pre-existing failures. +4 tests. Next: Lot D1 (#8) adaptive coach.
+---
+
+## 2026-06-08 - Task #8: Lot D1 HRV-baseline daily readiness (spec 03, NOT spec 02)
+- NEW SPEC for chantier D: specs/03-adaptive-coach.md (read §1-3). Non-destructive: nothing
+  here mutates a plan. Core signal = morning HRV vs individual baseline (ONLY validated method).
+- New package src/training/adaptive/ (__init__.py, readiness.py, queries.py).
+  - readiness.py = PURE functions/models (no DB, fully unit-tested):
+    * Verdict(str,Enum): green/amber/red/insufficient_baseline.
+    * build_hrv_baseline(values, min_points=28) -> HrvBaseline|None. x=ln(rMSSD), SAMPLE sd (n-1).
+      Drops None/<=0 BEFORE the >=28 count. Returns None if insufficient -> caller falls back.
+    * HrvBaseline props: lower_ln/upper_ln = mean -/+ 0.5*sd; red_threshold_ln = mean - 1.0*sd;
+      low/high = exp() back to raw ms.
+    * daily_verdict(today_hrv, baseline, *, secondary=None, prev_day_below_red=False).
+      GREEN if ln(today)>=lower_ln; AMBER if <lower_ln; RED only if <red_threshold AND
+      prev_day_below_red (2-day hysteresis — a single deep dip is AMBER, not RED).
+      Secondary nudge: ONLY when borderline GREEN (today_ln<mean_ln, i.e. lower half of band)
+      AND >=1 active flag -> AMBER. Never overrides RED, never downgrades a comfortable GREEN.
+    * SecondaryModifiers.active_flags(): sleep<50, resting_hr>resting_baseline+5, TR<30.
+  - queries.py = async DB (asyncpg pool.fetch/fetchval/fetchrow directly, no acquire needed).
+    HRV value column is hrv_data.last_night_avg (overnight rMSSD avg). resting HR from
+    daily_summary.resting_heart_rate; sleep_data.sleep_score; training_readiness.score.
+    evaluate_daily_readiness(pool,user_id,day,persist=True) ties fetch->pure->upsert.
+    fetchval call ORDER (matters for mock side_effect): today HRV, sleep, resting,
+    resting_baseline, TR, [yesterday HRV only if baseline not None].
+- Migration sql/12_daily_recommendations.sql (UNIQUE(user_id,date), suggested_modification JSONB,
+  accepted bool default false). NOT applied to prod (spec §6, manual).
+- Endpoint GET /api/v1/training/daily-readiness?date= in NEW router src/api/routers/training.py
+  (prefix /api/v1/training, get_api_key dep). Registered in main.py import+include_router.
+  Returns dict (date + verdict fields); does NOT mutate plan.
+- TESTS tests/test_training/test_adaptive_readiness.py: 15 tests (band g/a/r, insufficient
+  fallback, 2-day hysteresis, single-dip-in-band stays GREEN, secondary nudge/no-nudge/never-
+  override-RED, + 2 mocked-pool orchestrator smokes). Derive thresholds FROM the built baseline
+  (don't hardcode ms) for robustness.
+- ruff gate = src/ only. Full suite now 890 passed / 2 pre-existing failures. +15 tests.
+- Next: Lot D2 (#9) readiness_agent.py — Claude API (Haiku 4.5), anchored on D1 verdict.
+  NOTE: when wiring the LLM, read the claude-api skill first (model ids/SDK).
+---
+
+## 2026-06-08 - Task #9: Lot D2 AI reasoning layer (Claude API, anchored on D1)
+- Added dep `anthropic>=0.40.0` to pyproject [project].dependencies; `uv sync`
+  pulled anthropic==0.107.1 (+ distro, docstring-parser, jiter, sniffio). uv run
+  auto-syncs so tests see it.
+- NEW src/training/adaptive/readiness_agent.py (the LLM layer; LLM call isolated):
+  * AgentRecommendation(BaseModel): verdict, headline, rationale, adjustment,
+    suggested_modification, model, anchored.
+  * DEFAULT_MODEL = "claude-haiku-4-5" (spec 03 §3 says Haiku for cost; Sonnet
+    only if needed). Haiku does NOT take effort/thinking knobs — do NOT send them
+    (they 400 on Haiku). Plain messages.create.
+  * THE INVARIANT (test target): `_reconcile_verdict(anchor, proposed)` clamps so
+    the agent can MATCH or ESCALATE caution but NEVER relax. Severity GREEN<AMBER<RED.
+    RED anchor -> always RED (anchored=True). insufficient_baseline anchor ->
+    always insufficient (and SKIPS the LLM call entirely, model="").
+  * `_call_llm(client, ...)` = the single network seam. Uses
+    output_config={"format":{"type":"json_schema","schema":_OUTPUT_SCHEMA}} then
+    `next(b.text for b in resp.content if b.type=="text")` + json.loads. Tests
+    patch readiness_agent._call_llm (the clean "mock the LLM" point). _OUTPUT_SCHEMA
+    enum is only green/amber/red (no insufficient — agent only runs with a baseline).
+  * Lazy `import anthropic` inside build_agent_recommendation only when client is
+    None (so module import + all tests work without a key).
+  * Output rationale is FRENCH (athlete-facing coaching = "French for exchanges"),
+    neutral tone per Anthemion charte; D1 `reason` strings stay English. Mixed but
+    intentional (rule text vs coaching message).
+  * GOTCHA (py3.11): nested f-string reusing the same quote char is a SyntaxError
+    on 3.11 (3.12-only). ruff `invalid-syntax` flagged it. Rewrote the recent-context
+    f-string as an explicit loop. Repo runs 3.11 (requires-python>=3.11) even though
+    .venv showed 3.12 — ruff still targets 3.11, so AVOID nested same-quote f-strings.
+- queries.py (Lot D2 additions, all async, non-destructive):
+  * fetch_planned_session (planned_workouts for the day, first match),
+    fetch_recent_context (prior 3 daily_recommendations rows, oldest first),
+    persist_agent_recommendation (UPDATE ai_* columns only — NEVER touches the
+    authoritative `verdict` column written by D1),
+    explain_daily_readiness (orchestrator: fetch context -> run agent via
+    asyncio.to_thread (SDK is sync; don't block the loop, ADR-007 spirit) ->
+    persist). Pass client= to inject a mock; model= optional override.
+- sql/13_ai_rationale.sql: ALTER TABLE daily_recommendations ADD COLUMN IF NOT
+  EXISTS ai_rationale TEXT, ai_recommendation JSONB, ai_model VARCHAR(40),
+  ai_generated_at TIMESTAMPTZ. NOT applied to prod (spec §6 manual). Idempotent.
+- Endpoint: extended GET /api/v1/training/daily-readiness with `?explain=true`
+  (bool Query). When true, runs explain_daily_readiness and adds `ai` =
+  rec.model_dump(mode="json") to the payload. Default path (explain=false) makes
+  NO LLM call — zero cost/latency regression for D1 callers.
+- TESTS tests/test_training/test_adaptive_readiness_agent.py: 14 tests. Parametrized
+  _reconcile_verdict matrix (incl. RED+green->RED), build_* (red-can't-become-green,
+  escalate, schema shape, insufficient-skips-llm asserting _call_llm NOT called),
+  _call_llm content parsing (fake SimpleNamespace response), + 2 mocked-pool
+  orchestrator smokes (persist asserts UPDATE has ai_rationale & no "SET verdict";
+  persist=False asserts only 1 fetchrow). Mock pool = MagicMock with
+  fetchrow/fetch = AsyncMock(side_effect=[...]).
+- Verify gate = ruff check src/ + ruff format src/ + pytest tests/. Full suite now
+  904 passed / 2 pre-existing failures (CORS env_override + mfa cleanup). +14 tests.
+- Next: Lot D3 (#10) workout_matcher.py + adherence.py (READ-ONLY reconciliation,
+  ACWR informational-only). Spec 03 Lot D3.
+---
+
+## 2026-06-08 - Task #10: Lot D3 planned-vs-actual reconciliation (READ-ONLY)
+- All read-only; nothing here mutates a plan or activities. Spec 03 Lot D3.
+- NEW src/training/adaptive/workout_matcher.py (PURE): match_workouts(planned, activities,
+  day_tolerance=1) -> list[WorkoutMatch]. Greedy by planned-date order; each activity
+  consumed once; best = min(|day_offset|, distance_diff). sport_category() maps labels to
+  run/bike/swim/strength/other via substring ("run","cycl"/"bik","swim","strength"/"gym"/
+  "muscle"). road_running planned matches Garmin "running"/"trail_running" (same run category);
+  strength never matches a run. _as_date coerces datetime/date/ISO-str; _num floats Decimals.
+- NEW src/training/adaptive/adherence.py (PURE): build_session_adherence(match, planned_row,
+  activity_row|None) -> SessionAdherence (planned vs actual duration/distance/pace/TSS + ratios);
+  week_adherence(sessions, week_number, acwr_informational) -> WeekAdherence (compliance_pct =
+  completed/planned*100, planned_tss, realized_tss = sum actual TSS over COMPLETED only).
+  bucket_weekly_tss(activities, window_end, weeks=4) -> 4 trailing-7d TSS buckets OLDEST-FIRST
+  ([-1]=acute). compute_acwr_informational(weekly) -> {value,acute_tss,chronic_tss,weeks_used,
+  note=ACWR_CONTESTED_NOTE} (acute=last week, chronic=mean); empty -> None. ACWR is
+  INFORMATIONAL ONLY, never gates (spec §0/§3).
+- GOTCHA (pydantic): a BaseModel field named `date` typed `Optional[date]` BREAKS — the
+  `= None` default shadows the `date` type when pydantic re-resolves annotations with the class
+  dict as localns, so the field type collapses to NoneType ("Input should be None"). Renamed the
+  field to `session_date`. RULE: never name a pydantic field the same as its annotation type.
+- queries.py (Lot D3 additions, all async READ-ONLY): fetch_planned_for_plan (LEFT JOIN
+  training_plan_sessions ON s.planned_workout_id=pw.id to get target_tss — planned_workouts has
+  NO target_tss column, only training_plan_sessions does), fetch_activities_in_range (end bumped
+  +1 day for full-day coverage), reconcile_plan(pool, plan_id, user_id, week_number=None) ->
+  serialisable dict | None. Week window = start_date + (week-1)*7 .. +6; whole-plan otherwise.
+  Activity fetch widened +/-1 day for tolerance. Lazy imports of adherence/workout_matcher/
+  db_operations.get_training_plan INSIDE reconcile_plan (keeps pure modules import-light, dodges
+  any circular import at package load).
+- Endpoint GET /api/v1/training-plans/{plan_id}/reconcile?week= in training_plans router
+  (week: Optional[int] Query ge=1). Returns 404 if plan not found/not owned. Imports: Optional,
+  Query, reconcile_plan.
+- TESTS tests/test_training/test_adaptive_reconcile.py: 22 tests (sport_category matrix,
+  matching tolerance exact/+1/+2-missed/category/one-activity-per-planned/nearest-day,
+  build_session_adherence ratios+pace, missed-no-actuals, week compliance 75% + realized TSS,
+  bucket oldest-first + out-of-window drop, ACWR value+note+empty, + 2 mocked-pool orchestrator
+  smokes asserting pool.execute NOT called and missing-plan -> None without any fetch).
+  Mock pool = MagicMock; fetchrow=AsyncMock(plan_row); fetch=AsyncMock(side_effect=[planned,
+  window_acts, acwr_acts]). plan_row needs start_date+end_date as date objects.
+- ruff gate = src/ only. Full suite now 926 passed / 2 pre-existing failures (CORS env_override
+  + mfa cleanup). +22 tests. No migration (D3 read-only). Next: Lot D4 (#11) plan_adjuster.py
+  PROPOSE-ONLY + weekly_reconciliations table + finalize PR.
+---
+
+## 2026-06-08 - Task #11: Lot D4 propose-only weekly plan adjuster (spec 03)
+- NEW src/training/adaptive/plan_adjuster.py (PURE, no DB). propose_weekly_adjustment(
+  week_report: WeekAdherence, recent_verdicts: list[str], *, from_week, target_week=None)
+  -> WeeklyAdjustmentProposal. Heuristics:
+  * sustained fatigue (red>=2 OR amber+red>=3 in recent verdicts) AND compliance<60%
+    -> INSERT_RECOVERY (structural, tss_factor 0.6).
+  * compliance>=90% AND ahead (realized_tss>=planned_tss) AND not sustained
+    -> ACCELERATE (structural, tss_factor 1.15, evidence_label="heuristic (not evidence-based)").
+  * missed sessions AND no structural -> MAINTAIN ("do not pile up", non-structural).
+  * else -> MAINTAIN "on track".
+  ANTI-THRASHING: _cap_structural_changes keeps <=1 structural (mutually exclusive by
+  construction, but enforced as a safety net). target_week defaults from_week+1.
+- should_recompute_paces(cur,new,threshold=0.03) + maybe_recompute_paces(...) -> PaceSet|None
+  (relative VMA shift >3% -> compute_paces). Pace recompute is NON-structural.
+- AdjustmentAction enum (maintain/insert_recovery/accelerate/recompute_paces),
+  ProposedChange{action,target_week,structural,tss_factor,rationale,evidence_label,details},
+  WeeklyAdjustmentProposal{plan_id,from_week,target_week,compliance_pct,summary,changes,
+  recomputed_paces,auto_apply=False(always)} + .structural_change_count prop.
+- queries.py Lot D4 (DB):
+  * fetch_recent_verdicts(pool,user_id,end_iso,days=10) — reads daily_recommendations.verdict.
+    GOTCHA: mock fetch must return DICT rows [{"verdict":"green"}], not bare strings.
+  * fetch_plan_fitness_context — JOIN training_plans.generation_params + garmin_user.manual_vma;
+    _parse_generation_params handles JSON-string-or-dict (asyncpg gives str, no JSONB codec).
+    Returns current_vma_kmh (from paces dict), new_vma_kmh (manual_vma), objective, target_time.
+  * insert_weekly_reconciliation — fetchrow INSERT ... ON CONFLICT(plan_id,from_week) DO UPDATE
+    RETURNING * (resets to status='proposed', applied=FALSE). Persisting a PROPOSAL is NOT a
+    plan mutation -> propose path NEVER calls pool.execute (that is the read-only proof in tests).
+  * propose_plan_adjustment(pool,plan_id,user_id,*,week_number,persist=True) — orchestrator:
+    reuses reconcile_plan (1 fetchrow plan + 3 fetch), fetch_recent_verdicts (1 fetch),
+    fetch_plan_fitness_context (1 fetchrow), optional pace recompute, insert proposal (1 fetchrow).
+    Mock ordering: fetchrow=[plan_row, fitness_row, proposal_row]; fetch=[planned, window_acts,
+    acwr_acts, verdict_rows]. Returns None if plan absent. RaceObjective() coercion guarded.
+  * apply_plan_adjustment(pool,proposal_id,user_id) — THE ONLY plan-mutating path (explicit).
+    Loads weekly_reconciliations row; idempotent (status=='applied' -> return unchanged, no
+    execute); for each structural change UPDATE training_plan_weeks target_tss (accelerate) or
+    target_tss+is_recovery_week (insert_recovery) via pool.execute; recompute_paces UPDATEs
+    training_plans.generation_params. Marks status='applied'. Mock: fetchrow=[stored, week_row,
+    applied_row]; assert pool.execute.assert_awaited_once and args == (sql, round(300*1.15)=345, 40).
+- Migration sql/14_weekly_reconciliations.sql (plan_id, user_id, from_week, target_week,
+  compliance_pct, proposal JSONB, status, applied, UNIQUE(plan_id,from_week)). NOT applied to prod.
+- Endpoints (training_plans router): POST /{plan_id}/propose-adjustment?week= (201, propose-only)
+  + POST /{plan_id}/adjustments/{proposal_id}/apply (explicit apply). Both 404 on missing.
+- TESTS tests/test_training/test_adaptive_plan_adjuster.py: 14 tests (heuristics, anti-thrashing
+  cap, pace gating, propose-only smoke asserting pool.execute NOT called, apply-mutates smoke,
+  already-applied no-op, missing-proposal None).
+- Verify gate = ruff check src/ + ruff format src/ + pytest tests/. Full suite now 940 passed /
+  2 pre-existing failures (CORS env_override + mfa cleanup). +14 tests. app imports OK.
+- This is the LAST task in the queue (#11). All Lots 1-7 (spec 02) + D1-D4 (spec 03) complete.
+  PR finalization (spec 02 §10 + spec 03 §5) is the remaining human step — branch
+  feat/road-marathon-engine is ready; PR body must state HRV-baseline core, ACWR
+  informational/contested, Garmin TR secondary, and NO plan mutation without explicit apply.
+---

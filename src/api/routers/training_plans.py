@@ -1,8 +1,9 @@
 """Training plans API endpoints."""
 
 import logging
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from ..auth import get_api_key
 from ..dependencies import get_db, get_user_id, pagination
@@ -20,6 +21,11 @@ from ..schemas import (
     make_page,
 )
 from ...training import db_operations as db_ops
+from ...training.adaptive.queries import (
+    apply_plan_adjustment,
+    propose_plan_adjustment,
+    reconcile_plan,
+)
 from ...training.fitness_snapshot import build_fitness_snapshot
 from ...training.models import DayPreferences, GeneratePlanRequest
 from ...training.plan_generator import generate_plan
@@ -251,3 +257,95 @@ async def get_plan_week(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error loading week: {e}",
         )
+
+
+@router.get("/{plan_id}/reconcile")
+async def reconcile_training_plan(
+    plan_id: int,
+    week: Optional[int] = Query(
+        default=None,
+        ge=1,
+        description="1-based plan week to scope to (default: whole plan)",
+    ),
+    db=Depends(get_db),
+    user_id: int = Depends(get_user_id),
+):
+    """Read-only planned-vs-actual reconciliation report (Lot D3).
+
+    Matches each planned workout to the nearest completed activity (+/-1 day,
+    sport-category tolerant), then reports per-session and weekly compliance,
+    realized TSS, and an **informational-only** ACWR (never used to gate
+    anything). This endpoint never mutates the plan or the activities.
+    """
+    try:
+        report = await reconcile_plan(db.pool, plan_id, user_id, week_number=week)
+    except Exception as e:
+        logger.exception(f"Reconcile failed for plan {plan_id} user {user_id}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Reconcile error: {e}",
+        )
+    if report is None:
+        raise HTTPException(status_code=404, detail="Training plan not found")
+    return report
+
+
+@router.post("/{plan_id}/propose-adjustment", status_code=status.HTTP_201_CREATED)
+async def propose_training_plan_adjustment(
+    plan_id: int,
+    week: int = Query(
+        ge=1,
+        description="1-based evaluated (just-completed) plan week to react to",
+    ),
+    db=Depends(get_db),
+    user_id: int = Depends(get_user_id),
+):
+    """Generate a PROPOSE-ONLY weekly adjustment from adherence (Lot D4).
+
+    Reacts to the evaluated week's compliance plus recent daily readiness
+    verdicts: keep the next week stable after missed sessions, insert a recovery
+    week on sustained fatigue + low compliance, or progress slightly faster when
+    consistently green and ahead (a labelled +15% TSS heuristic). At most one
+    structural change is proposed (anti-thrashing). This stores a proposal only —
+    **the plan rows are never mutated** until ``/adjustments/{id}/apply`` is
+    called explicitly.
+    """
+    try:
+        proposal = await propose_plan_adjustment(
+            db.pool, plan_id, user_id, week_number=week
+        )
+    except Exception as e:
+        logger.exception(f"Propose-adjustment failed for plan {plan_id} user {user_id}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Propose-adjustment error: {e}",
+        )
+    if proposal is None:
+        raise HTTPException(status_code=404, detail="Training plan not found")
+    return proposal
+
+
+@router.post("/{plan_id}/adjustments/{proposal_id}/apply")
+async def apply_training_plan_adjustment(
+    plan_id: int,
+    proposal_id: int,
+    db=Depends(get_db),
+    user_id: int = Depends(get_user_id),
+):
+    """Apply a stored adjustment proposal — the only plan-mutating path (Lot D4).
+
+    Requires this explicit action (no auto-apply). Idempotent: re-applying an
+    already-applied proposal is a no-op. Adjusts the target week's TSS / recovery
+    flag and, when present, refreshes the plan's paces.
+    """
+    try:
+        applied = await apply_plan_adjustment(db.pool, proposal_id, user_id)
+    except Exception as e:
+        logger.exception(f"Apply-adjustment failed for proposal {proposal_id}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Apply-adjustment error: {e}",
+        )
+    if applied is None:
+        raise HTTPException(status_code=404, detail="Adjustment proposal not found")
+    return applied

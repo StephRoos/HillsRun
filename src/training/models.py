@@ -25,12 +25,13 @@ class RaceObjective(str, Enum):
 
 
 class RaceCategory(str, Enum):
-    """Trail race distance category."""
+    """Race distance category."""
 
     trail_court = "trail_court"  # < 42 km
     trail_moyen = "trail_moyen"  # 42-80 km
     ultra = "ultra"  # 80-160 km
     ultra_longue = "ultra_longue"  # > 160 km
+    road_marathon = "road_marathon"  # 42.195 km road
 
 
 class PlanPhase(str, Enum):
@@ -54,6 +55,7 @@ class SessionType(str, Enum):
     REC = "REC"  # Recuperation
     RMU = "RMU"  # Renforcement musculaire
     REST = "REST"  # Jour de repos
+    MPR = "MPR"  # Allure marathon specifique (Marathon Pace Run)
 
 
 class Intensity(str, Enum):
@@ -117,6 +119,8 @@ class RaceTargetInput(BaseModel):
     cutoff_hours: Optional[float] = None
     itra_points: Optional[int] = None
     objective: RaceObjective = RaceObjective.finish
+    discipline: str = Field(default="trail")  # 'trail' | 'road'
+    target_time_seconds: Optional[int] = Field(default=None, gt=0)
 
 
 class DayPreferences(BaseModel):
@@ -185,6 +189,7 @@ class RaceFlags(BaseModel):
     technical: bool = False
     is_ultra: bool = False
     high_altitude: bool = False
+    is_road_marathon: bool = False
 
 
 class WeekSpec(BaseModel):

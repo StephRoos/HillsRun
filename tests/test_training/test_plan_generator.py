@@ -91,6 +91,76 @@ async def test_generate_plan_creates_plan(mock_pool, mock_profile, mock_race):
     assert result["status"] == "draft"
 
 
+@pytest.fixture
+def mock_road_race():
+    """Flat road marathon (Brugge) with a 3h30 target."""
+    return {
+        "id": 2,
+        "race_name": "Marathon de Brugge",
+        "race_date": date(2026, 10, 12),
+        "distance_km": 42.195,
+        "elevation_gain_m": 0,
+        "elevation_loss_m": 0,
+        "technical_percent": 0,
+        "altitude_max_m": 0,
+        "objective": "performance",
+        "discipline": "road",
+        "target_time_seconds": 12600,
+    }
+
+
+@pytest.mark.asyncio
+async def test_generate_plan_road_marathon(mock_pool, mock_profile, mock_road_race):
+    """Road marathon plan: road_running sport_type and paces stored, no D+ on LR."""
+    request = GeneratePlanRequest(
+        race_target_id=2,
+        plan_name="Brugge 3h30",
+        total_weeks=16,
+        start_date=date(2026, 6, 22),
+    )
+
+    with patch("src.training.plan_generator.build_fitness_snapshot") as mock_fitness, \
+         patch("src.training.plan_generator.db_ops") as mock_db:
+
+        from src.training.models import UserFitnessData
+        mock_fitness.return_value = UserFitnessData(
+            vo2_max=52.0, resting_hr=56, max_hr=188,
+            weight_kg=70.0, vma_kmh=14.5,
+            weekly_volume_km=45.0, weekly_elevation_m=200,
+            recent_long_run_km=18.0,
+        )
+        mock_db.get_athlete_profile = AsyncMock(return_value=mock_profile)
+        mock_db.get_race_target = AsyncMock(return_value=mock_road_race)
+
+        result = await generate_plan(mock_pool, 67, request)
+
+    assert result["race_category"] == "road_marathon"
+
+    # Inspect the dual-write inserts: running sessions must be road_running.
+    conn = mock_pool.acquire.return_value.__aenter__.return_value
+    pw_sport_types = [
+        call.args[3]
+        for call in conn.fetchrow.call_args_list
+        if call.args and "INSERT INTO planned_workouts" in call.args[0]
+    ]
+    assert pw_sport_types, "expected planned_workouts inserts"
+    assert "road_running" in pw_sport_types
+    assert "trail_running" not in pw_sport_types
+
+    # Paces must be persisted in generation_params on the master plan insert.
+    import json as _json
+    plan_call = next(
+        call
+        for call in conn.fetchrow.call_args_list
+        if call.args and "INSERT INTO training_plans" in call.args[0]
+    )
+    gen_params = _json.loads(plan_call.args[9])
+    assert gen_params["discipline"] == "road"
+    assert gen_params["paces"] is not None
+    assert gen_params["paces"]["pace_source"] == "vma"
+    assert "MPR" in gen_params["paces"]["zones"]
+
+
 @pytest.mark.asyncio
 async def test_generate_plan_no_profile(mock_pool):
     """Test error when no athlete profile exists."""

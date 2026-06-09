@@ -155,6 +155,76 @@ def test_no_flags_no_elevation_on_long_run():
     assert sl[0].target_elevation_gain_m is None
 
 
+# --- Road marathon long-run wiring ---
+
+
+def _road_marathon_flags():
+    return RaceFlags(
+        category=RaceCategory.road_marathon, is_road_marathon=True
+    )
+
+
+def test_road_long_run_carries_mp_finish_block():
+    """A road long run with an MP finish must surface a Z3 marathon-pace block.
+
+    Regression: calculate_long_run produced the block but build_week dropped it,
+    so generated plans had zero marathon-pace exposure.
+    """
+    from src.training.long_run import calculate_long_run
+    from src.training.pace_calculator import compute_paces
+
+    pace_set = compute_paces(vma_kmh=14.5, objective=RaceObjective.performance)
+    lr_spec = calculate_long_run(
+        week_number=12,
+        total_weeks=17,
+        phase=PlanPhase.specific,
+        is_recovery_week=False,
+        experience=ExperienceLevel.intermediate,
+        race_distance_km=42.195,
+        current_long_run_km=15.0,
+        discipline="road",
+        pace_set=pace_set,
+    )
+    assert lr_spec["marathon_pace_block_km"] > 0  # guard: the spec carries a block
+
+    sessions = build_week(
+        available_days=[2, 4, 6, 7],
+        phase=PlanPhase.specific,
+        experience=ExperienceLevel.intermediate,
+        is_recovery_week=False,
+        week_number=12,
+        long_run_spec=lr_spec,
+        race_flags=_road_marathon_flags(),
+    )
+    sl = [s for s in sessions if s.session_type == SessionType.SL]
+    assert len(sl) == 1
+    mp_blocks = [b for b in sl[0].blocks if b.hr_zone == 3]
+    assert len(mp_blocks) == 1, "long run must carry a Z3 marathon-pace block"
+    assert mp_blocks[0].duration_seconds > 0
+    assert "allure marathon" in mp_blocks[0].description.lower()
+
+
+def test_road_base_long_run_has_no_mp_block():
+    """Base-phase road long runs are all-easy: no marathon-pace block."""
+    lr_spec = {
+        "target_km": 12.0,
+        "target_duration_seconds": 4320,
+        "progression_note": "Build",
+        "marathon_pace_block_km": 0.0,
+    }
+    sessions = build_week(
+        available_days=[2, 4, 6, 7],
+        phase=PlanPhase.base,
+        experience=ExperienceLevel.intermediate,
+        is_recovery_week=False,
+        week_number=2,
+        long_run_spec=lr_spec,
+        race_flags=_road_marathon_flags(),
+    )
+    sl = [s for s in sessions if s.session_type == SessionType.SL]
+    assert not [b for b in sl[0].blocks if b.hr_zone == 3]
+
+
 # --- Objective tests ---
 
 def test_finish_objective_max_1_quality():

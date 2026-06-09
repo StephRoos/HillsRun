@@ -8,10 +8,15 @@ def classify_race(
     elevation_gain_m: int,
     technical_percent: int = 0,
     altitude_max_m: int = 0,
+    discipline: str = "trail",
 ) -> RaceFlags:
-    """Classify a trail race into categories and derive behavior flags.
+    """Classify a race into categories and derive behavior flags.
 
-    Classification by distance:
+    Road discipline short-circuits to the road_marathon category: trail-only
+    flags (high_dplus, technical, is_ultra, high_altitude) are never set so the
+    road path is fully decoupled from trail behaviour.
+
+    Classification by distance (trail):
         trail_court: distance < 42 km
         trail_moyen: 42 <= distance < 80 km
         ultra: 80 <= distance < 160 km
@@ -22,16 +27,25 @@ def classify_race(
         technical: technical_percent > 30
         is_ultra: distance >= 80 km
         high_altitude: altitude_max_m > 2500
+        is_road_marathon: discipline == 'road'
 
     Args:
         distance_km: Race distance in kilometers (positive).
         elevation_gain_m: Total elevation gain in meters (non-negative).
         technical_percent: Percentage of technical terrain (0-100). Defaults to 0.
         altitude_max_m: Maximum altitude in meters (non-negative). Defaults to 0.
+        discipline: Race discipline ('trail' | 'road'). Defaults to 'trail'.
 
     Returns:
         RaceFlags object with category and behavior flags.
     """
+    # Road discipline: dedicated category, no trail flags
+    if discipline == "road":
+        return RaceFlags(
+            category=RaceCategory.road_marathon,
+            is_road_marathon=True,
+        )
+
     # Determine category based on distance
     if distance_km < 42:
         category = RaceCategory.trail_court

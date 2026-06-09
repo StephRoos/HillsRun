@@ -61,3 +61,30 @@ def test_marathon_trail():
     flags = classify_race(distance_km=42, elevation_gain_m=1800)
     assert flags.category == RaceCategory.trail_moyen
     assert not flags.is_ultra
+
+
+def test_road_marathon_brugge():
+    """Road discipline: Marathon de Brugge, 42.195 km, flat."""
+    flags = classify_race(
+        distance_km=42.195,
+        elevation_gain_m=0,
+        technical_percent=0,
+        discipline="road",
+    )
+    assert flags.category == RaceCategory.road_marathon
+    assert flags.is_road_marathon
+    assert not flags.is_ultra
+    assert not flags.high_dplus
+    assert not flags.technical
+
+
+def test_road_marathon_template_available():
+    """MPR templates must exist so get_session_template never raises."""
+    from src.training.session_catalog import get_session_template
+    from src.training.models import ExperienceLevel, PlanPhase, SessionType
+
+    template = get_session_template(
+        SessionType.MPR, ExperienceLevel.intermediate, PlanPhase.specific
+    )
+    assert template.session_type == SessionType.MPR
+    assert template.sport_type == "road_running"

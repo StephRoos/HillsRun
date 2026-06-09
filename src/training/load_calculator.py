@@ -12,6 +12,7 @@ INTENSITY_FACTORS = {
     SessionType.REC: 30,
     SessionType.EF: 50,
     SessionType.SL: 55,
+    SessionType.MPR: 62,  # marathon pace, between SL (55) and TMP (70)
     SessionType.RMU: 45,
     SessionType.DESC: 40,
     SessionType.TMP: 70,

@@ -10,6 +10,7 @@ from .models import (
     RaceObjective,
     SessionSpec,
     SessionType,
+    WorkoutBlock,
 )
 from .session_catalog import get_phase_session_types, get_session_template
 
@@ -352,7 +353,11 @@ def _get_quality_type_order(
     """
     default_order = [SessionType.TMP, SessionType.INT, SessionType.COT]
 
-    if race_flags and race_flags.high_dplus:
+    if race_flags and race_flags.is_road_marathon:
+        # Road marathon: no hill repeats (COT); marathon pace (MPR) is the
+        # discipline-specific quality work alongside threshold and VO2max.
+        default_order = [SessionType.TMP, SessionType.INT, SessionType.MPR]
+    elif race_flags and race_flags.high_dplus:
         # Prioritize COT for high D+ races
         default_order = [SessionType.COT, SessionType.TMP, SessionType.INT]
     elif race_flags and race_flags.is_ultra:
@@ -428,26 +433,63 @@ def _create_long_run_session(
     """
     template = get_session_template(SessionType.SL, experience, phase)
 
-    # Calculate elevation target for high D+ races
+    # Calculate elevation target for high D+ races.
+    # Road marathons are flat: never add elevation, even if other flags were set.
     target_elevation = None
-    if race_flags and race_flags.high_dplus:
+    if race_flags and race_flags.high_dplus and not race_flags.is_road_marathon:
         target_km = long_run_spec.get("target_km", 0)
         # Use a moderate D+/km ratio for long runs (50 m/km — training, not race pace)
         target_elevation = int(target_km * 50)
+
+    # Road long runs carry a marathon-pace finish block (specific/taper phases).
+    # calculate_long_run computes it; without this, the MP work is silently lost
+    # and the run renders as pure easy running. Split into a Z2 easy block + a
+    # Z3 marathon-pace block so it persists and renders.
+    description = template.description
+    blocks = template.blocks
+    mp_block_km = long_run_spec.get("marathon_pace_block_km") or 0
+    if mp_block_km > 0:
+        easy_km = long_run_spec.get("easy_km") or 0
+        ef_sec = long_run_spec.get("easy_pace_sec") or 0
+        mpr_sec = long_run_spec.get("marathon_pace_sec") or 0
+        easy_pace = long_run_spec.get("easy_pace")
+        mp_pace = long_run_spec.get("marathon_pace")
+        fast_finish = long_run_spec.get("fast_finish", False)
+        blocks = [
+            WorkoutBlock(
+                name="Endurance fondamentale",
+                duration_seconds=int(easy_km * ef_sec),
+                hr_zone=2,
+                description=f"{easy_km:g} km en Z2"
+                + (f" ({easy_pace})" if easy_pace else ""),
+            ),
+            WorkoutBlock(
+                name="Finish rapide" if fast_finish else "Bloc allure marathon",
+                duration_seconds=int(mp_block_km * mpr_sec),
+                hr_zone=3,
+                description=f"{mp_block_km:g} km à allure marathon"
+                + (f" ({mp_pace})" if mp_pace else "")
+                + (" — terminer plus vite que l'allure marathon" if fast_finish else ""),
+            ),
+        ]
+        description += (
+            f" — dont {mp_block_km:g} km à allure marathon en fin de sortie"
+        )
+
+    description += f" ({long_run_spec.get('progression_note', '')})"
 
     return SessionSpec(
         day_of_week=day,
         session_type=SessionType.SL,
         title=template.title,
-        description=template.description
-        + f" ({long_run_spec.get('progression_note', '')})",
+        description=description,
         sport_type=template.sport_type,
         target_duration_seconds=long_run_spec.get("target_duration_seconds", 0),
         target_distance_meters=long_run_spec.get("target_km", 0) * 1000,
         target_elevation_gain_m=target_elevation,
         intensity=template.intensity,
         hr_zone_primary=template.hr_zone_primary,
-        blocks=template.blocks,
+        blocks=blocks,
     )
 
 

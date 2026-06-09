@@ -29,6 +29,7 @@ from .routers import (
     coaching,
     user,
     nutrition,
+    training,
 )
 
 logger = logging.getLogger(__name__)
@@ -130,3 +131,4 @@ app.include_router(training_plans.router)
 app.include_router(coaching.router)
 app.include_router(user.router)
 app.include_router(nutrition.router)
+app.include_router(training.router)
