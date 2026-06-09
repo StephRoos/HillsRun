@@ -6,7 +6,6 @@ from datetime import date
 from typing import Optional, Dict, Any, List
 
 from garminconnect import Garmin, GarminConnectAuthenticationError
-import garth
 
 from .config import GarminConfig
 from .utils.retry import retry_api_call, safe_api_call
@@ -48,48 +47,34 @@ class GarminClient:
         tm = TokenManager(token_key)
         token_data = tm.decrypt(encrypted_tokens)
 
-        garth_client = garth.Client()
-        garth_client.loads(token_data)
-
         instance = cls.__new__(cls)
         instance.config = None
         instance.rate_limit_delay = rate_limit_delay
         instance._last_request_time = 0.0
 
-        instance.client = Garmin()
-        instance.client.garth = garth_client
+        # garminconnect 0.3.x owns its native DI-token client (garth is dropped).
+        # login(tokenstore=<dumped JSON>) loads the tokens, refreshes them when
+        # expiring, and populates the profile (display_name) used in API paths.
+        client = Garmin()
+        client.login(tokenstore=token_data)
+        instance.client = client
 
-        prof = garth_client.profile
-        instance.client.display_name = prof.get("displayName")
-        instance.client.full_name = prof.get("fullName")
-        logger.info(
-            f"Connected to Garmin from DB tokens as {instance.client.display_name}"
-        )
+        logger.info(f"Connected to Garmin from DB tokens as {client.display_name}")
 
         return instance
 
     def get_refreshed_tokens(self) -> str:
-        """Export current garth tokens as JSON string (after potential refresh)."""
-        return self.client.garth.dumps()
+        """Export current Garmin session tokens as a JSON string (post-refresh)."""
+        return self.client.client.dumps()
 
     def connect(self) -> None:
         """Connect to Garmin Connect using stored tokens."""
         try:
             tokens_dir = str(self.config.tokens_dir)
 
-            # Create a garth client and load tokens into it
-            garth_client = garth.Client()
-            garth_client.load(tokens_dir)
-            logger.info(f"Loaded Garmin tokens from {tokens_dir}")
-
-            # Initialize Garmin client and inject our configured garth client
+            # garminconnect 0.3.x restores its own token store from the directory.
             self.client = Garmin()
-            self.client.garth = garth_client
-
-            # Fetch profile to set display_name (required for API URL paths)
-            prof = garth_client.profile
-            self.client.display_name = prof.get("displayName")
-            self.client.full_name = prof.get("fullName")
+            self.client.login(tokenstore=tokens_dir)
             logger.info(
                 f"Successfully connected to Garmin Connect as {self.client.display_name}"
             )
