@@ -142,23 +142,27 @@ async def _finalize_connect(
 @router.post("/connect", response_model=ConnectResponse)
 @limiter.limit(AUTH_RATE_LIMIT)
 async def connect_garmin(
-    http_request: FastAPIRequest, request: ConnectRequest, db=Depends(get_db)
+    request: FastAPIRequest, body: ConnectRequest, db=Depends(get_db)
 ):
-    """Authenticate with Garmin Connect, store encrypted tokens, link to Better-Auth user."""
+    """Authenticate with Garmin Connect, store encrypted tokens, link to Better-Auth user.
+
+    Note: the starlette ``request`` parameter must be named exactly ``request``
+    so slowapi's ``@limiter.limit`` can find it; the JSON payload is ``body``.
+    """
     token_key = os.environ.get("GARMIN_TOKEN_KEY", "")
     if not token_key:
         raise HTTPException(status_code=500, detail="Token encryption not configured")
 
     # Check if this Better-Auth user already has a linked Garmin account
     existing_user_id = None
-    existing = await db.get_user_by_better_auth_id(request.better_auth_user_id)
+    existing = await db.get_user_by_better_auth_id(body.better_auth_user_id)
     if existing:
         # Link exists — remember user_id so we reuse it after auth
         existing_user_id = existing
 
     # Authenticate with Garmin (MFA-aware)
     try:
-        garmin_client = Garmin(request.email, request.password, return_on_mfa=True)
+        garmin_client = Garmin(body.email, body.password, return_on_mfa=True)
         result = garmin_client.login()
     except GarminConnectAuthenticationError:
         raise HTTPException(status_code=401, detail="Garmin authentication failed")
@@ -172,8 +176,8 @@ async def connect_garmin(
         session_id = str(uuid.uuid4())
         _mfa_sessions[session_id] = {
             "client_state": result[1],
-            "email": request.email,
-            "better_auth_user_id": request.better_auth_user_id,
+            "email": body.email,
+            "better_auth_user_id": body.better_auth_user_id,
             "garmin_client": garmin_client,
             "existing_user_id": existing_user_id,
             "created": time.time(),
@@ -186,8 +190,8 @@ async def connect_garmin(
     # No MFA — finalize
     return await _finalize_connect(
         garmin_client,
-        request.email,
-        request.better_auth_user_id,
+        body.email,
+        body.better_auth_user_id,
         db,
         existing_user_id=existing_user_id,
     )
@@ -196,27 +200,31 @@ async def connect_garmin(
 @router.post("/connect/mfa", response_model=ConnectResponse)
 @limiter.limit(AUTH_RATE_LIMIT)
 async def connect_garmin_mfa(
-    http_request: FastAPIRequest, request: MfaRequest, db=Depends(get_db)
+    request: FastAPIRequest, body: MfaRequest, db=Depends(get_db)
 ):
-    """Complete Garmin Connect login with MFA code."""
+    """Complete Garmin Connect login with MFA code.
+
+    The starlette ``request`` parameter must be named exactly ``request`` so
+    slowapi's ``@limiter.limit`` can find it; the JSON payload is ``body``.
+    """
     token_key = os.environ.get("GARMIN_TOKEN_KEY", "")
     if not token_key:
         raise HTTPException(status_code=500, detail="Token encryption not configured")
 
     _cleanup_expired_mfa()
-    session = _mfa_sessions.pop(request.mfa_session_id, None)
+    session = _mfa_sessions.pop(body.mfa_session_id, None)
     if not session:
         raise HTTPException(
             status_code=400,
             detail="MFA session expired or invalid — please restart connection",
         )
 
-    if session["better_auth_user_id"] != request.better_auth_user_id:
+    if session["better_auth_user_id"] != body.better_auth_user_id:
         raise HTTPException(status_code=403, detail="MFA session does not match user")
 
     try:
         oauth1, oauth2 = garth.sso.resume_login(
-            session["client_state"], request.mfa_code
+            session["client_state"], body.mfa_code
         )
     except Exception:
         logger.exception("MFA verification failed")
@@ -238,7 +246,7 @@ async def connect_garmin_mfa(
     return await _finalize_connect(
         garmin_client,
         session["email"],
-        request.better_auth_user_id,
+        body.better_auth_user_id,
         db,
         existing_user_id=session.get("existing_user_id"),
     )
