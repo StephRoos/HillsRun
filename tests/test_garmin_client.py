@@ -4,13 +4,12 @@ import json
 import time
 import pytest
 from datetime import date
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 from garminconnect import GarminConnectAuthenticationError, GarminConnectConnectionError, GarminConnectTooManyRequestsError
 from garth.exc import GarthHTTPError
 from tenacity import RetryError
 
-from src.config import GarminConfig
 from src.garmin_client import GarminClient
 from src.token_manager import TokenManager
 from src.utils.retry import safe_api_call
@@ -71,48 +70,36 @@ class TestGarminClientConnect:
     """Tests for GarminClient.connect()."""
 
     def test_connect_success(self, test_garmin_config):
-        """connect() loads tokens, creates the Garmin client, and sets display_name."""
-        mock_garth_client = MagicMock()
-        mock_garth_client.profile = {
-            "displayName": "testuser",
-            "fullName": "Test User",
-        }
-
-        with patch("src.garmin_client.garth.Client", return_value=mock_garth_client) as mock_garth_cls, \
-             patch("src.garmin_client.Garmin") as mock_garmin_cls:
-
+        """connect() restores the Garmin client via login(tokenstore=<dir>)."""
+        with patch("src.garmin_client.Garmin") as mock_garmin_cls:
             mock_garmin_instance = MagicMock()
             mock_garmin_cls.return_value = mock_garmin_instance
 
             gc = GarminClient(test_garmin_config)
             gc.connect()
 
-            # garth.Client().load() must be called with the tokens directory
-            mock_garth_client.load.assert_called_once_with(str(test_garmin_config.tokens_dir))
-
-            # The inner Garmin instance must be assigned
+            # garminconnect 0.3.x restores its own token store from the directory.
+            mock_garmin_instance.login.assert_called_once_with(
+                tokenstore=str(test_garmin_config.tokens_dir)
+            )
             assert gc.client is mock_garmin_instance
-
-            # display_name and full_name must be set from the profile
-            assert mock_garmin_instance.display_name == "testuser"
-            assert mock_garmin_instance.full_name == "Test User"
 
     def test_connect_missing_tokens_raises_auth_error(self, test_garmin_config):
         """connect() raises GarminConnectAuthenticationError when tokens are absent."""
-        mock_garth_client = MagicMock()
-        mock_garth_client.load.side_effect = FileNotFoundError("no tokens")
-
-        with patch("src.garmin_client.garth.Client", return_value=mock_garth_client):
+        with patch("src.garmin_client.Garmin") as mock_garmin_cls:
+            mock_garmin_cls.return_value.login.side_effect = FileNotFoundError(
+                "no tokens"
+            )
             gc = GarminClient(test_garmin_config)
             with pytest.raises(GarminConnectAuthenticationError):
                 gc.connect()
 
     def test_connect_general_exception_propagates(self, test_garmin_config):
         """connect() re-raises unexpected exceptions unchanged."""
-        mock_garth_client = MagicMock()
-        mock_garth_client.load.side_effect = RuntimeError("unexpected failure")
-
-        with patch("src.garmin_client.garth.Client", return_value=mock_garth_client):
+        with patch("src.garmin_client.Garmin") as mock_garmin_cls:
+            mock_garmin_cls.return_value.login.side_effect = RuntimeError(
+                "unexpected failure"
+            )
             gc = GarminClient(test_garmin_config)
             with pytest.raises(RuntimeError, match="unexpected failure"):
                 gc.connect()
@@ -173,12 +160,7 @@ class TestFromEncryptedTokens:
         tm = TokenManager(token_key)
         encrypted = tm.encrypt(token_data)
 
-        mock_garth_client = MagicMock()
-        mock_garth_client.profile = {"displayName": "dbuser", "fullName": "DB User"}
-
-        with patch("src.garmin_client.garth.Client", return_value=mock_garth_client) as mock_garth_cls, \
-             patch("src.garmin_client.Garmin") as mock_garmin_cls:
-
+        with patch("src.garmin_client.Garmin") as mock_garmin_cls:
             mock_garmin_instance = MagicMock()
             mock_garmin_cls.return_value = mock_garmin_instance
 
@@ -187,11 +169,9 @@ class TestFromEncryptedTokens:
             # Must be a GarminClient
             assert isinstance(instance, GarminClient)
 
-            # garth_client.loads() must have been called with the decrypted JSON
-            mock_garth_client.loads.assert_called_once_with(token_data)
-
-            # display_name set from profile
-            assert mock_garmin_instance.display_name == "dbuser"
+            # garminconnect restores via login(tokenstore=<decrypted JSON>)
+            mock_garmin_instance.login.assert_called_once_with(tokenstore=token_data)
+            assert instance.client is mock_garmin_instance
 
             # rate_limit_delay default
             assert instance.rate_limit_delay == 0.5
@@ -203,13 +183,10 @@ class TestFromEncryptedTokens:
         tm = TokenManager(token_key)
         encrypted = tm.encrypt(token_data)
 
-        mock_garth_client = MagicMock()
-        mock_garth_client.profile = {"displayName": "u", "fullName": "U"}
-
-        with patch("src.garmin_client.garth.Client", return_value=mock_garth_client), \
-             patch("src.garmin_client.Garmin"):
-
-            instance = GarminClient.from_encrypted_tokens(encrypted, token_key, rate_limit_delay=1.5)
+        with patch("src.garmin_client.Garmin"):
+            instance = GarminClient.from_encrypted_tokens(
+                encrypted, token_key, rate_limit_delay=1.5
+            )
             assert instance.rate_limit_delay == 1.5
 
 
@@ -221,22 +198,22 @@ class TestGetRefreshedTokens:
     """Tests for GarminClient.get_refreshed_tokens()."""
 
     def test_returns_string(self, test_garmin_config):
-        """get_refreshed_tokens() returns a string (JSON export from garth)."""
+        """get_refreshed_tokens() returns a string (JSON export from the client)."""
         gc = GarminClient(test_garmin_config)
         gc.client = MagicMock()
-        gc.client.garth.dumps.return_value = '{"access_token": "new_token"}'
+        gc.client.client.dumps.return_value = '{"di_token": "new_token"}'
 
         result = gc.get_refreshed_tokens()
 
         assert isinstance(result, str)
-        gc.client.garth.dumps.assert_called_once()
+        gc.client.client.dumps.assert_called_once()
 
     def test_returns_garth_dumps_output(self, test_garmin_config):
-        """get_refreshed_tokens() returns exactly what garth.dumps() produces."""
+        """get_refreshed_tokens() returns exactly what client.dumps() produces."""
         gc = GarminClient(test_garmin_config)
         gc.client = MagicMock()
         expected = '{"some": "token_data"}'
-        gc.client.garth.dumps.return_value = expected
+        gc.client.client.dumps.return_value = expected
 
         assert gc.get_refreshed_tokens() == expected
 

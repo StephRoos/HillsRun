@@ -11,7 +11,6 @@ from fastapi import APIRouter, Depends, HTTPException, Request as FastAPIRequest
 from pydantic import BaseModel
 
 from garminconnect import Garmin, GarminConnectAuthenticationError
-import garth
 
 from ..auth import get_api_key
 from ..dependencies import get_db
@@ -91,7 +90,9 @@ async def _finalize_connect(
 
     display_name = garmin_client.display_name or garmin_client.full_name
 
-    token_data = garmin_client.garth.dumps()
+    # garminconnect 0.3.x serializes its native DI tokens via the inner client
+    # (.client.dumps()); the Garmin object no longer exposes a .garth attribute.
+    token_data = garmin_client.client.dumps()
     tm = TokenManager(token_key)
     encrypted = tm.encrypt(token_data)
 
@@ -175,7 +176,8 @@ async def connect_garmin(
         _cleanup_expired_mfa()
         session_id = str(uuid.uuid4())
         _mfa_sessions[session_id] = {
-            "client_state": result[1],
+            # The Garmin object holds the in-progress MFA state internally; we
+            # reuse it in /connect/mfa (garminconnect 0.3.x design).
             "email": body.email,
             "better_auth_user_id": body.better_auth_user_id,
             "garmin_client": garmin_client,
@@ -222,26 +224,17 @@ async def connect_garmin_mfa(
     if session["better_auth_user_id"] != body.better_auth_user_id:
         raise HTTPException(status_code=403, detail="MFA session does not match user")
 
+    # garminconnect 0.3.x keeps the in-progress MFA state inside the SAME Garmin
+    # object created at /connect (the client_state arg is ignored). resume_login
+    # completes the SSO with the code and populates display_name/full_name.
+    garmin_client = session["garmin_client"]
     try:
-        oauth1, oauth2 = garth.sso.resume_login(
-            session["client_state"], body.mfa_code
-        )
+        garmin_client.resume_login(None, body.mfa_code)
+    except GarminConnectAuthenticationError:
+        raise HTTPException(status_code=401, detail="MFA verification failed")
     except Exception:
         logger.exception("MFA verification failed")
         raise HTTPException(status_code=401, detail="MFA verification failed")
-
-    garmin_client = session["garmin_client"]
-    # Set the real OAuth tokens (login() with return_on_mfa stored intermediate state)
-    garmin_client.garth.oauth1_token = oauth1
-    garmin_client.garth.oauth2_token = oauth2
-
-    # Load profile after MFA completion
-    try:
-        prof = garmin_client.garth.connectapi("/userprofile-service/usersettings")
-        garmin_client.display_name = prof.get("displayName")
-        garmin_client.full_name = prof.get("fullName") or prof.get("displayName")
-    except Exception:
-        logger.warning("Could not load Garmin profile after MFA")
 
     return await _finalize_connect(
         garmin_client,

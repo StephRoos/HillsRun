@@ -92,19 +92,19 @@ def client(mock_db):
 
 
 def _make_mock_garmin(display_name="TrailRunner42"):
-    """Return a mock Garmin client that looks authenticated."""
+    """Return a mock garminconnect.Garmin (0.3.x) that looks authenticated.
+
+    In 0.3.x the Garmin object owns an inner ``.client`` that serializes the
+    native DI tokens (``.client.dumps()``) and there is no ``.garth`` attribute;
+    MFA is completed via ``.resume_login(client_state, code)``.
+    """
     garmin_client = MagicMock()
     garmin_client.display_name = display_name
     garmin_client.full_name = display_name
-    garmin_client.login = MagicMock(return_value=None)  # non-tuple → no MFA
-    garmin_client.garth = MagicMock()
-    garmin_client.garth.dumps = MagicMock(return_value="fake-token-data")
-    garmin_client.garth.oauth1_token = None
-    garmin_client.garth.oauth2_token = None
-    garmin_client.garth.connectapi = MagicMock(return_value={
-        "displayName": display_name,
-        "fullName": display_name,
-    })
+    garmin_client.login = MagicMock(return_value=(None, None))  # clean → no MFA
+    garmin_client.resume_login = MagicMock(return_value=(None, None))
+    garmin_client.client = MagicMock()
+    garmin_client.client.dumps = MagicMock(return_value='{"di_token":"fake"}')
     return garmin_client
 
 
@@ -414,7 +414,6 @@ class TestConnectMfaEndpoint:
             mock_garmin = _make_mock_garmin()
 
         _mfa_sessions[session_id] = {
-            "client_state": {"state": "pending"},
             "email": "mfa@runner.com",
             "better_auth_user_id": better_auth_user_id,
             "garmin_client": mock_garmin,
@@ -428,22 +427,18 @@ class TestConnectMfaEndpoint:
         mock_garmin = _make_mock_garmin("MfaRunner")
         self._seed_mfa_session(session_id, TEST_BETTER_AUTH_USER_ID, mock_garmin)
 
-        fake_oauth1 = MagicMock()
-        fake_oauth2 = MagicMock()
+        response = client.post(
+            "/api/v1/auth/connect/mfa",
+            json={
+                "mfa_session_id": session_id,
+                "mfa_code": "123456",
+                "better_auth_user_id": TEST_BETTER_AUTH_USER_ID,
+            },
+            headers=valid_headers,
+        )
 
-        with patch("src.api.routers.auth_garmin.garth") as mock_garth:
-            mock_garth.sso.resume_login = MagicMock(return_value=(fake_oauth1, fake_oauth2))
-
-            response = client.post(
-                "/api/v1/auth/connect/mfa",
-                json={
-                    "mfa_session_id": session_id,
-                    "mfa_code": "123456",
-                    "better_auth_user_id": TEST_BETTER_AUTH_USER_ID,
-                },
-                headers=valid_headers,
-            )
-
+        # resume_login completes the in-progress MFA on the same Garmin object.
+        mock_garmin.resume_login.assert_called_once()
         assert response.status_code == 200
         body = response.json()
         assert body["connected"] is True
@@ -484,21 +479,24 @@ class TestConnectMfaEndpoint:
 
     def test_mfa_wrong_code_returns_401(self, client, valid_headers):
         """POST /connect/mfa returns 401 if the MFA code verification fails."""
+        from garminconnect import GarminConnectAuthenticationError
+
         session_id = "test-session-uuid-003"
-        self._seed_mfa_session(session_id, TEST_BETTER_AUTH_USER_ID)
+        mock_garmin = _make_mock_garmin()
+        mock_garmin.resume_login = MagicMock(
+            side_effect=GarminConnectAuthenticationError("wrong code")
+        )
+        self._seed_mfa_session(session_id, TEST_BETTER_AUTH_USER_ID, mock_garmin)
 
-        with patch("src.api.routers.auth_garmin.garth") as mock_garth:
-            mock_garth.sso.resume_login = MagicMock(side_effect=Exception("wrong code"))
-
-            response = client.post(
-                "/api/v1/auth/connect/mfa",
-                json={
-                    "mfa_session_id": session_id,
-                    "mfa_code": "000000",
-                    "better_auth_user_id": TEST_BETTER_AUTH_USER_ID,
-                },
-                headers=valid_headers,
-            )
+        response = client.post(
+            "/api/v1/auth/connect/mfa",
+            json={
+                "mfa_session_id": session_id,
+                "mfa_code": "000000",
+                "better_auth_user_id": TEST_BETTER_AUTH_USER_ID,
+            },
+            headers=valid_headers,
+        )
 
         assert response.status_code == 401
         assert "MFA verification failed" in response.json()["detail"]
