@@ -97,7 +97,7 @@ _Progressive build: 12.0% per week_
 
 ### Semaine 6 · development
 
-Volume cible 21.10 km · TSS 156.60 · 5 séances
+Volume cible 11.90 km · TSS 156.80 · 5 séances
 
 _Progressive build: 12.0% per week_
 
@@ -106,21 +106,21 @@ _Progressive build: 12.0% per week_
 | Monday | RMU | Renforcement Musculaire | 21min | — | — | 2 | 15.80 |
 | Tuesday | TMP | Tempo · Steady Z3 (148-161 bpm) | 24min | — | 4:42 /km | 3 | 27.80 |
 | Thursday | EF | Endurance Fondamentale | 28min | — | 6:05–5:45 /km | 2 | 23.40 |
-| Saturday | SL | Sortie Longue | 1h12 | 21.1 km | 6:05–5:45 /km | 2 | 66.10 |
+| Saturday | SL | Sortie Longue | 1h12 | 11.9 km | 6:05–5:45 /km | 2 | 66.40 |
 | Sunday | EF | Endurance Fondamentale | 28min | — | 6:05–5:45 /km | 2 | 23.40 |
 
 ### Semaine 7 · development
 
-Volume cible 21.10 km · TSS 180.10 · 5 séances
+Volume cible 13.60 km · TSS 179.90 · 5 séances
 
 _Progressive build: 12.0% per week_
 
 | Jour | Type | Séance | Durée | Distance | Allure | FC | TSS |
 |---|---|---|---|---|---|---|---|
 | Monday | RMU | Renforcement Musculaire | 24min | — | — | 2 | 18.20 |
-| Tuesday | TMP | Tempo · Steady Z3 (148-161 bpm) | 27min | — | 4:42 /km | 3 | 32.00 |
+| Tuesday | TMP | Tempo · Steady Z3 (148-161 bpm) | 27min | — | 4:42 /km | 3 | 32.10 |
 | Thursday | EF | Endurance Fondamentale | 32min | — | 6:05–5:45 /km | 2 | 26.90 |
-| Saturday | SL | Sortie Longue | 1h23 | 21.1 km | 6:05–5:45 /km | 2 | 76.00 |
+| Saturday | SL | Sortie Longue | 1h23 | 13.6 km | 6:05–5:45 /km | 2 | 75.80 |
 | Sunday | EF | Endurance Fondamentale | 32min | — | 6:05–5:45 /km | 2 | 26.90 |
 
 ### Semaine 8 · development — récup
@@ -137,7 +137,7 @@ _Recovery week: 40% reduction_
 
 ### Semaine 9 · development
 
-Volume cible 21.10 km · TSS 207.10 · 5 séances
+Volume cible 15.70 km · TSS 207.00 · 5 séances
 
 _Progressive build: 12.0% per week_
 
@@ -146,35 +146,35 @@ _Progressive build: 12.0% per week_
 | Monday | RMU | Renforcement Musculaire | 28min | — | — | 2 | 20.90 |
 | Tuesday | TMP | Tempo · Steady Z3 (148-161 bpm) | 32min | — | 4:42 /km | 3 | 36.80 |
 | Thursday | EF | Endurance Fondamentale | 37min | — | 6:05–5:45 /km | 2 | 30.90 |
-| Saturday | SL | Sortie Longue | 1h35 | 21.1 km | 6:05–5:45 /km | 2 | 87.40 |
+| Saturday | SL | Sortie Longue | 1h36 | 15.7 km | 6:05–5:45 /km | 2 | 87.50 |
 | Sunday | EF | Endurance Fondamentale | 37min | — | 6:05–5:45 /km | 2 | 30.90 |
 
 ### Semaine 10 · development
 
-Volume cible 21.10 km · TSS 238.20 · 5 séances
+Volume cible 18.00 km · TSS 237.90 · 5 séances
 
 _Progressive build: 12.0% per week_
 
 | Jour | Type | Séance | Durée | Distance | Allure | FC | TSS |
 |---|---|---|---|---|---|---|---|
 | Monday | RMU | Renforcement Musculaire | 32min | — | — | 2 | 24.00 |
-| Tuesday | TMP | Tempo · Steady Z3 (148-161 bpm) | 36min | — | 4:42 /km | 3 | 42.40 |
+| Tuesday | TMP | Tempo · Steady Z3 (148-161 bpm) | 36min | — | 4:42 /km | 3 | 42.30 |
 | Thursday | EF | Endurance Fondamentale | 43min | — | 6:05–5:45 /km | 2 | 35.60 |
-| Saturday | SL | Sortie Longue | 1h50 | 21.1 km | 6:05–5:45 /km | 2 | 100.50 |
+| Saturday | SL | Sortie Longue | 1h50 | 18.0 km | 6:05–5:45 /km | 2 | 100.40 |
 | Sunday | EF | Endurance Fondamentale | 43min | — | 6:05–5:45 /km | 2 | 35.60 |
 
 ### Semaine 11 · specific
 
-Volume cible 29.50 km · TSS 273.90 · 5 séances
+Volume cible 25.70 km · TSS 273.20 · 5 séances
 
 _Progressive build: 12.0% per week_
 
 | Jour | Type | Séance | Durée | Distance | Allure | FC | TSS |
 |---|---|---|---|---|---|---|---|
 | Monday | RMU | Renforcement Musculaire | 33min | — | — | 2 | 24.50 |
-| Tuesday | TMP | Tempo · Steady Z3 (148-161 bpm) | 37min | — | 4:42 /km | 3 | 43.30 |
+| Tuesday | TMP | Tempo · Steady Z3 (148-161 bpm) | 37min | — | 4:42 /km | 3 | 43.20 |
 | Thursday | EF | Endurance Fondamentale | 44min | — | 6:05–5:45 /km | 2 | 36.30 |
-| Saturday | SL | Sortie Longue · 11.8 km à allure marathon (4:59 /km) | 2h25 | 29.5 km | 6:05–5:45 /km → 4:59 /km | 2 | 133.30 |
+| Saturday | SL | Sortie Longue · 10.3 km à allure marathon (4:59 /km) | 2h25 | 25.7 km | 6:05–5:45 /km → 4:59 /km | 2 | 132.90 |
 | Sunday | EF | Endurance Fondamentale | 44min | — | 6:05–5:45 /km | 2 | 36.30 |
 
 ### Semaine 12 · specific
@@ -221,7 +221,7 @@ _Progressive build: 12.0% per week_
 
 Volume cible 16.90 km · TSS 250.10 · 5 séances
 
-_Progressive build: 12.0% per week_
+_Taper: reduced volume, intensity kept_
 
 | Jour | Type | Séance | Durée | Distance | Allure | FC | TSS |
 |---|---|---|---|---|---|---|---|
@@ -235,7 +235,7 @@ _Progressive build: 12.0% per week_
 
 Volume cible 16.90 km · TSS 250.10 · 5 séances
 
-_Progressive build: 12.0% per week_
+_Taper: reduced volume, intensity kept_
 
 | Jour | Type | Séance | Durée | Distance | Allure | FC | TSS |
 |---|---|---|---|---|---|---|---|

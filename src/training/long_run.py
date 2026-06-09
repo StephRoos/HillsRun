@@ -183,6 +183,8 @@ def _build_road_long_run(
     elif phase == PlanPhase.taper:
         # Cut volume, keep intensity: retain a short marathon-pace block.
         variant = "taper_quality"
+        # The build note is meaningless in the taper (volume goes down, not up).
+        note = "Taper: reduced volume, intensity kept"
         mp_block_km = round(
             min(_ROAD_TAPER_MP_BLOCK_MAX_KM, target_km * _ROAD_TAPER_MP_BLOCK_FRACTION),
             1,
@@ -222,6 +224,50 @@ def _build_road_long_run(
         "easy_pace_sec": ef_sec,
         "marathon_pace_sec": mpr_sec,
     }
+
+
+def scale_long_run_spec(spec: dict, scale: float) -> dict:
+    """Return a copy of a long-run spec with its volume scaled by ``scale``.
+
+    Distance and duration shrink together so the rendered pace stays correct.
+    This backs the plan generator's weekly TSS-progression guard, which used to
+    trim only the duration and leave the distance (and thus the implied pace)
+    incoherent — a 21 km run rendered as 1h12 (3:24/km, impossible). Per-km pace
+    fields and the remaining metadata are preserved.
+
+    Args:
+        spec: A ``calculate_long_run`` output dict.
+        scale: Multiplier; values >= 1.0 return the spec unchanged.
+
+    Returns:
+        A new spec dict with ``target_km`` and ``target_duration_seconds`` scaled
+        (plus ``easy_km`` / ``marathon_pace_block_km`` for road runs). Durations
+        are recomputed from the scaled distances and the preserved paces so the
+        blocks the week builder derives stay self-consistent.
+    """
+    if scale >= 1.0:
+        return spec
+
+    scaled = dict(spec)
+    scaled["target_km"] = round(spec["target_km"] * scale, 1)
+    for key in ("easy_km", "marathon_pace_block_km"):
+        if spec.get(key):
+            scaled[key] = round(spec[key] * scale, 1)
+
+    # Recompute duration from the scaled distances × preserved paces so
+    # distance ÷ duration keeps yielding the right pace. Trail specs carry no
+    # per-km pace, so scale their duration directly.
+    ef_sec = spec.get("easy_pace_sec")
+    if ef_sec is not None:
+        mpr_sec = spec.get("marathon_pace_sec") or ef_sec
+        scaled["target_duration_seconds"] = int(
+            scaled.get("easy_km", 0) * ef_sec
+            + scaled.get("marathon_pace_block_km", 0) * mpr_sec
+        )
+    else:
+        scaled["target_duration_seconds"] = int(spec["target_duration_seconds"] * scale)
+
+    return scaled
 
 
 def _get_starting_long_run(experience: ExperienceLevel) -> float:

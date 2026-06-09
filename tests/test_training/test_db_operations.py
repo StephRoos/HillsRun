@@ -1,6 +1,5 @@
 """Tests for training plan database operations."""
 
-import json
 from datetime import date
 from unittest.mock import AsyncMock, MagicMock
 

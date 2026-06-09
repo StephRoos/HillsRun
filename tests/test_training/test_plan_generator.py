@@ -162,6 +162,60 @@ async def test_generate_plan_road_marathon(mock_pool, mock_profile, mock_road_ra
 
 
 @pytest.mark.asyncio
+async def test_generate_plan_long_runs_have_coherent_pace(
+    mock_pool, mock_profile, mock_road_race
+):
+    """Every long run's distance and duration must imply a plausible pace.
+
+    Regression test for the TSS-progression guard that trimmed only the duration
+    and left the distance untouched — a 21 km run rendered as 1h12 (3:24/km,
+    faster than VO2max pace). An SL is easy running plus at most a marathon-pace
+    finish, so its overall pace can never be faster than marathon pace (~4:59).
+    """
+    request = GeneratePlanRequest(
+        race_target_id=2,
+        plan_name="Brugge 3h30",
+        total_weeks=17,
+        start_date=date(2026, 6, 15),
+    )
+
+    with patch("src.training.plan_generator.build_fitness_snapshot") as mock_fitness, \
+         patch("src.training.plan_generator.db_ops") as mock_db:
+
+        from src.training.models import UserFitnessData
+        mock_fitness.return_value = UserFitnessData(
+            vo2_max=52.0, resting_hr=56, max_hr=188,
+            weight_kg=70.0, vma_kmh=14.5,
+            weekly_volume_km=45.0, weekly_elevation_m=200,
+            recent_long_run_km=18.0,
+        )
+        mock_db.get_athlete_profile = AsyncMock(return_value=mock_profile)
+        mock_db.get_race_target = AsyncMock(return_value=mock_road_race)
+
+        await generate_plan(mock_pool, 67, request)
+
+    conn = mock_pool.acquire.return_value.__aenter__.return_value
+    sl_runs = [
+        call.args
+        for call in conn.fetchrow.call_args_list
+        if call.args
+        and "INSERT INTO planned_workouts" in call.args[0]
+        and call.args[10] == "SL"          # session_type
+        and call.args[6]                    # planned_duration_seconds
+        and call.args[7]                    # planned_distance_meters
+    ]
+    assert sl_runs, "expected long-run inserts"
+    for args in sl_runs:
+        duration_s, distance_m = args[6], args[7]
+        pace_sec_per_km = duration_s / (distance_m / 1000)
+        # No long run faster than ~4:50/km (290 s), and a sane upper bound.
+        assert 290 <= pace_sec_per_km <= 540, (
+            f"incoherent SL pace {pace_sec_per_km:.0f} s/km "
+            f"({distance_m / 1000:.1f} km in {duration_s}s)"
+        )
+
+
+@pytest.mark.asyncio
 async def test_generate_plan_no_profile(mock_pool):
     """Test error when no athlete profile exists."""
     request = GeneratePlanRequest(race_target_id=1, total_weeks=12)
