@@ -30,8 +30,9 @@ def setup_env():
     """Set required environment variables before each test and disable rate limiter."""
     os.environ["API_KEY"] = TEST_API_KEY
     os.environ["GARMIN_TOKEN_KEY"] = TokenManager.generate_key()
-    # Disable slowapi rate limiter so the /connect and /connect/mfa decorators
-    # don't crash in tests (they require the 'request' kwarg name from slowapi)
+    # Disable slowapi rate limiter for the bulk of tests so repeated /connect
+    # calls don't hit the 5/15min auth limit. The limiter-enabled path is
+    # covered explicitly by TestConnectRateLimiterIntegration.
     from src.api.rate_limit import limiter
     limiter.enabled = False
     yield
@@ -110,6 +111,65 @@ def _make_mock_garmin(display_name="TrailRunner42"):
 # ---------------------------------------------------------------------------
 # POST /connect — success (no MFA)
 # ---------------------------------------------------------------------------
+
+
+class TestConnectRateLimiterIntegration:
+    """Regression: rate-limited auth endpoints must expose the starlette Request
+    as the parameter named ``request`` so slowapi can inject it.
+
+    The endpoints used to name the Request ``http_request`` and the Pydantic body
+    ``request``; with the limiter enabled (as in prod) slowapi found the body and
+    raised 'parameter `request` must be an instance of starlette.requests.Request'
+    → every Garmin connect attempt 500'd. These tests run with the limiter
+    ENABLED, unlike the rest of the suite.
+    """
+
+    def test_connect_works_with_rate_limiter_enabled(
+        self, client, valid_headers, mock_db
+    ):
+        """/connect must not 500 from slowapi when the limiter is active."""
+        from src.api.rate_limit import limiter
+
+        mock_garmin = _make_mock_garmin("TrailRunner42")
+        limiter.enabled = True
+        try:
+            with patch(
+                "src.api.routers.auth_garmin.Garmin", return_value=mock_garmin
+            ):
+                response = client.post(
+                    "/api/v1/auth/connect",
+                    json={
+                        "email": "trail@runner.com",
+                        "password": "secret",
+                        "better_auth_user_id": TEST_BETTER_AUTH_USER_ID,
+                    },
+                    headers=valid_headers,
+                )
+        finally:
+            limiter.enabled = False
+        assert response.status_code == 200
+        assert response.json()["connected"] is True
+
+    def test_connect_mfa_works_with_rate_limiter_enabled(self, client, valid_headers):
+        """/connect/mfa must reach its handler (400 on bad session), not 500."""
+        from src.api.rate_limit import limiter
+
+        limiter.enabled = True
+        try:
+            response = client.post(
+                "/api/v1/auth/connect/mfa",
+                json={
+                    "mfa_session_id": "does-not-exist",
+                    "mfa_code": "123456",
+                    "better_auth_user_id": TEST_BETTER_AUTH_USER_ID,
+                },
+                headers=valid_headers,
+            )
+        finally:
+            limiter.enabled = False
+        # 400 = handler ran and rejected the unknown session. Before the fix
+        # slowapi 500'd before the handler was reached.
+        assert response.status_code == 400
 
 
 class TestConnectSuccess:
