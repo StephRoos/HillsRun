@@ -469,12 +469,12 @@ def create_long_run_session(
                 hr_zone=3,
                 description=f"{mp_block_km:g} km à allure marathon"
                 + (f" ({mp_pace})" if mp_pace else "")
-                + (" — terminer plus vite que l'allure marathon" if fast_finish else ""),
+                + (
+                    " — terminer plus vite que l'allure marathon" if fast_finish else ""
+                ),
             ),
         ]
-        description += (
-            f" — dont {mp_block_km:g} km à allure marathon en fin de sortie"
-        )
+        description += f" — dont {mp_block_km:g} km à allure marathon en fin de sortie"
 
     description += f" ({long_run_spec.get('progression_note', '')})"
 
