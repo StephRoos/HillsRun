@@ -45,6 +45,33 @@ RACE_DATE = date(2026, 10, 12)
 TARGET_TIME_SECONDS = 12600  # 3h30
 
 DEFAULT_OUT = Path(__file__).resolve().parent.parent / "specs" / "mon-plan-marathon.md"
+_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+
+
+def _load_env_file(path: Path = _ENV_FILE) -> None:
+    """Load ``KEY=VALUE`` pairs from a ``.env`` file into ``os.environ``.
+
+    The project ships no python-dotenv dependency, so this is a minimal, zero-dep
+    parser. Existing environment variables always win — values from the file only
+    fill in what is not already set, so an explicit ``export`` still overrides it.
+
+    Args:
+        path: Path to the ``.env`` file. Silently does nothing if absent.
+    """
+    if not path.exists():
+        return
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export ") :]
+        key, sep, value = line.partition("=")
+        if not sep:
+            continue
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        os.environ.setdefault(key, value)
 
 PROFILE_DATA: dict[str, Any] = {
     "experience_level": "intermediate",
@@ -501,6 +528,10 @@ async def main() -> None:
         help=f"Output markdown path (default: {DEFAULT_OUT})",
     )
     args = parser.parse_args()
+
+    # Load POSTGRES_* / GARMIN_* from the project .env when present, so the
+    # script runs standalone without an explicit `set -a; . ./.env`.
+    _load_env_file()
 
     db = Database(_db_config_from_env())
     await db.connect()
