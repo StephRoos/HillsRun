@@ -7,6 +7,27 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
+# JSONB columns on athlete_profiles. The asyncpg pool registers no JSON codec,
+# so these come back as raw ``str`` and must be decoded before the API schemas
+# (which expect dicts) validate them.
+_PROFILE_JSONB_FIELDS = ("day_preferences", "available_slots")
+
+
+def _decode_profile_jsonb(profile: dict[str, Any]) -> dict[str, Any]:
+    """Decode JSONB profile columns asyncpg returns as strings into dicts.
+
+    Args:
+        profile: Raw profile dict from a fetched row.
+
+    Returns:
+        The same dict, with JSONB string fields parsed in place.
+    """
+    for field in _PROFILE_JSONB_FIELDS:
+        value = profile.get(field)
+        if isinstance(value, str):
+            profile[field] = json.loads(value)
+    return profile
+
 
 # ============================================
 # Athlete Profile Operations
@@ -26,7 +47,7 @@ async def get_athlete_profile(pool, user_id: int) -> Optional[dict[str, Any]]:
     row = await pool.fetchrow(
         "SELECT * FROM athlete_profiles WHERE user_id = $1", user_id
     )
-    return dict(row) if row else None
+    return _decode_profile_jsonb(dict(row)) if row else None
 
 
 async def upsert_athlete_profile(
@@ -83,7 +104,7 @@ async def upsert_athlete_profile(
         RETURNING *
     """
     row = await pool.fetchrow(query, *values)
-    return dict(row)
+    return _decode_profile_jsonb(dict(row))
 
 
 # ============================================

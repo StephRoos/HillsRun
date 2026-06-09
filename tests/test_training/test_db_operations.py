@@ -126,6 +126,26 @@ async def test_upsert_athlete_profile_serializes_day_preferences():
 
 
 @pytest.mark.asyncio
+async def test_get_athlete_profile_decodes_jsonb_string_to_dict():
+    # asyncpg returns JSONB columns as raw strings (no codec on the pool);
+    # the profile must come back with day_preferences parsed to a dict.
+    row = {"user_id": 1, "day_preferences": '{"long_run": 6, "quality": [2]}'}
+    pool = make_pool(fetchrow=row)
+    result = await get_athlete_profile(pool, user_id=1)
+    assert result["day_preferences"] == {"long_run": 6, "quality": [2]}
+
+
+@pytest.mark.asyncio
+async def test_upsert_athlete_profile_decodes_jsonb_on_return():
+    # The RETURNING * row also carries JSONB as a string → decode before returning.
+    row = {"user_id": 1, "day_preferences": '{"long_run": 6}'}
+    pool = make_pool(fetchrow=row)
+    data = {"day_preferences": {"long_run": 6}}
+    result = await upsert_athlete_profile(pool, user_id=1, data=data)
+    assert result["day_preferences"] == {"long_run": 6}
+
+
+@pytest.mark.asyncio
 async def test_upsert_athlete_profile_ignores_unknown_fields():
     row = {"user_id": 1, "height_cm": 180}
     pool = make_pool(fetchrow=row)
