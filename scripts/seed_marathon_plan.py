@@ -251,6 +251,53 @@ def _session_pace_label(session_type: str, paces: Optional[PaceSet]) -> str:
     return zone.label if zone else "—"
 
 
+def _mp_finish_block(session: dict[str, Any]) -> Optional[dict[str, Any]]:
+    """Return the marathon-pace finish block of a session, if any.
+
+    The long run carries its structure in ``blocks`` (stored as JSON, returned
+    by asyncpg as a string or a list). The marathon-pace block is the Z3 one.
+
+    Args:
+        session: A planned-workout row.
+
+    Returns:
+        The MP block dict (name/duration_seconds/hr_zone/description), or None.
+    """
+    blocks = session.get("blocks")
+    if isinstance(blocks, str):
+        try:
+            blocks = json.loads(blocks)
+        except (ValueError, TypeError):
+            return None
+    if not blocks:
+        return None
+    for block in blocks:
+        if isinstance(block, dict) and block.get("hr_zone") == 3:
+            return block
+    return None
+
+
+def _session_pace_cell(
+    session: dict[str, Any], session_type: str, paces: Optional[PaceSet]
+) -> str:
+    """Pace label for a session row, surfacing a long-run MP finish block.
+
+    Args:
+        session: The planned-workout row.
+        session_type: SessionType code.
+        paces: The plan's PaceSet, or None.
+
+    Returns:
+        A pace label; for a long run with an MP finish, ``"EF → MPR"``.
+    """
+    base = _session_pace_label(session_type, paces)
+    if session_type == "SL" and paces is not None and _mp_finish_block(session):
+        mpr = paces.pace_for("MPR")
+        if mpr:
+            return f"{base} → {mpr.label}"
+    return base
+
+
 def _parse_paces(plan: dict[str, Any]) -> Optional[PaceSet]:
     """Reconstruct the PaceSet stored in a plan's generation_params.
 
@@ -372,12 +419,16 @@ def render_plan_markdown(
         for s in sessions:
             stype = str(s.get("session_type", ""))
             day = _DAY_NAMES.get(s.get("day_of_week"), str(s.get("day_of_week")))
-            pace = _session_pace_label(stype, paces)
+            pace = _session_pace_cell(s, stype, paces)
             hr = s.get("hr_zone_primary") or "—"
             tss = s.get("target_tss")
             tss_str = f"{tss:g}" if tss is not None else "—"
+            title = s.get("title", "")
+            mp_block = _mp_finish_block(s)
+            if mp_block:
+                title = f"{title} · {mp_block.get('description', '')}"
             lines.append(
-                f"| {day} | {stype} | {s.get('title', '')} | "
+                f"| {day} | {stype} | {title} | "
                 f"{_fmt_duration(s.get('target_duration_seconds'))} | "
                 f"{_fmt_distance(s.get('target_distance_meters'))} | "
                 f"{pace} | {hr} | {tss_str} |"

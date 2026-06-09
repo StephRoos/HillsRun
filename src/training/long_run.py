@@ -212,10 +212,15 @@ def _build_road_long_run(
         "progression_note": note,
         "variant": variant,
         "marathon_pace_block_km": mp_block_km,
+        "easy_km": round(easy_km, 1),
         "fast_finish": fast_finish,
         "hr_zone": "Z2",
         "easy_pace": easy_pace,
         "marathon_pace": marathon_pace,
+        # Per-km seconds for each portion — lets the week builder split the run
+        # into a Z2 easy block + a Z3 marathon-pace finish block (durations).
+        "easy_pace_sec": ef_sec,
+        "marathon_pace_sec": mpr_sec,
     }
 
 
