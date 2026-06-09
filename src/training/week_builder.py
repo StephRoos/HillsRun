@@ -101,7 +101,7 @@ def build_week(
         else:
             long_run_day = _find_weekend_day(available_days_sorted)
         if long_run_day:
-            lr_session = _create_long_run_session(
+            lr_session = create_long_run_session(
                 day=long_run_day,
                 experience=experience,
                 phase=phase,
@@ -409,7 +409,7 @@ def _find_weekend_day(available_days: list[int]) -> int | None:
     return None
 
 
-def _create_long_run_session(
+def create_long_run_session(
     day: int,
     experience: ExperienceLevel,
     phase: PlanPhase,

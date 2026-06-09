@@ -10,16 +10,17 @@ from .models import (
     ExperienceLevel,
     GeneratePlanRequest,
     RaceObjective,
+    SessionType,
 )
 from . import db_operations as db_ops
 from .fitness_snapshot import build_fitness_snapshot
 from .hr_zones import calculate_hr_zones
 from .load_calculator import calculate_session_tss, validate_weekly_progression
-from .long_run import calculate_long_run
+from .long_run import calculate_long_run, scale_long_run_spec
 from .pace_calculator import compute_paces_from_fitness
 from .periodization import build_periodization
 from .race_classifier import classify_race
-from .week_builder import build_week
+from .week_builder import build_week, create_long_run_session
 
 logger = logging.getLogger(__name__)
 
@@ -215,17 +216,7 @@ async def generate_plan(
                 # Inject personalized HR zones into sessions
                 if hr_zones:
                     for s in sessions:
-                        if s.hr_zone_primary:
-                            zone = next(
-                                (z for z in hr_zones if z.zone == s.hr_zone_primary),
-                                None,
-                            )
-                            if zone:
-                                for block in s.blocks:
-                                    if block.hr_zone == s.hr_zone_primary:
-                                        block.description += (
-                                            f" ({zone.hr_min}-{zone.hr_max} bpm)"
-                                        )
+                        _inject_hr_zones(s, hr_zones)
 
                 # Calculate total TSS for validation
                 week_tss = sum(
@@ -242,15 +233,50 @@ async def generate_plan(
                     is_valid, max_tss = validate_weekly_progression(
                         week_tss, previous_week_tss
                     )
-                    if not is_valid:
-                        # Scale down sessions proportionally
-                        scale = max_tss / week_tss if week_tss > 0 else 1.0
+                    if not is_valid and week_tss > 0:
+                        # Scale the week down to respect the +15% TSS rule. The
+                        # long run is rebuilt from a coherently-scaled spec so its
+                        # distance, duration and pace-blocks stay consistent (a
+                        # bare duration trim left "21 km in 1h12" = 3:24/km). Other
+                        # sessions are template-fixed: scale their duration only.
+                        scale = max_tss / week_tss
+                        long_run_spec = scale_long_run_spec(long_run_spec, scale)
+                        scaled_sessions = []
                         for s in sessions:
-                            if s.target_duration_seconds:
-                                s.target_duration_seconds = int(
-                                    s.target_duration_seconds * scale
+                            if s.session_type == SessionType.SL:
+                                new_sl = create_long_run_session(
+                                    day=s.day_of_week,
+                                    experience=experience,
+                                    phase=week_spec.phase,
+                                    long_run_spec=long_run_spec,
+                                    race_flags=race_flags,
                                 )
-                        week_tss = max_tss
+                                if (
+                                    discipline == "road"
+                                    and new_sl.sport_type == "trail_running"
+                                ):
+                                    new_sl.sport_type = "road_running"
+                                if hr_zones:
+                                    _inject_hr_zones(new_sl, hr_zones)
+                                scaled_sessions.append(new_sl)
+                            else:
+                                if s.target_duration_seconds:
+                                    s.target_duration_seconds = int(
+                                        s.target_duration_seconds * scale
+                                    )
+                                scaled_sessions.append(s)
+                        sessions = scaled_sessions
+
+                        # Recompute from the coherently-scaled sessions rather than
+                        # assuming max_tss (elevation/rounding make it slightly off).
+                        week_tss = sum(
+                            calculate_session_tss(
+                                s.session_type,
+                                s.target_duration_seconds or 0,
+                                s.target_elevation_gain_m or 0,
+                            )
+                            for s in sessions
+                        )
 
                 if not week_spec.is_recovery_week:
                     previous_week_tss = week_tss
@@ -367,6 +393,26 @@ async def generate_plan(
         "experience_level": experience.value,
         "status": "draft",
     }
+
+
+def _inject_hr_zones(session, hr_zones) -> None:
+    """Append the athlete's personalized bpm range to a session's matching blocks.
+
+    Mutates ``session`` in place: every workout block whose ``hr_zone`` equals the
+    session's primary zone gets its description suffixed with ``(min-max bpm)``.
+
+    Args:
+        session: The SessionSpec to annotate.
+        hr_zones: The athlete's computed HR zones.
+    """
+    if not session.hr_zone_primary:
+        return
+    zone = next((z for z in hr_zones if z.zone == session.hr_zone_primary), None)
+    if not zone:
+        return
+    for block in session.blocks:
+        if block.hr_zone == session.hr_zone_primary:
+            block.description += f" ({zone.hr_min}-{zone.hr_max} bpm)"
 
 
 def _resolve_day_preferences(

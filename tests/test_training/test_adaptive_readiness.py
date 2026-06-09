@@ -3,7 +3,7 @@
 import math
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 from src.training.adaptive.readiness import (
     SecondaryModifiers,

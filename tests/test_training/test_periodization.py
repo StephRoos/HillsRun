@@ -66,8 +66,6 @@ def test_volume_factor_taper():
 def test_20_weeks_expert():
     weeks = build_periodization(20, ExperienceLevel.expert, RaceCategory.ultra_longue)
     assert len(weeks) == 20
-    # Expert: recovery every 4 weeks
-    phases_with_recovery = [(w.week_number, w.is_recovery_week) for w in weeks]
-    # Should have some recovery weeks but not too many
+    # Expert: recovery every 4 weeks — should have some, but not too many
     recovery_count = sum(1 for w in weeks if w.is_recovery_week)
     assert recovery_count >= 3

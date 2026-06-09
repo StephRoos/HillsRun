@@ -1,6 +1,6 @@
 """Tests for long run calculator."""
 import pytest
-from src.training.long_run import calculate_long_run
+from src.training.long_run import calculate_long_run, scale_long_run_spec
 from src.training.models import ExperienceLevel, PlanPhase, RaceObjective
 from src.training.pace_calculator import compute_paces
 
@@ -136,6 +136,52 @@ def test_road_pace_labels_from_pace_set():
     result = _road_lr(week=11, phase=PlanPhase.specific, pace_set=paces)
     assert result["easy_pace"] == paces.zones["EF"].label
     assert result["marathon_pace"] == paces.zones["MPR"].label
+
+
+def _implied_pace_sec(spec: dict) -> float:
+    """Pace in seconds/km implied by a spec's distance and duration."""
+    return spec["target_duration_seconds"] / spec["target_km"]
+
+
+def test_scale_long_run_keeps_distance_and_duration_coherent():
+    """Scaling shrinks distance and duration together: implied pace is preserved."""
+    paces = compute_paces(14.5, objective=RaceObjective.performance)
+    spec = _road_lr(week=11, phase=PlanPhase.specific, pace_set=paces)
+
+    scaled = scale_long_run_spec(spec, 0.6)
+
+    assert scaled["target_km"] == pytest.approx(spec["target_km"] * 0.6, abs=0.1)
+    assert scaled["marathon_pace_block_km"] < spec["marathon_pace_block_km"]
+    # The whole point: pace stays the same after scaling (was the bug — duration
+    # was trimmed while distance stayed, yielding impossible paces).
+    assert _implied_pace_sec(scaled) == pytest.approx(_implied_pace_sec(spec), rel=0.05)
+
+
+def test_scale_long_run_noop_when_scale_ge_one():
+    """A scale >= 1 returns the spec unchanged (no inflation)."""
+    spec = _road_lr(week=6, phase=PlanPhase.development)
+    assert scale_long_run_spec(spec, 1.0) is spec
+    assert scale_long_run_spec(spec, 1.5) is spec
+
+
+def test_scale_long_run_trail_spec_scales_duration():
+    """Trail specs (no per-km pace) still scale distance and duration together."""
+    spec = calculate_long_run(
+        week_number=10, total_weeks=12, phase=PlanPhase.specific,
+        is_recovery_week=False, experience=ExperienceLevel.expert,
+        race_distance_km=100, current_long_run_km=25,
+    )
+    scaled = scale_long_run_spec(spec, 0.5)
+    assert scaled["target_km"] == pytest.approx(spec["target_km"] * 0.5, abs=0.1)
+    assert scaled["target_duration_seconds"] < spec["target_duration_seconds"]
+    assert _implied_pace_sec(scaled) == pytest.approx(_implied_pace_sec(spec), rel=0.05)
+
+
+def test_road_taper_note_is_not_progressive_build():
+    """Taper weeks must not carry the misleading 'progressive build' note."""
+    taper = _road_lr(week=16, phase=PlanPhase.taper)
+    assert "build" not in taper["progression_note"].lower()
+    assert "taper" in taper["progression_note"].lower()
 
 
 def test_trail_unaffected_by_road_changes():
