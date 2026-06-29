@@ -67,13 +67,15 @@ services:
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-https://hillsrun.com}
       NEXT_PUBLIC_BETTER_AUTH_URL: ${NEXT_PUBLIC_BETTER_AUTH_URL:-https://hillsrun.com}
       TZ: ${TZ:-Europe/Paris}
-    # Exposure + TLS are managed by Coolify, NOT hand-written labels: the domain
-    # is set via the app's `docker_compose_domains` (web -> hillsrun.com,www),
-    # and Coolify generates the Traefik routers + handles Let's Encrypt (HTTP-01),
-    # exactly like ladtc. Hand-written labels here would conflict with Coolify's.
-    # api/db/sync get no domain and stay internal. web listens on 3000.
-    expose:
-      - "3000"
+    # Routing model (June 2026): the homelab moved off Coolify's Traefik
+    # (coolify-proxy is intentionally stopped) to a Cloudflare Tunnel that
+    # forwards each app domain straight to a published loopback host port —
+    # exactly how ladtc runs (tunnel hillsrun.com,www -> http://localhost:3001).
+    # So publish web on a loopback port instead of expose-only; 3000 is taken
+    # by ladtc, hence 3001. api/db/sync stay internal (no published port).
+    # TLS is terminated at the Cloudflare edge.
+    ports:
+      - "127.0.0.1:3001:3000"
     depends_on:
       db:
         condition: service_healthy
