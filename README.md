@@ -1,13 +1,11 @@
 # HillsRun
 
-> **Statut : en prod, dev figé depuis 2026-04-21.**
-> Frontend (Vercel) + backend (Railway) + Neon PostgreSQL + replica NAS opérationnels.
-> Sync Garmin quotidien via cron NAS (05:00 UTC).
-> **Aucune nouvelle feature prévue.** Seul usage futur : rédaction du case study portfolio.
-> **Conditions de reprise** : pas de reprise dev — uniquement case study + éventuel article blog (« Comment j'ai connecté Garmin à mon propre dashboard »).
-> Cadre dans la réduction de 9 à 3 projets actifs (roadmap v2 2026-04-21).
+> **Statut : en production sur UM880, actif jusqu'au marathon de Bruges (12 octobre 2026).**
+> Stack hébergée en autohébergé : backend Python/FastAPI + frontend Next.js 16 sur UM880, PostgreSQL sur UM880, backups vers B2.
+> Sync Garmin quotidien via cron (05:00 UTC).
+> **Usage actif** : suivi du plan marathon et dogfooding du coach d'ajustement.
 
-[![CI](https://github.com/stpmusic/HillsRun/actions/workflows/ci.yml/badge.svg)](https://github.com/stpmusic/HillsRun/actions/workflows/ci.yml)
+[![CI](https://github.com/StephRoos/HillsRun/actions/workflows/ci.yml/badge.svg)](https://github.com/StephRoos/HillsRun/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-black.svg)](https://nextjs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -38,10 +36,10 @@ Trail-focused Garmin dashboard that shows only what matters: D+, pace, HR, and d
 | **Frontend** | Next.js 16, React 19, TypeScript, Tailwind v4, shadcn/ui |
 | **Auth** | Better-Auth (email/password) + Prisma adapter |
 | **Charts** | Plotly.js (dynamic import, no SSR) |
-| **Database** | PostgreSQL 15+ (Neon primary + NAS replica) |
+| **Database** | PostgreSQL 15+ (UM880 principal + backups NAS/B2) |
 | **Data fetching** | TanStack Query (client) + API routes (server) |
 | **PWA** | Serwist service worker |
-| **CI/CD** | GitHub Actions + Railway (backend) + Vercel (frontend) |
+| **CI/CD** | GitHub Actions + Coolify sur UM880 |
 
 ## Features
 
@@ -66,7 +64,7 @@ Trail-focused Garmin dashboard that shows only what matters: D+, pace, HR, and d
 ### 1. Clone and Setup
 
 ```bash
-git clone https://github.com/stpmusic/HillsRun.git
+git clone https://github.com/StephRoos/HillsRun.git
 cd HillsRun
 
 # Backend env
