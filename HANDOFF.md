@@ -1,10 +1,10 @@
 # HANDOFF — HillsRun
 
 > AI/human handoff document. Goal: resume work with zero prior context.
-> Last audit: 2026-07-07. Complements (does not replace) `README.md`, `CLAUDE.md`,
+> Last audit: 2026-07-07. Complements (does not replace) `README.md`, `AGENTS.md`,
 > `ARCHITECTURE.md`, `PRD.md` and `docs/DEPLOY-UM880.md`.
 >
-> **Read `CLAUDE.md` first** — it is the most current concise reference.
+> **Read `AGENTS.md` first** — it is the most current concise reference.
 > **`README.md`'s status header is STALE** (see Pitfalls below).
 
 ## 1. What this is
@@ -59,7 +59,7 @@ reconciliation, propose/apply model).
 
 ## 3. Architecture & stack
 
-Full details: `ARCHITECTURE.md` (long, partially pre-UM880) and `CLAUDE.md` (current).
+Full details: `ARCHITECTURE.md` (long, partially pre-UM880) and `AGENTS.md` (current).
 
 ```
 Garmin Connect ──> FastAPI backend (src/)  ──> PostgreSQL 16 (UM880, primary)
@@ -89,7 +89,7 @@ sync service: cron 06:00 Europe/Paris → POST /api/v1/sync/trigger
   UM880 (192.168.129.10) via Coolify; auto-deploy on push to `main` through the
   GitHub App `hillsrun-coolify` (App ID 4006693). Pre-UM880 configs archived in
   `legacy/` (Vercel/Railway/Neon/NAS — all retired).
-- Key ADRs: `CLAUDE.md` §Key Architecture Decisions (ADR-001…012).
+- Key ADRs: `AGENTS.md` §Key Architecture Decisions (ADR-001…012).
 
 ## 4. How to run
 
@@ -165,7 +165,7 @@ No paid cloud left (Vercel/Railway/Neon retired June 2026).
    (`ralph-run.log`, `telegram-watch.log`, `.coverage` — gitignored but noisy);
    `~/Projects/hills-run-telegram-watch.sh` is a leftover Ralph watcher.
 
-Known data quirks (`CLAUDE.md` §Known Issues): `score_feedback`, `hrv_status`,
+Known data quirks (`AGENTS.md` §Known Issues): `score_feedback`, `hrv_status`,
 `chronic_load` come back null from Garmin; legacy garmin user_id 67 has no
 better_auth link.
 
@@ -174,7 +174,7 @@ better_auth link.
 - **README header is stale.** It describes the April 2026 state ("dev frozen,
   Vercel + Railway + Neon, cron on NAS"). Reality since June 2026: everything
   self-hosted on UM880/Coolify, active development, Neon/Railway/Vercel retired.
-  Trust `CLAUDE.md` and `docs/DEPLOY-UM880.md`.
+  Trust `AGENTS.md` and `docs/DEPLOY-UM880.md`.
 - **Never run `prisma db push` carelessly** — Prisma only knows the auth tables;
   Garmin tables are raw SQL by design (ADR-001).
 - **SQL migrations are manual and untracked.** `sql/12–14` were explicitly
@@ -208,7 +208,7 @@ better_auth link.
 
 ## 8. Pointers
 
-- In-repo docs: `CLAUDE.md` (current reference), `PRD.md`, `ARCHITECTURE.md`
+- In-repo docs: `AGENTS.md` (current reference), `PRD.md`, `ARCHITECTURE.md`
   (long-form, partly pre-UM880), `docs/DEPLOY-UM880.md` (deploy runbook),
   `docs/SCHEMA.md`, `docs/TROUBLESHOOTING.md`, `docs/PLAN-API.md`,
   `docs/PERFORMANCE.md` (`docs/SETUP.md` = legacy NAS guide, pre-UM880),

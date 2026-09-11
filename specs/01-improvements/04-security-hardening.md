@@ -1,7 +1,7 @@
 # Task 04: Security Hardening
 
 ## Context
-Several security items flagged in CLAUDE.md need resolution before HillsRun can be considered production-ready for multi-user deployment.
+Several security items flagged in AGENTS.md need resolution before HillsRun can be considered production-ready for multi-user deployment.
 
 ## Scope
 - Rotate `BETTER_AUTH_SECRET` (currently using dev value)
@@ -42,7 +42,7 @@ Several security items flagged in CLAUDE.md need resolution before HillsRun can 
 **Blocks**: None
 
 ## Related Documentation
-- **CLAUDE.md**: Known Issues
+- **AGENTS.md**: Known Issues
 
 ---
 **Estimated Time**: 1 hour

@@ -39,7 +39,7 @@ The automated daily sync scheduler is currently disabled because of broken `ON C
 **Blocks**: None (independent improvement)
 
 ## Related Documentation
-- **CLAUDE.md**: Known Issues section
+- **AGENTS.md**: Known Issues section
 - **docs/SCHEMA.md**: Table constraints
 
 ---
